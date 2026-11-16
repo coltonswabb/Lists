@@ -1,5 +1,5 @@
 import { type FC, useEffect } from 'react';
-import { Image, StyleSheet, useWindowDimensions, View } from 'react-native';
+import { StyleSheet, useWindowDimensions, View } from 'react-native';
 import Animated, {
   Easing,
   useAnimatedStyle,
@@ -15,6 +15,7 @@ import { scheduleOnRN } from 'react-native-worklets';
 import { waxSeal } from '../art';
 import { thud } from '../haptics';
 import { play } from '../sounds';
+import { WaxSeal } from './WaxSeal';
 
 const SIZE = 150;
 /** The pause before the seal comes down, so it follows the last strike rather than landing on it. */
@@ -80,7 +81,7 @@ export const SealPress: FC<{ onDone: () => void }> = ({ onDone }) => {
       <View style={[styles.place, { left: width / 2 - SIZE / 2, top: height * 0.42 - SIZE / 2 }]}>
         <Animated.View style={[styles.shadow, shadowStyle]} />
         <Animated.View style={sealStyle}>
-          <Image source={waxSeal.source} style={styles.seal} />
+          <WaxSeal size={SIZE} />
         </Animated.View>
       </View>
     </View>
@@ -89,7 +90,6 @@ export const SealPress: FC<{ onDone: () => void }> = ({ onDone }) => {
 
 const styles = StyleSheet.create({
   place: { position: 'absolute', width: SIZE, height: SIZE, alignItems: 'center', justifyContent: 'center' },
-  seal: { width: SIZE, height: SIZE },
   shadow: {
     position: 'absolute',
     width: SIZE * 0.8,

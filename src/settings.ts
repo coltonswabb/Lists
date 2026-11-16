@@ -16,6 +16,10 @@ import { isThemeName, type ThemeName } from './theme';
 
 const STORAGE_KEY = 'lists/settings/v1';
 
+/** The letter pressed into the wax seal, or null for the scribe's own seal. Read wherever a seal is drawn. */
+let sealInitial: string | null = null;
+export const getSealInitial = () => sealInitial;
+
 export const useSettings = () => {
   const [sound, setSound] = useState(true);
   const [theme, setTheme] = useState<ThemeName>('scriptorium');
@@ -24,6 +28,8 @@ export const useSettings = () => {
   /** Null until the user has told the scribe how to address them. */
   const [address, setAddress] = useState<Address | null>(null);
   const [scribe, setScribe] = useState<ScribeMode>('chatty');
+  /** The user's own letter for the wax seal, or null to keep the scribe's. */
+  const [seal, setSeal] = useState<string | null>(null);
   /** Whether the home screen icon follows the paper. Off by default: iOS interrupts with an alert on every change. */
   const [matchIcon, setMatchIcon] = useState(false);
   const [loaded, setLoaded] = useState(false);
@@ -45,6 +51,10 @@ export const useSettings = () => {
         if (typeof stored === 'object' && stored !== null && 'dayTheme' in stored && isThemeName(stored.dayTheme)) {
           setDayTheme(stored.dayTheme);
         }
+        if (typeof stored === 'object' && stored !== null && 'seal' in stored && typeof stored.seal === 'string' && stored.seal) {
+          sealInitial = stored.seal;
+          setSeal(stored.seal);
+        }
         if (typeof stored === 'object' && stored !== null && 'matchIcon' in stored && stored.matchIcon === true) {
           setMatchIcon(true);
         }
@@ -59,8 +69,8 @@ export const useSettings = () => {
 
   useEffect(() => {
     if (!loaded) return;
-    AsyncStorage.setItem(STORAGE_KEY, JSON.stringify({ sound, theme, dayTheme, address, scribe, matchIcon })).catch(() => undefined);
-  }, [loaded, sound, theme, dayTheme, address, scribe, matchIcon]);
+    AsyncStorage.setItem(STORAGE_KEY, JSON.stringify({ sound, theme, dayTheme, address, scribe, matchIcon, seal })).catch(() => undefined);
+  }, [loaded, sound, theme, dayTheme, address, scribe, matchIcon, seal]);
 
   const toggleSound = useCallback(() => {
     setSound((on) => {
@@ -90,6 +100,13 @@ export const useSettings = () => {
     setMatchIcon(!matchIcon);
   }, [matchIcon, theme]);
 
+  /** Takes the first letter of what was typed for the seal; nothing typed gives the scribe's seal back. */
+  const chooseSeal = useCallback((typed: string) => {
+    const letter = [...typed.trim()].find((char) => /\p{L}/u.test(char))?.toUpperCase() ?? null;
+    sealInitial = letter;
+    setSeal(letter);
+  }, []);
+
   const chooseAddress = useCallback((value: Address | null) => {
     if (value) setScribeAddress(value);
     setAddress(value);
@@ -103,5 +120,5 @@ export const useSettings = () => {
     });
   }, []);
 
-  return { loaded, sound, toggleSound, theme, chooseTheme, toggleNight, matchIcon, toggleMatchIcon, address, chooseAddress, scribe, nextScribeMode };
+  return { loaded, sound, toggleSound, theme, chooseTheme, toggleNight, seal, chooseSeal, matchIcon, toggleMatchIcon, address, chooseAddress, scribe, nextScribeMode };
 };

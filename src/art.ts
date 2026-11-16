@@ -38,6 +38,9 @@ export const drawings: Partial<Record<'quill' | 'flourish' | 'divider' | 'empty-
 /** The wax seal pressed on a finished scroll, in its own colours. */
 export const waxSeal: Drawing | undefined = { source: require('../assets/art/wax-seal.png'), width: 192, height: 191 };
 
+/** The same seal with an empty field under its crown, for the user's own initial. */
+export const blankSeal: Drawing | undefined = { source: require('../assets/art/wax-seal-blank.png'), width: 289, height: 300 };
+
 /** A tileable darkening layer that gives every paper a parchment mottle. */
 export const parchment: Drawing | undefined = { source: require('../assets/art/parchment.png'), width: 1254, height: 1254 };
 

@@ -1,5 +1,5 @@
 import type { FC } from 'react';
-import { Alert, Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import Animated, { FadeIn } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -13,6 +13,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 
 import { ChronicleMonth } from './ChronicleMonth';
 import { LineArt } from './LineArt';
+import { WaxSeal } from './WaxSeal';
 import { Tiled } from './Tiled';
 
 type ChronicleScreenProps = {
@@ -94,7 +95,7 @@ export const ChronicleScreen: FC<ChronicleScreenProps> = ({ entries, sealed, add
                 accessibilityLabel={`${scroll.name}, sealed on ${describeDay(new Date(scroll.sealedAt))}`}
               >
                 {waxSeal ? (
-                  <Image source={waxSeal.source} style={styles.waxSeal} accessibilityElementsHidden />
+                  <WaxSeal size={40} />
                 ) : (
                   <View style={styles.seal}>
                     <Text style={styles.sealMark}>✓</Text>
@@ -211,7 +212,6 @@ const makeStyles = (colors: Palette) =>
       borderColor: colors.accent,
     },
     sealMark: { color: colors.onAction, fontSize: 14, fontWeight: '700' },
-    waxSeal: { width: 40, height: 40 },
     sealedName: { color: colors.ink, fontFamily: fonts.body, fontSize: 20 },
     sealedOn: { color: colors.inkFaded, fontFamily: fonts.bodyItalic, fontSize: 15 },
     page: {

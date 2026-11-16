@@ -1,12 +1,13 @@
 import { LinearGradient } from 'expo-linear-gradient';
 import type { FC } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Alert, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import Animated, { FadeIn } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { addresses } from '../scribe';
 import type { useSettings } from '../settings';
 import { useTheme } from '../ThemeContext';
+import { WaxSeal } from './WaxSeal';
 import { fonts, mixColors, type Palette, type ThemeName, themeNames, themes } from '../theme';
 
 const scribeLabels = { chatty: 'Chatty', quiet: 'Quiet', silent: 'Silent' } as const;
@@ -65,6 +66,31 @@ export const SettingsScreen: FC<SettingsScreenProps> = ({ settings, onClose, onB
         >
           <Text style={styles.label}>App icon</Text>
           <Text style={styles.value}>{settings.matchIcon ? 'matches the paper' : 'stays as it is'}</Text>
+        </Pressable>
+        <Pressable
+          style={styles.row}
+          accessibilityRole="button"
+          accessibilityLabel={`Seal initial, ${settings.seal ?? 'the scribe’s own'}`}
+          onPress={() => {
+            // The system's own prompt for a line of text exists only on iOS.
+            if (Platform.OS !== 'ios') return;
+            Alert.prompt(
+              'Thy seal',
+              'One letter to press into the wax. Leave it empty to keep the scribe’s own seal.',
+              [
+                { text: 'Leave it', style: 'cancel' },
+                { text: 'Press it', onPress: (typed?: string) => settings.chooseSeal(typed ?? '') },
+              ],
+              'plain-text',
+              settings.seal ?? '',
+            );
+          }}
+        >
+          <Text style={styles.label}>Seal</Text>
+          <View style={styles.sealValue}>
+            <Text style={styles.value}>{settings.seal ? `bears “${settings.seal}”` : 'the scribe’s own'}</Text>
+            <WaxSeal size={34} />
+          </View>
         </Pressable>
         <Text style={[styles.heading, styles.later]}>The scribe</Text>
         <View>
@@ -196,6 +222,7 @@ const makeStyles = (colors: Palette) =>
       borderRadius: 3,
       backgroundColor: colors.paperFrom,
     },
+    sealValue: { flexDirection: 'row', alignItems: 'center', gap: 10 },
     label: { color: colors.ink, fontFamily: fonts.body, fontSize: 21 },
     value: { color: colors.accent, fontFamily: fonts.bodyItalic, fontSize: 20 },
   });

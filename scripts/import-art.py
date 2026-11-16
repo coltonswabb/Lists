@@ -6,7 +6,7 @@ Turns art dropped in assets/incoming/ into files the app can use, named as in do
 
 - Line drawings (black ink on white): the white becomes transparent and the ink its alpha, so the
   app can tint it to any paper's ink; trimmed, and scaled to at most 900px wide.
-- wax-seal: the white around the seal is cut away from the edges inward, so the wax's own white
+- wax-seal, wax-seal-blank: the white around the seal is cut away from the edges inward, so the wax's own white
   highlights survive; trimmed and scaled to 192px.
 - parchment: a greyscale texture becomes a soft darkening layer (black, with the darker mottling as
   alpha), so it marks every paper colour without greying it. Kept tileable, at full size.
@@ -44,7 +44,7 @@ PAPER, INK = 235, 70
 SINGLES = ("quill", "flourish", "divider", "empty-shelf", "initial-frame", "tick", "strike", "nil-found", "sky-wheel", "sky-corner")
 LINE_ART = re.compile(r"^(margin-\d+|" + "|".join(SINGLES) + r")$")
 # Painted objects cut out of a white ground, and the longest side each is scaled to.
-OBJECTS = {"wax-seal": 192, "finial-brass": 200, "finial-iron": 200, "desk-inkwell": 480, "desk-candle": 420, "sky-sun": 640, "sky-moon": 560}
+OBJECTS = {"wax-seal": 192, "wax-seal-blank": 300, "finial-brass": 200, "finial-iron": 200, "desk-inkwell": 480, "desk-candle": 420, "sky-sun": 640, "sky-moon": 560}
 # Full-bleed paintings behind the turn of day and night, kept as JPEGs: they have no transparency and are large.
 SKIES = ("sky-night", "sky-dawn")
 SKY_HEIGHT = 1280
@@ -295,6 +295,9 @@ def write_module(drawings):
     lines += ["", "/** The wax seal pressed on a finished scroll, in its own colours. */"]
     seal = drawings.get("wax-seal")
     lines.append(f"export const waxSeal: Drawing | undefined = {entry('wax-seal', *seal) if seal else 'undefined'};")
+    lines += ["", "/** The same seal with an empty field under its crown, for the user's own initial. */"]
+    blank = drawings.get("wax-seal-blank")
+    lines.append(f"export const blankSeal: Drawing | undefined = {entry('wax-seal-blank', *blank) if blank else 'undefined'};")
     lines += ["", "/** A tileable darkening layer that gives every paper a parchment mottle. */"]
     parchment = drawings.get("parchment")
     lines.append(f"export const parchment: Drawing | undefined = {entry('parchment', *parchment) if parchment else 'undefined'};")
