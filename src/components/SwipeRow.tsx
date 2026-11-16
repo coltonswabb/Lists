@@ -320,7 +320,8 @@ export const SwipeRow: FC<SwipeRowProps> = ({
       </Animated.View>
       <GestureDetector gesture={gesture}>
         <Animated.View
-          style={[styles.row, { backgroundColor: color }, rowStyle]}
+          // A see-through row lies straight on the desk, which has no ruled lines.
+          style={[styles.row, { backgroundColor: color }, color === 'transparent' && styles.unruled, rowStyle]}
           // Gestures have no VoiceOver equivalent, so each is offered as a named action instead.
           accessible
           accessibilityRole="button"
@@ -365,6 +366,7 @@ const makeStyles = (colors: Palette) =>
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: colors.rule,
   },
+  unruled: { borderBottomWidth: 0 },
   action: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, justifyContent: 'center', paddingHorizontal: 24 },
   complete: { backgroundColor: colors.complete, alignItems: 'flex-start' },
   remove: { backgroundColor: colors.remove, alignItems: 'flex-end' },

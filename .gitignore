@@ -39,3 +39,7 @@ yarn-error.*
 # generated native folders
 /ios
 /android
+
+# Art sources: full-size originals stay local; assets/art/ holds what ships (see scripts/import-art.py)
+assets/incoming/*
+!assets/incoming/.gitkeep

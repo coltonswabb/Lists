@@ -211,7 +211,7 @@ fallback until then.
 
 ## Status
 
-Imported and in use: all twelve marginal drawings, the quill, the flourish, the divider, the empty
-Library drawing, the wax seal, the parchment, and the Scriptorium and Night Vigil desks. Still to
-come: `desk-lapis`, `desk-verdant` and `desk-codex`; until they arrive, those papers keep their
-plain desk colour.
+Everything in the list is imported and in use, including all five desks. The full-size originals
+live in `assets/incoming/` on the machine that imported them and are not committed; `assets/art/`
+holds the processed files the app ships. `desk-codex-alt.png` is the second leather, kept in case
+it's preferred: rename it to `desk-codex.png` and re-run the importer to swap it in.
