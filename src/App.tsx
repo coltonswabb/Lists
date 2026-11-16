@@ -463,6 +463,7 @@ export const App: FC = () => {
   const turnSky = () => {
     if (turning) return;
     tick();
+    play('wheel');
     setTurning(settings.theme === 'vigil' ? 'day' : 'night');
   };
   return (
@@ -479,7 +480,11 @@ export const App: FC = () => {
           {turning ? (
             <DayNightVeil
               to={turning}
-              onCovered={settings.toggleNight}
+              onCovered={() => {
+                // As the moon or sun reaches its place: a bell for night, a rising phrase for day.
+                play(turning === 'night' ? 'dusk' : 'dawn');
+                settings.toggleNight();
+              }}
               onDone={() => {
                 say(turning === 'night' ? 'nightfall' : 'daybreak');
                 setTurning(null);

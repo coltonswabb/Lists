@@ -10,6 +10,12 @@ const sources = {
   paper: require('../assets/sounds/paper.wav'),
   /** The last item on a scroll is struck: an Amen in open fifths. */
   amen: require('../assets/sounds/amen.wav'),
+  /** The wheel of stars turning as day gives way to night, or night to day: a ratchet running down. */
+  wheel: require('../assets/sounds/wheel.wav'),
+  /** Day has come: three plucked notes climbing. */
+  dawn: require('../assets/sounds/dawn.wav'),
+  /** Night has come: one toll of a small bell. */
+  dusk: require('../assets/sounds/dusk.wav'),
   /** Items struck one after another walk a phrase in D Dorian, one note each. */
   note0: require('../assets/sounds/note-0.wav'),
   note1: require('../assets/sounds/note-1.wav'),

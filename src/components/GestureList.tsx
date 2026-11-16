@@ -830,7 +830,8 @@ const makeStyles = (colors: Palette) =>
   },
   sealMark: { color: colors.onAction, fontSize: 14, fontWeight: '700' },
   waxSeal: { width: 38, height: 38, marginLeft: 10 },
-  waxSealImage: { width: 38, height: 38 },
+  // Pressed onto a roll, the wax follows its curve: seen from above it is a little shallower than it is wide.
+  waxSealImage: { width: 38, height: 38, transform: [{ scaleY: 0.88 }] },
   finis: { color: colors.accent, fontFamily: fonts.bodyItalic, fontSize: 19 },
   tail: { minHeight: ROW_HEIGHT, alignItems: 'center', justifyContent: 'center' },
   // With a drawing, the close of the scroll is centred on the writing column, right of the margin rule.
