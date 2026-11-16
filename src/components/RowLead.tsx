@@ -3,7 +3,7 @@ import { StyleSheet, Text, View } from 'react-native';
 
 import { drawings } from '../art';
 import { useTheme } from '../ThemeContext';
-import { type Palette, fonts } from '../theme';
+import { type Palette, fonts, MAX_TEXT_SCALE } from '../theme';
 import { LineArt } from './LineArt';
 
 export type Lead =
@@ -36,7 +36,7 @@ export const RowLead: FC<{ lead: Lead }> = ({ lead }) => {
   if (lead.kind === 'label') {
     return (
       <View style={styles.cell}>
-        <Text style={[styles.label, { color: lead.color }]} numberOfLines={1}>
+        <Text style={[styles.label, { color: lead.color }]} numberOfLines={1} maxFontSizeMultiplier={MAX_TEXT_SCALE}>
           {lead.label}
         </Text>
       </View>
@@ -54,7 +54,7 @@ export const RowLead: FC<{ lead: Lead }> = ({ lead }) => {
         // Pen-flourishing round a painted initial, as a scribe would add to mark a new section.
         <LineArt drawing={frame} width={FLOURISH} color={lead.flourish} style={styles.flourish} />
       ) : null}
-      <Text style={[styles.letter, { color: lead.letter }]}>{lead.text.trim().charAt(0).toUpperCase()}</Text>
+      <Text style={[styles.letter, { color: lead.letter }]} maxFontSizeMultiplier={1.15}>{lead.text.trim().charAt(0).toUpperCase()}</Text>
     </View>
   );
 };

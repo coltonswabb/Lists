@@ -7,8 +7,11 @@ import { drawings, parchment, waxSeal } from '../art';
 import { capitalize, describeDay, isSameDay, officeOf } from '../calendar';
 import { type Address, addresses } from '../scribe';
 import { useTheme } from '../ThemeContext';
-import { fonts, type Palette } from '../theme';
+import { fonts, mixColors, type Palette } from '../theme';
 import type { ChronicleEntry, SealedList } from '../types';
+import { LinearGradient } from 'expo-linear-gradient';
+
+import { ChronicleMonth } from './ChronicleMonth';
 import { LineArt } from './LineArt';
 import { Tiled } from './Tiled';
 
@@ -76,7 +79,9 @@ export const ChronicleScreen: FC<ChronicleScreenProps> = ({ entries, sealed, add
           <Text style={styles.action}>Close</Text>
         </Pressable>
       </View>
-      <ScrollView contentContainerStyle={{ paddingBottom: insets.bottom + 24 }}>
+      <View style={styles.fill}>
+      <ScrollView contentContainerStyle={{ paddingTop: 6, paddingBottom: insets.bottom + 24 }}>
+        <ChronicleMonth entries={entries} />
         {sealed.length > 0 ? (
           <>
             <Text style={styles.heading}>Sealed scrolls</Text>
@@ -153,6 +158,8 @@ export const ChronicleScreen: FC<ChronicleScreenProps> = ({ entries, sealed, add
           )}
         </View>
       </ScrollView>
+        <LinearGradient colors={[mixColors(colors.desk, '#000000', 0.45), 'rgba(0,0,0,0)']} style={styles.fade} pointerEvents="none" />
+      </View>
     </Animated.View>
   );
 };
@@ -170,6 +177,7 @@ const makeStyles = (colors: Palette) =>
       height: 56,
       marginBottom: 4,
     },
+    fade: { position: 'absolute', top: 0, left: 0, right: 0, height: 18 },
     title: { color: colors.onDesk, fontFamily: fonts.display, fontSize: 30 },
     action: { color: colors.onDesk, fontFamily: fonts.bodyItalic, fontSize: 18 },
     heading: {

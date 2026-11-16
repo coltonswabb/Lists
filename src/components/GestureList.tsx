@@ -46,7 +46,7 @@ import { drawings, waxSeal } from '../art';
 import { success, thud, tick } from '../haptics';
 import { play } from '../sounds';
 import { useTheme } from '../ThemeContext';
-import { accentAt, fonts, type Palette, paperAt, roman, ROW_HEIGHT } from '../theme';
+import { accentAt, fonts, MAX_TEXT_SCALE, type Palette, paperAt, roman, ROW_HEIGHT, TEXT_SCALE } from '../theme';
 import { DeckleEdge } from './DeckleEdge';
 import { Finial, hasFinial } from './Finial';
 import { PaperOverlay } from './PaperOverlay';
@@ -78,6 +78,14 @@ export const STAMP_DELAY_MS = 350;
 const CHAR_WIDTH = 9.2;
 
 type PullAction = 'none' | 'create' | 'back';
+
+/**
+ * A heading's painted initial is its first letter, so the word beside it carries on from the second:
+ * "S" then "triking", as an illuminated initial works. A heading that does not open with a letter,
+ * or is a single character, is written out whole.
+ */
+const headingAfterInitial = (row: { text: string; section?: boolean }, isShelf: boolean) =>
+  !isShelf && row.section && row.text.length > 1 && /^\p{L}/u.test(row.text) ? row.text.slice(1) : row.text;
 
 const pullLabels = {
   none: 'Pull to add',
@@ -559,10 +567,10 @@ export const GestureList: FC<GestureListProps> = ({
           style={[styles.rowText, styles.fill, row.section ? styles.sectionText : !isShelf && styles.itemText, row.done && styles.doneText]}
           // A long item runs onto a second line before it is cut short.
           numberOfLines={isShelf || row.section ? 1 : 2}
-          maxFontSizeMultiplier={1.2}
+          maxFontSizeMultiplier={MAX_TEXT_SCALE}
         >
           {rubricated[index] ? <Text style={styles.rubric}>{row.text.charAt(0)}</Text> : null}
-          {rubricated[index] ? row.text.slice(1) : row.text}
+          {rubricated[index] ? row.text.slice(1) : headingAfterInitial(row, isShelf)}
         </Text>
         {row.sealed ? (
           <Animated.View
@@ -619,7 +627,7 @@ export const GestureList: FC<GestureListProps> = ({
         ) : null}
         {titleDraft === null ? (
           <Pressable style={styles.fill} disabled={!onRenameTitle || busy} onPress={() => setTitleDraft(title)}>
-            <Text style={styles.title} numberOfLines={1} maxFontSizeMultiplier={1.2}>
+            <Text style={styles.title} numberOfLines={1} maxFontSizeMultiplier={MAX_TEXT_SCALE}>
               {title}
             </Text>
           </Pressable>
@@ -812,17 +820,17 @@ const makeStyles = (colors: Palette) =>
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    height: 48,
+    height: ROW_HEIGHT - 14,
     paddingHorizontal: 12,
     borderRadius: 3,
     zIndex: 1,
   },
   rollLight: { ...StyleSheet.absoluteFill, borderRadius: 3 },
   rowText: { color: colors.ink, fontFamily: fonts.body, fontSize: 21 },
-  // Set off from its framed initial, whose vinework reaches past the painted block.
-  sectionText: { fontFamily: fonts.display, fontSize: 26, marginLeft: 12 },
+  // Close against its framed initial, which is the word's own first letter.
+  sectionText: { fontFamily: fonts.display, fontSize: 26, marginLeft: 3 },
   // Close enough set that two lines sit inside one row with air above and below.
-  itemText: { lineHeight: 25 },
+  itemText: { lineHeight: Math.round(25 * TEXT_SCALE) },
   rubric: { color: colors.accent },
   doneText: { color: colors.inkFaded, textDecorationLine: 'line-through', textDecorationColor: colors.accent },
   badge: { color: colors.inkFaded, fontFamily: fonts.label, fontSize: 14, letterSpacing: 1, marginLeft: 12 },

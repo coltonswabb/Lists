@@ -1,11 +1,12 @@
 import { type FC, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import Animated, { FadeIn } from 'react-native-reanimated';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { drawings } from '../art';
 import { useTheme } from '../ThemeContext';
-import { type Palette, fonts, roman, ROW_HEIGHT } from '../theme';
+import { type Palette, fonts, mixColors, roman, ROW_HEIGHT } from '../theme';
 import type { List } from '../types';
 import { LineArt } from './LineArt';
 
@@ -46,7 +47,8 @@ export const SearchScreen: FC<SearchScreenProps> = ({ lists, onOpen, onClose }) 
           <Text style={styles.action}>Close</Text>
         </Pressable>
       </View>
-      <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingBottom: insets.bottom + 24 }}>
+      <View style={styles.body}>
+      <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingTop: 6, paddingBottom: insets.bottom + 24 }}>
         {needle ? <Text style={styles.count}>{`${roman(matches.length)} FOUND`}</Text> : null}
         {matches.map(({ list, item }) => (
           <Pressable key={item.id} style={styles.row} onPress={() => onOpen(list.id)}>
@@ -65,6 +67,8 @@ export const SearchScreen: FC<SearchScreenProps> = ({ lists, onOpen, onClose }) 
           </View>
         ) : null}
       </ScrollView>
+        <LinearGradient colors={[mixColors(colors.desk, '#000000', 0.45), 'rgba(0,0,0,0)']} style={styles.fade} pointerEvents="none" />
+      </View>
     </Animated.View>
   );
 };
@@ -73,6 +77,8 @@ const makeStyles = (colors: Palette) =>
   StyleSheet.create({
   // Transparent: the Desk behind every screen shows through.
   screen: { flex: 1 },
+  body: { flex: 1 },
+  fade: { position: 'absolute', top: 0, left: 0, right: 0, height: 18 },
   header: { flexDirection: 'row', alignItems: 'center', gap: 16, paddingHorizontal: 20, height: 56 },
   input: { flex: 1, color: colors.onDesk, fontFamily: fonts.body, fontSize: 21, padding: 0 },
   action: { color: colors.onDesk, fontFamily: fonts.bodyItalic, fontSize: 18 },

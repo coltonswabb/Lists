@@ -147,7 +147,7 @@ const BACKUP_APP = 'decree';
 const BACKUP_VERSION = 1;
 
 /** Everything the scribe keeps, as one JSON document that `readBackup` can take back. */
-export const writeBackup = (state: { lists: List[] } & Chronicle): string =>
+export const writeBackup = (state: { lists: List[] } & Chronicle & { patterns?: unknown }): string =>
   JSON.stringify(
     { app: BACKUP_APP, version: BACKUP_VERSION, savedAt: new Date().toISOString(), ...state },
     null,
@@ -155,13 +155,14 @@ export const writeBackup = (state: { lists: List[] } & Chronicle): string =>
   );
 
 /** A backup's contents, or null if the text is not a Decree backup. */
-export const readBackup = (text: string): ({ lists: List[] } & Chronicle) | null => {
+export const readBackup = (text: string): ({ lists: List[] } & Chronicle & { patterns: unknown }) | null => {
   try {
     const parsed: unknown = JSON.parse(text);
     if (typeof parsed !== 'object' || parsed === null) return null;
     if (!('app' in parsed) || parsed.app !== BACKUP_APP || !('lists' in parsed) || !Array.isArray(parsed.lists)) return null;
     const { entries, sealed } = parseChronicle(JSON.stringify(parsed));
-    return { lists: parsed.lists.filter(isList), entries, sealed };
+    // Patterns are kept apart from the scrolls; they are handed back as found, for their own keeper to read.
+    return { lists: parsed.lists.filter(isList), entries, sealed, patterns: 'patterns' in parsed ? parsed.patterns : [] };
   } catch {
     return null;
   }
@@ -333,11 +334,12 @@ export const useLists = () => {
 
   /** Lays a new scroll at the end of the shelf, already written with the given lines, none of them done. */
   const addListFrom = useCallback(
-    (name: string, lines: { text: string; section?: boolean }[]) => {
+    (name: string, lines: { text: string; section?: boolean }[], daily = false) => {
       const items: Item[] = lines.map((line) =>
         line.section ? { id: newId(), text: line.text, done: false, section: true } : { id: newId(), text: line.text, done: false },
       );
-      apply((all) => [...all, { id: newId(), name, items, touchedAt: Date.now() }]);
+      const renewal = daily ? { daily: true, renewedOn: renewalDay(new Date()) } : {};
+      apply((all) => [...all, { id: newId(), name, items, touchedAt: Date.now(), ...renewal }]);
     },
     [apply],
   );
@@ -543,11 +545,15 @@ export const useLists = () => {
   );
 
   /** Everything kept, as a backup document. */
-  const backup = useCallback(() => writeBackup(current.current), []);
+  const backup = useCallback((patterns?: unknown) => writeBackup({ ...current.current, patterns }), []);
 
   /** Replaces everything with a backup's contents. Undoable, in case the wrong file was chosen. */
   const restore = useCallback(
-    (contents: Kept) => applyAll(() => ({ ...contents, lists: renewDue(contents.lists) }), 'Restored from the backup'),
+    (contents: Kept) =>
+      applyAll(
+        () => ({ lists: renewDue(contents.lists), entries: contents.entries, sealed: contents.sealed }),
+        'Restored from the backup',
+      ),
     [applyAll],
   );
 

@@ -3,7 +3,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { StyleSheet, TextInput, View } from 'react-native';
 
 import { useTheme } from '../ThemeContext';
-import { fonts, type Palette, ROW_HEIGHT } from '../theme';
+import { fonts, MAX_TEXT_SCALE, type Palette, ROW_HEIGHT, TEXT_SCALE } from '../theme';
 import { Finial, hasFinial } from './Finial';
 import { ROLL_LIGHT, ROLL_LIGHT_AT } from './Roller';
 import { type Lead, RowLead } from './RowLead';
@@ -103,7 +103,7 @@ export const RowInput: FC<RowInputProps> = ({ leadFor, paper, placeholder, initi
         <TextInput
           ref={input}
           autoFocus
-          maxFontSizeMultiplier={1.2}
+          maxFontSizeMultiplier={MAX_TEXT_SCALE}
           multiline
           scrollEnabled={false}
           value={text}
@@ -134,7 +134,7 @@ const makeStyles = (colors: Palette) =>
   },
   rolledRow: { backgroundColor: 'transparent', borderBottomWidth: 0, flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-start', paddingHorizontal: 2 },
   inner: { flexDirection: 'row', alignItems: 'center' },
-  rolledInner: { flex: 1, height: 48, paddingHorizontal: 12, borderRadius: 3, zIndex: 1 },
+  rolledInner: { flex: 1, height: ROW_HEIGHT - 14, paddingHorizontal: 12, borderRadius: 3, zIndex: 1 },
   rollLight: { ...StyleSheet.absoluteFill, borderRadius: 3 },
   input: {
     flex: 1,
@@ -142,7 +142,7 @@ const makeStyles = (colors: Palette) =>
     fontFamily: fonts.body,
     fontSize: 21,
     padding: 0,
-    height: 28,
+    height: Math.round(28 * TEXT_SCALE),
     textAlignVertical: 'center',
   },
 });

@@ -25,7 +25,7 @@ import { SettingsScreen } from './components/SettingsScreen';
 import { UndoToast } from './components/UndoToast';
 import { formatReminder } from './reminder';
 import { syncReminders } from './reminders';
-import { usePatterns } from './patterns';
+import { readPatterns, usePatterns } from './patterns';
 import { type Address, say, standing } from './scribe';
 import { useSettings } from './settings';
 import { ThemeProvider, useTheme } from './ThemeContext';
@@ -75,7 +75,7 @@ const Screens: FC<{ settings: Settings; address: Address; onCandle: () => void }
   const { colors, styles } = useTheme(makeStyles);
   const insets = useSafeAreaInsets();
   const store = useLists();
-  const { patterns, keep: keepPattern, forget: forgetPattern } = usePatterns();
+  const { patterns, keep: keepPattern, forget: forgetPattern, replace: replacePatterns } = usePatterns();
   /** The Library's sheet offering a blank scroll or a kept pattern. */
   const [choosing, setChoosing] = useState(false);
   /** Counts the seals pressed, so each press is its own animation; null when none is showing. */
@@ -146,7 +146,7 @@ const Screens: FC<{ settings: Settings; address: Address; onCandle: () => void }
   }, [freshSeal, openListId]);
 
   const backUp = () => {
-    shareBackup(store.backup()).catch(() =>
+    shareBackup(store.backup(patterns)).catch(() =>
       Alert.alert('The backup could not be made', 'Nothing was changed. Try again in a moment.'),
     );
   };
@@ -165,7 +165,14 @@ const Screens: FC<{ settings: Settings; address: Address; onCandle: () => void }
           `It holds ${lists.length} scroll${lists.length === 1 ? '' : 's'}, ${sealed.length} sealed, and ${entries.length} lines of chronicle. They will replace everything now kept.`,
           [
             { text: 'Keep what I have', style: 'cancel' },
-            { text: 'Restore', style: 'destructive', onPress: () => store.restore(picked.contents) },
+            {
+              text: 'Restore',
+              style: 'destructive',
+              onPress: () => {
+                store.restore(picked.contents);
+                replacePatterns(readPatterns(picked.contents.patterns));
+              },
+            },
           ],
         );
       })
@@ -428,7 +435,7 @@ const Screens: FC<{ settings: Settings; address: Address; onCandle: () => void }
           setChoosing(false);
           say('fromPattern');
           play('paper');
-          store.addListFrom(pattern.name, pattern.lines);
+          store.addListFrom(pattern.name, pattern.lines, pattern.daily);
         }}
       />
       <View style={[styles.controls, { paddingBottom: insets.bottom + 12 }]}>

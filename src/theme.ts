@@ -1,4 +1,14 @@
-export const ROW_HEIGHT = 62;
+import { PixelRatio } from 'react-native';
+
+/**
+ * How much larger than usual the reader has asked text to be, held between 1 and 1.4. Read once at
+ * launch: rows are a fixed height that the gestures count in, so they are sized to the text then.
+ */
+export const TEXT_SCALE = Math.min(1.4, Math.max(1, PixelRatio.getFontScale()));
+/** The most any text in a row may grow, to match the room the rows were given. */
+export const MAX_TEXT_SCALE = 1.4;
+
+export const ROW_HEIGHT = Math.round(62 * TEXT_SCALE);
 
 /**
  * Two hands, as in a manuscript: blackletter for names, and an old-style serif for everything else:
