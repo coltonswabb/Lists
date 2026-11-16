@@ -490,6 +490,10 @@ const Screens: FC<{ settings: Settings; address: Address; onCandle: () => void }
   );
 };
 
+/** The widest a page of the app is drawn, however wide the screen. */
+export const PAGE_WIDTH = 640;
+const columnStyle = { flex: 1, width: '100%', maxWidth: PAGE_WIDTH, alignSelf: 'center' } as const;
+
 export const App: FC = () => {
   const [fontsLoaded] = useFonts({
     PirataOne_400Regular,
@@ -512,11 +516,14 @@ export const App: FC = () => {
         <ThemeProvider value={palette}>
           <StatusBar style="light" />
           <Desk />
-          {!fontsLoaded || !settings.loaded ? null : settings.address ? (
-            <Screens settings={settings} address={settings.address} onCandle={turnSky} />
-          ) : (
-            <ScribeWelcome onChoose={settings.chooseAddress} />
-          )}
+          {/* On a wide screen the scrolls keep a page's width, centred on the desk, instead of stretching across it. */}
+          <View style={columnStyle}>
+            {!fontsLoaded || !settings.loaded ? null : settings.address ? (
+              <Screens settings={settings} address={settings.address} onCandle={turnSky} />
+            ) : (
+              <ScribeWelcome onChoose={settings.chooseAddress} />
+            )}
+          </View>
           {turning ? (
             <DayNightVeil
               to={turning}

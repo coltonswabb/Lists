@@ -177,7 +177,9 @@ export const GestureList: FC<GestureListProps> = ({
 }) => {
   const { colors, styles } = useTheme(makeStyles);
   const insets = useSafeAreaInsets();
-  const { width: screenWidth, height: screenHeight } = useWindowDimensions();
+  const { width: windowWidth, height: screenHeight } = useWindowDimensions();
+  // The page is never drawn wider than this (see PAGE_WIDTH in App), whatever the screen.
+  const screenWidth = Math.min(windowWidth, 640);
   const scrollView = useRef<ComponentRef<typeof NativeScrollView>>(null);
   const scrollOffset = useRef(0);
   const [atTop, setAtTop] = useState(true);

@@ -98,7 +98,8 @@ const INK_AFTER_MS = 420;
  * paper; each scroll keeps the same one.
  */
 export const Marginalia: FC<MarginaliaProps> = ({ seed, ink, accent }) => {
-  const { width: screenWidth } = useWindowDimensions();
+  const { width: windowWidth } = useWindowDimensions();
+  const screenWidth = Math.min(windowWidth, 640);
   const pick = Math.abs(hash(seed));
   const drawing = marginalia[pick % Math.max(1, marginalia.length)];
   if (drawing) {

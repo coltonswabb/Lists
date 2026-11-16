@@ -11,6 +11,14 @@
       "bundleIdentifier": "com.coltonswabb.decree",
       "config": {
         "usesNonExemptEncryption": false
+      },
+      "infoPlist": {
+        "UISupportedInterfaceOrientations~ipad": [
+          "UIInterfaceOrientationPortrait",
+          "UIInterfaceOrientationPortraitUpsideDown",
+          "UIInterfaceOrientationLandscapeLeft",
+          "UIInterfaceOrientationLandscapeRight"
+        ]
       }
     },
     "android": {
