@@ -5,10 +5,12 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { drawings } from '../art';
+import { searchLine } from '../scribe';
 import { useTheme } from '../ThemeContext';
 import { type Palette, fonts, mixColors, roman, ROW_HEIGHT } from '../theme';
 import type { List } from '../types';
 import { LineArt } from './LineArt';
+import { ScribeLine } from './ScribeLine';
 
 type SearchScreenProps = {
   lists: List[];
@@ -21,6 +23,8 @@ export const SearchScreen: FC<SearchScreenProps> = ({ lists, onOpen, onClose }) 
   const insets = useSafeAreaInsets();
   const [query, setQuery] = useState('');
   const needle = query.trim().toLowerCase();
+  // One wording per visit, so the scribe's line changes only when the search does, not at every letter.
+  const [wording] = useState(() => Math.floor(Math.random() * 12));
 
   const matches = needle
     ? lists.flatMap((list) =>
@@ -47,6 +51,7 @@ export const SearchScreen: FC<SearchScreenProps> = ({ lists, onOpen, onClose }) 
           <Text style={styles.action}>Close</Text>
         </Pressable>
       </View>
+      <ScribeLine standing={searchLine(!needle ? 'seeking' : matches.length > 0 ? 'found' : 'none', wording)} />
       <View style={styles.body}>
       <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingTop: 6, paddingBottom: insets.bottom + 24 }}>
         {needle ? <Text style={styles.count}>{`${roman(matches.length)} FOUND`}</Text> : null}
@@ -63,7 +68,6 @@ export const SearchScreen: FC<SearchScreenProps> = ({ lists, onOpen, onClose }) 
         {needle && matches.length === 0 ? (
           <View style={styles.nothing}>
             {drawings['nil-found'] ? <LineArt drawing={drawings['nil-found']} width={210} color={colors.onDeskFaded} inkIn={120} /> : null}
-            <Text style={styles.none}>No line on any scroll reads so.</Text>
           </View>
         ) : null}
       </ScrollView>
@@ -104,5 +108,4 @@ const makeStyles = (colors: Palette) =>
   done: { color: colors.inkFaded, textDecorationLine: 'line-through', textDecorationColor: colors.accent },
   source: { color: colors.inkFaded, fontFamily: fonts.bodyItalic, fontSize: 15 },
   nothing: { marginTop: 36, alignItems: 'center', gap: 14 },
-  none: { textAlign: 'center', color: colors.onDeskFaded, fontFamily: fonts.bodyItalic, fontSize: 18 },
 });

@@ -89,6 +89,27 @@ export const standing = {
   done: (to: Address) => `All is done, ${addresses[to]}.`,
 } as const;
 
+/** What the scribe says while searching, by how the search stands. `{t}` is the form of address. */
+const searching = {
+  seeking: ['What dost thou seek, {t}?', 'Name it, {t}, and I shall find it.', 'I know every scroll by heart, {t}.', 'Speak, {t}. I am listening.'],
+  found: ['Here it is, {t}.', 'I had it all along, {t}.', 'As I thought, {t}.', 'Found, {t}. I never lose a line.'],
+  none: ['No line on any scroll reads so, {t}.', 'I find nothing of the kind, {t}.', 'Not in this library, {t}.', 'Perhaps it was never written, {t}.'],
+} as const;
+
+export type SearchState = keyof typeof searching;
+
+/**
+ * The scribe's line for a search as it stands. `pick` chooses among the wordings and should stay the
+ * same for one visit to the search, so the line changes only when the search itself does. A silent
+ * scribe says nothing.
+ */
+export const searchLine = (state: SearchState, pick: number): string => {
+  if (mode === 'silent') return '';
+  const options = searching[state];
+  const line = options[Math.abs(Math.floor(pick)) % options.length] ?? options[0];
+  return line.replace('{t}', addresses[address]);
+};
+
 /** Has the scribe pass a brief remark. */
 export const say = (remark: Remark) => {
   if (mode === 'silent' || (mode === 'quiet' && !worthSaying.includes(remark))) return;
