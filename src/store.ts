@@ -311,12 +311,17 @@ export const useLists = () => {
 
   const dismissUndo = useCallback(() => setUndo(null), []);
 
-  /** Unmarks daily scrolls whose day has turned. Called when the app comes back to the front. */
-  const renew = useCallback(() => {
+  /**
+   * Unmarks daily scrolls whose day has turned. Called when the app comes back to the front.
+   * Says whether any scroll was in fact renewed, so the scribe can mention it.
+   */
+  const renew = useCallback((): boolean => {
+    const before = current.current;
     applyAll((all) => {
       const lists = renewDue(all.lists);
       return lists.some((list, index) => list !== all.lists[index]) ? { ...all, lists } : all;
     });
+    return current.current !== before;
   }, [applyAll]);
 
   const addLists = useCallback(

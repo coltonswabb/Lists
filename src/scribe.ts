@@ -44,7 +44,18 @@ const remarks = {
   newScroll: ['A fresh scroll, {t}.', 'I have cut a new sheet, {t}.'],
   bigClear: ['A fine day’s work, {t}.', 'The page breathes again, {t}.'],
   seal: ['Sealed, and set down in the chronicle.', 'I have pressed the wax, {t}.'],
-  renew: ['It shall be renewed each dawn, {t}.'],
+  renew: [
+    'It shall be renewed each dawn, {t}.',
+    'Each dawn a clean page, {t}.',
+    'I shall wipe it clean at every cockcrow, {t}.',
+    'The same toil daily, {t}. How devout.',
+  ],
+  renewOff: ['Once is enough, {t}.', 'It shall stand as written, {t}.', 'No more fresh starts, {t}.'],
+  renewed: [
+    'Dawn has come, {t}. The page is clean again.',
+    'Yesterday is struck, {t}. Begin anew.',
+    'I have renewed thy daily scrolls, {t}.',
+  ],
   moved: ['Carried over, {t}.', 'It is moved, {t}.'],
 } as const;
 

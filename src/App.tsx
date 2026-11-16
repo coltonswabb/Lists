@@ -93,7 +93,7 @@ const Screens: FC<{ settings: Settings; address: Address; onCandle: () => void }
   // Daily scrolls renew at dawn, so a day can turn while the app sits in the background.
   useEffect(() => {
     const subscription = AppState.addEventListener('change', (state) => {
-      if (state === 'active') renew();
+      if (state === 'active' && renew()) say('renewed');
     });
     return () => subscription.remove();
   }, [renew]);
@@ -294,7 +294,7 @@ const Screens: FC<{ settings: Settings; address: Address; onCandle: () => void }
               <View style={styles.footer}>
                 <Pressable
                   onPress={() => {
-                    if (!openList.daily) say('renew');
+                    say(openList.daily ? 'renewOff' : 'renew');
                     store.setDaily(openList.id, !openList.daily);
                   }}
                   hitSlop={8}
