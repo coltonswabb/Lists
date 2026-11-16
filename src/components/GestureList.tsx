@@ -292,7 +292,8 @@ export const GestureList: FC<GestureListProps> = ({
   const leave = () => {
     if (!onBack || leaving.current) return;
     leaving.current = true;
-    play('paper');
+    // Played slower and lower than the unrolling: the same paper, winding back down.
+    play('paper', 0.78);
     // A long scroll takes longer to wind, up to a point.
     const duration = Math.min(480, 220 + measuredHeight.current * 0.2);
     rolledUp.set(withTiming(1, { duration }));

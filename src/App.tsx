@@ -22,7 +22,7 @@ import { syncReminders } from './reminders';
 import { type Address, say, standing } from './scribe';
 import { useSettings } from './settings';
 import { ThemeProvider, useTheme } from './ThemeContext';
-import { play } from './sounds';
+import { play, playNote } from './sounds';
 import { useLists } from './store';
 import { fonts, type Palette, paletteOf, roman } from './theme';
 import type { Item, List } from './types';
@@ -259,7 +259,11 @@ const Screens: FC<{ settings: Settings; address: Address }> = ({ settings, addre
           onMove={(from, to) => store.moveItem(openList.id, positionOf(from), positionOf(to))}
           onComplete={(id) => {
             const finishing = !openList.items.find((item) => item.id === id)?.done;
-            if (finishing) play('lute');
+            // Each item struck plays the next note of the phrase; the last on the scroll, an Amen.
+            if (finishing) {
+              if (remaining === 1) play('amen');
+              else playNote(items.length - remaining);
+            }
             if (finishing) say(remaining === 1 ? 'finish' : 'complete');
             if (finishing && remaining === 1) setFreshSeal(openList.id);
             store.toggleItem(openList.id, id);

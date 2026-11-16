@@ -24,7 +24,10 @@ A gesture-driven list app built with Expo and React Native.
 - On the shelf, swipe a scroll right to seal it into the Chronicle. The Chronicle keeps sealed scrolls (return them to the shelf, or burn them) and a dated record of everything struck done, named by feast days ("the Monday after Martinmas") and marked with the hour of the office.
 - Settings can back up every scroll and the Chronicle to a file through the share sheet, and restore from one.
 
-Data is stored on the device with AsyncStorage. The sound effects in `assets/sounds` are synthesized, not recordings.
+- Each item struck done plays the next note of a short plucked phrase in D Dorian, so finishing a scroll plays a tune; the last item is answered with a sung Amen. Rolling a scroll up plays its paper sound slower and lower.
+- Choosing a paper in Settings also gives the app the matching home screen icon.
+
+Data is stored on the device with AsyncStorage. The sound effects in `assets/sounds` are synthesized, not recordings: `scripts/make-notes.py` writes the notes and the Amen. The per-paper app icons in `assets/icons` are drawn by `scripts/draw-icons.py` from the palettes in `src/theme.ts`.
 
 ```bash
 npm install
