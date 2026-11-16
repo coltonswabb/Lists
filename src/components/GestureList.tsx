@@ -20,7 +20,7 @@ import { scheduleOnRN } from 'react-native-worklets';
 
 import { success, thud, tick } from '../haptics';
 import { colors, fonts, type PaletteName, ROW_HEIGHT, rowColor } from '../theme';
-import { Initial } from './Initial';
+import { Initial, type MarkerKind } from './Initial';
 import { Roller } from './Roller';
 import { RowInput } from './RowInput';
 import { SwipeRow } from './SwipeRow';
@@ -52,6 +52,7 @@ export type GestureListRow = {
 type GestureListProps = {
   title: string;
   palette: PaletteName;
+  marker: MarkerKind;
   rows: GestureListRow[];
   placeholder: string;
   emptyHint: string;
@@ -70,6 +71,7 @@ type GestureListProps = {
 export const GestureList: FC<GestureListProps> = ({
   title,
   palette,
+  marker,
   rows,
   placeholder,
   emptyHint,
@@ -267,6 +269,7 @@ export const GestureList: FC<GestureListProps> = ({
       <RowInput
         key="new-row"
         color={rowColor(palette, addIndex, colorTotal)}
+        marker={marker}
         placeholder={placeholder}
         onLines={addLines}
         onEnd={endAdd}
@@ -334,6 +337,7 @@ export const GestureList: FC<GestureListProps> = ({
                 <RowInput
                   key={row.id}
                   color={colorAt(index)}
+                  marker={marker}
                   placeholder={placeholder}
                   initialText={row.text}
                   onEnd={(text) => endEdit(row.id, text)}
@@ -353,7 +357,7 @@ export const GestureList: FC<GestureListProps> = ({
                   onDragStart={startDrag}
                   onDrop={drop}
                 >
-                  <Initial text={row.text} pigment={colorAt(index)} faded={row.done} />
+                  <Initial text={row.text} pigment={colorAt(index)} kind={marker} faded={row.done} />
                   <Text style={[styles.rowText, styles.fill, row.done && styles.doneText]} numberOfLines={1}>
                     {row.text}
                   </Text>

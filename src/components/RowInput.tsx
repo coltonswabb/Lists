@@ -2,11 +2,12 @@ import { type FC, useRef, useState } from 'react';
 import { StyleSheet, TextInput, View } from 'react-native';
 
 import { colors, fonts, ROW_HEIGHT } from '../theme';
-import { Initial } from './Initial';
+import { Initial, type MarkerKind } from './Initial';
 
 type RowInputProps = {
   /** Pigment for the row's initial. */
   color: string;
+  marker: MarkerKind;
   placeholder: string;
   initialText?: string;
   /**
@@ -18,7 +19,7 @@ type RowInputProps = {
   onEnd: (remaining: string) => void;
 };
 
-export const RowInput: FC<RowInputProps> = ({ color, placeholder, initialText = '', onLines, onEnd }) => {
+export const RowInput: FC<RowInputProps> = ({ color, marker, placeholder, initialText = '', onLines, onEnd }) => {
   const [text, setText] = useState(initialText);
   const ended = useRef(false);
 
@@ -51,7 +52,7 @@ export const RowInput: FC<RowInputProps> = ({ color, placeholder, initialText = 
 
   return (
     <View style={styles.row}>
-      <Initial text={text} pigment={color} />
+      <Initial text={text} pigment={color} kind={marker} />
       <TextInput
         autoFocus
         multiline

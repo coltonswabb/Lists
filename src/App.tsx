@@ -36,6 +36,7 @@ export const App: FC = () => {
             key={openList.id}
             title={openList.name}
             palette="items"
+            marker="stripe"
             placeholder="New item"
             emptyHint="Pull down or tap to inscribe an item"
             rows={openList.items}
@@ -64,6 +65,7 @@ export const App: FC = () => {
             key="lists"
             title="Scrolls"
             palette="lists"
+            marker="initial"
             placeholder="New scroll"
             emptyHint="Pull down or tap to begin a scroll"
             rows={store.lists.map((list) => ({
