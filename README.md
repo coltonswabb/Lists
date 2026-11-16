@@ -18,7 +18,7 @@ A gesture-driven list app built with Expo and React Native.
 - End an item with "@ 5pm" or "@ tomorrow 9am" to be reminded of it, or by the canonical hours: "@ lauds" (5am), "@ prime" (6am), "@ terce" (9am), "@ sext" (noon), "@ nones" (3pm), "@ vespers" (6pm), "@ compline" (9pm), "@ matins" (3am).
 - "Settings" on the Library screen holds the paper theme, sound, how talkative the scribe is, and how it addresses you.
 - At the end of a scroll, keep pulling up to clear the finished items, which sweep off the sheet one after another. "Unmark all" resets a reusable list.
-- "Library" at the foot of a scroll rolls it up and returns to the shelf of scrolls.
+- The ‹ beside a scroll's title rolls it up and returns to the shelf of scrolls.
 - At the foot of a scroll, "Renew at dawn" makes it a daily scroll whose items are unmarked again each morning.
 - A finished scroll earns a small drawing in its margin beside "Finis".
 - On the shelf, swipe a scroll right to seal it into the Chronicle. The Chronicle keeps sealed scrolls (return them to the shelf, or burn them) and a dated record of everything struck done, named by feast days ("the Monday after Martinmas") and marked with the hour of the office.

@@ -117,8 +117,6 @@ type GestureListProps = {
   onOpen?: (id: string) => void;
   onRenameTitle?: (title: string) => void;
   onBack?: () => void;
-  /** Name of the place `onBack` returns to, for the button at the foot of the screen. */
-  backLabel?: string;
   /** Pulling up past the end of the rows clears the finished ones. Absent when there are none. */
   onPullUp?: () => void;
   /** Drawn in the margin beside "Finis" once every item is done. */
@@ -143,7 +141,6 @@ export const GestureList: FC<GestureListProps> = ({
   onOpen,
   onRenameTitle,
   onBack,
-  backLabel,
   onPullUp,
   finisArt,
   leadActionLabel,
@@ -716,16 +713,6 @@ export const GestureList: FC<GestureListProps> = ({
           </Animated.View>
         </View>
       </GestureDetector>
-      {canGoBack && backLabel ? (
-        <View style={[styles.foot, { paddingBottom: insets.bottom + 12 }]}>
-          <Pressable onPress={leave} hitSlop={12} accessibilityRole="button">
-            <View style={styles.footButton}>
-              <Text style={styles.footChevron}>‹</Text>
-              <Text style={styles.footLabel}>{backLabel}</Text>
-            </View>
-          </Pressable>
-        </View>
-      ) : null}
     </View>
   );
 };
@@ -793,8 +780,4 @@ const makeStyles = (colors: Palette) =>
     fontFamily: fonts.bodyItalic,
     fontSize: 18,
   },
-  foot: { flexDirection: 'row', paddingHorizontal: 20, paddingTop: 12 },
-  footButton: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  footChevron: { color: colors.onDesk, fontSize: 26, lineHeight: 28, opacity: 0.85 },
-  footLabel: { color: colors.onDesk, fontFamily: fonts.bodyItalic, fontSize: 18, opacity: 0.85 },
 });

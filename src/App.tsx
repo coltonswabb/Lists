@@ -259,7 +259,6 @@ const Screens: FC<{ settings: Settings; address: Address }> = ({ settings, addre
           }}
           onRenameTitle={(name) => store.renameList(openList.id, name)}
           onBack={() => setOpenListId(null)}
-          backLabel="Library"
           onPullUp={
             items.some((item) => item.done)
               ? () => {
