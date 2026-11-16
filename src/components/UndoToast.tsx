@@ -4,7 +4,7 @@ import Animated, { FadeInDown, FadeOutDown } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import type { Undo } from '../store';
-import { colors } from '../theme';
+import { colors, fonts } from '../theme';
 
 const VISIBLE_MS = 5000;
 
@@ -35,7 +35,7 @@ export const UndoToast: FC<UndoToastProps> = ({ undo, onUndo, onDismiss }) => {
         {undo.label}
       </Text>
       <Pressable onPress={onUndo} hitSlop={12}>
-        <Text style={styles.action}>Undo</Text>
+        <Text style={styles.action}>Restore</Text>
       </Pressable>
     </Animated.View>
   );
@@ -51,9 +51,11 @@ const styles = StyleSheet.create({
     gap: 16,
     paddingHorizontal: 18,
     paddingVertical: 14,
-    borderRadius: 14,
-    backgroundColor: '#2a2a33',
+    borderRadius: 4,
+    borderWidth: 1.5,
+    borderColor: colors.gold,
+    backgroundColor: colors.ink,
   },
-  label: { flex: 1, color: colors.text, fontSize: 15, fontWeight: '500' },
-  action: { color: '#9db4ff', fontSize: 15, fontWeight: '700' },
+  label: { flex: 1, color: colors.parchment, fontFamily: fonts.bodyItalic, fontSize: 17 },
+  action: { color: colors.gold, fontFamily: fonts.display, fontSize: 20 },
 });

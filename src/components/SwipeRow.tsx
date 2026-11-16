@@ -41,6 +41,7 @@ export type GapState = {
 };
 
 type SwipeRowProps = {
+  /** Row background. */
   color: string;
   children: ReactNode;
   index: number;
@@ -201,14 +202,21 @@ export const SwipeRow: FC<SwipeRowProps> = ({
 const styles = StyleSheet.create({
   container: {
     height: ROW_HEIGHT,
-    backgroundColor: colors.background,
+    backgroundColor: colors.parchment,
     shadowColor: '#000',
     shadowRadius: 12,
     shadowOffset: { width: 0, height: 6 },
   },
-  row: { height: ROW_HEIGHT, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20 },
+  row: {
+    height: ROW_HEIGHT,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.rule,
+  },
   action: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, justifyContent: 'center', paddingHorizontal: 24 },
   complete: { backgroundColor: colors.complete, alignItems: 'flex-start' },
   remove: { backgroundColor: colors.remove, alignItems: 'flex-end' },
-  glyph: { color: colors.text, fontSize: 24, fontWeight: '700' },
+  glyph: { color: colors.onPigment, fontSize: 24, fontWeight: '700' },
 });

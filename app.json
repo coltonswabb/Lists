@@ -5,7 +5,7 @@
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
-    "userInterfaceStyle": "dark",
+    "userInterfaceStyle": "light",
     "ios": {
       "supportsTablet": true
     },
@@ -21,6 +21,6 @@
     "web": {
       "favicon": "./assets/favicon.png"
     },
-    "backgroundColor": "#101014"
+    "backgroundColor": "#ece0c4"
   }
 }

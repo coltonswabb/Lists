@@ -34,7 +34,7 @@ const newItem = (text: string): Item => ({ id: newId(), text, done: false });
 const starterLists = (): List[] => [
   {
     id: newId(),
-    name: 'Start here',
+    name: 'Read me first',
     items: [
       'Swipe me right to complete',
       'Swipe me left to delete',
@@ -139,7 +139,7 @@ export const useLists = () => {
   const deleteList = useCallback(
     (id: string) => {
       const name = current.current.find((l) => l.id === id)?.name ?? 'list';
-      apply((all) => all.filter((l) => l.id !== id), `Deleted “${name}”`);
+      apply((all) => all.filter((l) => l.id !== id), `Struck “${name}”`);
     },
     [apply],
   );
@@ -171,7 +171,7 @@ export const useLists = () => {
     (listId: string, id: string) => {
       const items = current.current.find((l) => l.id === listId)?.items ?? [];
       const text = items.find((i) => i.id === id)?.text ?? 'item';
-      applyToItems(listId, (all) => all.filter((i) => i.id !== id), `Deleted “${text}”`);
+      applyToItems(listId, (all) => all.filter((i) => i.id !== id), `Struck “${text}”`);
     },
     [applyToItems],
   );
@@ -183,14 +183,14 @@ export const useLists = () => {
 
   const uncheckAll = useCallback(
     (listId: string) => {
-      applyToItems(listId, (items) => items.map((i) => ({ ...i, done: false })), 'Unchecked all items');
+      applyToItems(listId, (items) => items.map((i) => ({ ...i, done: false })), 'Unmarked every item');
     },
     [applyToItems],
   );
 
   const clearDone = useCallback(
     (listId: string) => {
-      applyToItems(listId, (items) => items.filter((i) => !i.done), 'Cleared completed items');
+      applyToItems(listId, (items) => items.filter((i) => !i.done), 'Struck the finished items');
     },
     [applyToItems],
   );

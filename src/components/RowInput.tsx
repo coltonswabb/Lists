@@ -1,9 +1,11 @@
 import { type FC, useRef, useState } from 'react';
 import { StyleSheet, TextInput, View } from 'react-native';
 
-import { colors, ROW_HEIGHT } from '../theme';
+import { colors, fonts, ROW_HEIGHT } from '../theme';
+import { Initial } from './Initial';
 
 type RowInputProps = {
+  /** Pigment for the row's initial. */
   color: string;
   placeholder: string;
   initialText?: string;
@@ -48,7 +50,8 @@ export const RowInput: FC<RowInputProps> = ({ color, placeholder, initialText = 
   };
 
   return (
-    <View style={[styles.row, { backgroundColor: color }]}>
+    <View style={styles.row}>
+      <Initial text={text} pigment={color} />
       <TextInput
         autoFocus
         multiline
@@ -57,8 +60,8 @@ export const RowInput: FC<RowInputProps> = ({ color, placeholder, initialText = 
         onChangeText={change}
         onBlur={() => end(text)}
         placeholder={placeholder}
-        placeholderTextColor={colors.textDim}
-        selectionColor={colors.text}
+        placeholderTextColor={colors.inkFaded}
+        selectionColor={colors.rubric}
         style={styles.input}
       />
     </View>
@@ -66,6 +69,22 @@ export const RowInput: FC<RowInputProps> = ({ color, placeholder, initialText = 
 };
 
 const styles = StyleSheet.create({
-  row: { height: ROW_HEIGHT, justifyContent: 'center', paddingHorizontal: 20 },
-  input: { color: colors.text, fontSize: 19, fontWeight: '600', padding: 0, height: 26, textAlignVertical: 'center' },
+  row: {
+    height: ROW_HEIGHT,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    backgroundColor: colors.parchmentShade,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.rule,
+  },
+  input: {
+    flex: 1,
+    color: colors.ink,
+    fontFamily: fonts.body,
+    fontSize: 21,
+    padding: 0,
+    height: 28,
+    textAlignVertical: 'center',
+  },
 });

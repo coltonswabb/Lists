@@ -12,7 +12,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { scheduleOnRN } from 'react-native-worklets';
 
 import { success, thud, tick } from '../haptics';
-import { colors, type PaletteName, ROW_HEIGHT, rowColor } from '../theme';
+import { colors, fonts, type PaletteName, ROW_HEIGHT, rowColor } from '../theme';
+import { Initial } from './Initial';
 import { RowInput } from './RowInput';
 import { SwipeRow } from './SwipeRow';
 
@@ -26,9 +27,9 @@ const SPRING = { damping: 24, stiffness: 240 } as const;
 type PullAction = 'none' | 'create' | 'back';
 
 const pullLabels = {
-  none: 'Pull to add',
-  create: 'Release to add',
-  back: 'Release to go back',
+  none: 'Pull to inscribe',
+  create: 'Release to inscribe',
+  back: 'Release to return',
 } as const satisfies Record<PullAction, string>;
 
 export type GestureListRow = {
@@ -277,7 +278,7 @@ export const GestureList: FC<GestureListProps> = ({
             onSubmitEditing={endTitleEdit}
             onBlur={endTitleEdit}
             returnKeyType="done"
-            selectionColor={colors.text}
+            selectionColor={colors.rubric}
             style={[styles.title, styles.titleInput]}
           />
         )}
@@ -302,7 +303,7 @@ export const GestureList: FC<GestureListProps> = ({
               <Animated.View
                 style={[styles.pullRow, { backgroundColor: rowColor(palette, 0, activeCount + 1) }, pullRowStyle]}
               >
-                <Text style={styles.rowText}>{pullLabels[pullAction]}</Text>
+                <Text style={styles.pullText}>{pullLabels[pullAction]}</Text>
               </Animated.View>
             </Animated.View>
 
@@ -311,7 +312,7 @@ export const GestureList: FC<GestureListProps> = ({
               editingId === row.id ? (
                 <RowInput
                   key={row.id}
-                  color={row.done ? colors.doneRow : colorAt(index)}
+                  color={colorAt(index)}
                   placeholder={placeholder}
                   initialText={row.text}
                   onEnd={(text) => endEdit(row.id, text)}
@@ -319,7 +320,7 @@ export const GestureList: FC<GestureListProps> = ({
               ) : (
                 <SwipeRow
                   key={row.id}
-                  color={row.done ? colors.doneRow : colorAt(index)}
+                  color={row.done ? colors.parchmentShade : colors.parchment}
                   index={index}
                   reorderLimit={activeCount}
                   reorder={{ from: dragFrom, to: dragTo }}
@@ -331,6 +332,7 @@ export const GestureList: FC<GestureListProps> = ({
                   onDragStart={startDrag}
                   onDrop={drop}
                 >
+                  <Initial text={row.text} pigment={colorAt(index)} faded={row.done} />
                   <Text style={[styles.rowText, styles.fill, row.done && styles.doneText]} numberOfLines={1}>
                     {row.text}
                   </Text>
@@ -354,18 +356,27 @@ export const GestureList: FC<GestureListProps> = ({
 };
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: colors.background },
+  screen: { flex: 1, backgroundColor: colors.parchment },
   fill: { flex: 1 },
-  header: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 20, height: 44 },
-  back: { color: colors.textDim, fontSize: 28, fontWeight: '500', lineHeight: 30 },
-  title: { color: colors.textDim, fontSize: 13, fontWeight: '700', letterSpacing: 1.4, textTransform: 'uppercase' },
-  titleInput: { flex: 1, color: colors.text, padding: 0 },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingHorizontal: 16,
+    height: 56,
+    borderBottomWidth: 2,
+    borderBottomColor: colors.rubric,
+  },
+  back: { color: colors.rubric, fontSize: 34, lineHeight: 36 },
+  title: { color: colors.ink, fontFamily: fonts.display, fontSize: 30 },
+  titleInput: { flex: 1, padding: 0 },
   content: { flexGrow: 1 },
   pullSpace: { justifyContent: 'flex-end', overflow: 'hidden' },
-  pullRow: { height: ROW_HEIGHT, justifyContent: 'center', paddingHorizontal: 20, transformOrigin: 'bottom' },
-  rowText: { color: colors.text, fontSize: 19, fontWeight: '600' },
-  doneText: { color: colors.textDim, textDecorationLine: 'line-through' },
-  badge: { color: colors.text, fontSize: 17, fontWeight: '700', opacity: 0.7, marginLeft: 12 },
+  pullRow: { height: ROW_HEIGHT, justifyContent: 'center', paddingHorizontal: 16, transformOrigin: 'bottom' },
+  pullText: { color: colors.onPigment, fontFamily: fonts.bodyItalic, fontSize: 21 },
+  rowText: { color: colors.ink, fontFamily: fonts.body, fontSize: 21 },
+  doneText: { color: colors.inkFaded, textDecorationLine: 'line-through', textDecorationColor: colors.rubric },
+  badge: { color: colors.rubric, fontFamily: fonts.display, fontSize: 22, marginLeft: 12 },
   tapZone: { flexGrow: 1, minHeight: ROW_HEIGHT * 2, alignItems: 'center', paddingTop: 36 },
-  hint: { color: colors.textDim, fontSize: 16, fontWeight: '500' },
+  hint: { color: colors.inkFaded, fontFamily: fonts.bodyItalic, fontSize: 18 },
 });
