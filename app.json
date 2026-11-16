@@ -8,7 +8,10 @@
     "userInterfaceStyle": "dark",
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.coltonswabb.decree"
+      "bundleIdentifier": "com.coltonswabb.decree",
+      "config": {
+        "usesNonExemptEncryption": false
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -94,7 +97,31 @@
             }
           }
         ]
-      ]
-    ]
+      ],
+      "expo-asset"
+    ],
+    "extra": {
+      "eas": {
+        "build": {
+          "experimental": {
+            "ios": {
+              "appExtensions": [
+                {
+                  "targetName": "ExpoWidgetsTarget",
+                  "bundleIdentifier": "com.coltonswabb.decree.ExpoWidgetsTarget",
+                  "entitlements": {
+                    "com.apple.security.application-groups": [
+                      "group.com.coltonswabb.decree"
+                    ]
+                  }
+                }
+              ]
+            }
+          }
+        },
+        "projectId": "d27c7234-4682-4791-a72a-7f53a6aaea1e"
+      }
+    },
+    "owner": "coltonswabb"
   }
 }
