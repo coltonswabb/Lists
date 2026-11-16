@@ -444,6 +444,7 @@ export const GestureList: FC<GestureListProps> = ({
   }));
 
   const gesture = useSimultaneousGestures(pan, pullUp, pinch);
+  const pulls = useMemo(() => [pan, pullUp], [pan, pullUp]);
 
   // Pulling draws fresh paper out from under the rod.
   const pullSpaceStyle = useAnimatedStyle(() => ({ height: pull.value }));
@@ -646,6 +647,7 @@ export const GestureList: FC<GestureListProps> = ({
                     reorder={{ from: dragFrom, to: dragTo, span: dragSpan, dragY, scrollStart: dragScrollStart }}
                     groupSize={groupSizes[index] ?? 1}
                     stops={sectionStops[index]}
+                    pulls={pulls}
                     gap={{ index: gapIndex, size: gapSize }}
                     animateLayout={!dragging}
                     sweepAfter={sweeping && row.done ? (sweepOrder.get(row.id) ?? 0) * SWEEP_STAGGER_MS : undefined}

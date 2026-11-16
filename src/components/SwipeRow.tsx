@@ -1,7 +1,9 @@
-import { type FC, type ReactNode, useEffect } from 'react';
+import { type FC, type ReactNode, useEffect, useRef } from 'react';
 import { StyleSheet, Text, useWindowDimensions } from 'react-native';
 import {
   GestureDetector,
+  GestureStateManager,
+  type PanGesture,
   useCompetingGestures,
   usePanGesture,
   useTapGesture,
@@ -66,6 +68,11 @@ type SwipeRowProps = {
   groupSize: number;
   /** For a heading: the only positions it may be dropped on, so it can never split another section. */
   stops?: number[];
+  /**
+   * The list's own pull gestures. They wait until the hold-to-drag has failed, so a row that is held
+   * and then dragged far cannot also be read as a pull.
+   */
+  pulls: PanGesture[];
   reorder: ReorderState;
   gap: GapState;
   animateLayout: boolean;
@@ -95,6 +102,7 @@ export const SwipeRow: FC<SwipeRowProps> = ({
   draggable,
   groupSize,
   stops,
+  pulls,
   reorder,
   gap,
   animateLayout,
@@ -115,6 +123,26 @@ export const SwipeRow: FC<SwipeRowProps> = ({
   const armed = useSharedValue(0);
   const { dragY, scrollStart } = reorder;
   const lastNudge = useSharedValue(0);
+  /** Counts touches, so a hold timer can tell whether the touch it was started for is still the current one. */
+  const holdToken = useSharedValue(0);
+  /** The current touch can no longer become a drag: it moved too soon, or it has ended. */
+  const holdOver = useSharedValue(true);
+  const holdTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(
+    () => () => {
+      if (holdTimer.current) clearTimeout(holdTimer.current);
+    },
+    [],
+  );
+  // The drag begins once the finger has rested on the row for the hold time, whether or not it then moves.
+  const armHold = (handlerTag: number, token: number) => {
+    if (holdTimer.current) clearTimeout(holdTimer.current);
+    holdTimer.current = setTimeout(() => {
+      if (holdToken.value === token && !holdOver.value) GestureStateManager.activate(handlerTag);
+    }, HOLD_TO_DRAG_MS);
+  };
+  const holdX = useSharedValue(0);
+  const holdY = useSharedValue(0);
   const lift = useSharedValue(0);
   const canComplete = onComplete !== undefined;
 
@@ -161,7 +189,43 @@ export const SwipeRow: FC<SwipeRowProps> = ({
   const drag = usePanGesture({
     enabled: draggable && rowCount > 1,
     maxPointers: 1,
-    activateAfterLongPress: HOLD_TO_DRAG_MS,
+    // Activated by hand rather than by the gesture's own hold timer: that timer fires even when the
+    // finger has moved on, which turned a slow pull that began on a row into a drag and cancelled the pull.
+    manualActivation: true,
+    block: pulls,
+    onTouchesDown: (event) => {
+      'worklet';
+      const touch = event.allTouches[0];
+      if (!touch || event.numberOfTouches !== 1) {
+        holdOver.value = true;
+        GestureStateManager.fail(event.handlerTag);
+        return;
+      }
+      holdOver.value = false;
+      holdToken.value += 1;
+      holdX.value = touch.absoluteX;
+      holdY.value = touch.absoluteY;
+      scheduleOnRN(armHold, event.handlerTag, holdToken.value);
+    },
+    onTouchesMove: (event) => {
+      'worklet';
+      if (holdOver.value || reorder.from.value >= 0) return;
+      const touch = event.allTouches[0];
+      if (!touch) return;
+      // Moving before the hold has matured means this touch is a swipe, pull or scroll, not a drag.
+      if (Math.abs(touch.absoluteX - holdX.value) > TAP_SLOP || Math.abs(touch.absoluteY - holdY.value) > TAP_SLOP) {
+        holdOver.value = true;
+        GestureStateManager.fail(event.handlerTag);
+      }
+    },
+    onTouchesUp: () => {
+      'worklet';
+      holdOver.value = true;
+    },
+    onTouchesCancel: () => {
+      'worklet';
+      holdOver.value = true;
+    },
     onActivate: () => {
       'worklet';
       dragY.value = 0;
