@@ -12,14 +12,22 @@ import { GestureList, type GestureListRow, STAMP_DELAY_MS } from './components/G
 import { ScribeLine } from './components/ScribeLine';
 import { ScribeWelcome } from './components/ScribeWelcome';
 import { SearchScreen } from './components/SearchScreen';
+import { SettingsScreen } from './components/SettingsScreen';
 import { UndoToast } from './components/UndoToast';
+import { formatReminder } from './reminder';
+import { syncReminders } from './reminders';
 import { type Address, say, standing } from './scribe';
 import { useSettings } from './settings';
 import { ThemeProvider, useTheme } from './ThemeContext';
 import { play } from './sounds';
 import { useLists } from './store';
-import { fonts, type Palette, paletteOf, roman, themes } from './theme';
+import { fonts, type Palette, paletteOf, roman } from './theme';
 import type { Item, List } from './types';
+import { syncWidget } from './widgetSync';
+
+const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
+/** Clearing at least this many items at once earns a word from the scribe. */
+const BIG_CLEAR = 5;
 
 const itemsOf = (list: List) => list.items.filter((item) => !item.section);
 const openCount = (items: Item[]) => items.filter((item) => !item.done).length;
@@ -32,7 +40,9 @@ const scrollRows = (items: Item[]): { rows: GestureListRow[]; visible: Item[] } 
   items.forEach((item, index) => {
     if (!item.section) {
       if (folded) return;
-      rows.push(item);
+      // A reminder shows as its time, and reappears in the text when the row is edited so it survives the edit.
+      const reminder = item.remindAt && !item.done ? formatReminder(item.remindAt) : null;
+      rows.push(reminder ? { ...item, badge: reminder.toUpperCase(), editText: `${item.text} @ ${reminder}` } : item);
       visible.push(item);
       return;
     }
@@ -52,9 +62,19 @@ const scrollRows = (items: Item[]): { rows: GestureListRow[]; visible: Item[] } 
 type Settings = ReturnType<typeof useSettings>;
 
 const Screens: FC<{ settings: Settings; address: Address }> = ({ settings, address }) => {
-  const { styles } = useTheme(makeStyles);
+  const { colors, styles } = useTheme(makeStyles);
   const insets = useSafeAreaInsets();
   const store = useLists();
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  /** A silent scribe says nothing at all, not even its standing lines. */
+  const spoken = (line: string) => (settings.scribe === 'silent' ? '' : line);
+
+  // Whatever changes in the lists is mirrored to the system: scheduled reminders and the home screen widget.
+  useEffect(() => {
+    if (!store.loaded) return;
+    void syncReminders(store.lists, address);
+    void syncWidget(store.lists, colors, address);
+  }, [store.loaded, store.lists, address, colors]);
   // The scroll whose last item was just finished: its seal is stamped on when the shelf next appears.
   const [freshSeal, setFreshSeal] = useState<string | null>(null);
   // The scribe greets once per visit, then waits for instructions.
@@ -72,14 +92,15 @@ const Screens: FC<{ settings: Settings; address: Address }> = ({ settings, addre
   const openList = store.lists.find((list) => list.id === openListId);
 
   useEffect(() => {
-    if (!openList && !searching) return;
+    if (!openList && !searching && !settingsOpen) return;
     const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
-      if (searching) setSearching(false);
+      if (settingsOpen) setSettingsOpen(false);
+      else if (searching) setSearching(false);
       else setOpenListId(null);
       return true;
     });
     return () => subscription.remove();
-  }, [openList, searching]);
+  }, [openList, searching, settingsOpen]);
 
   useEffect(() => {
     if (!freshSeal || openListId) return;
@@ -90,6 +111,8 @@ const Screens: FC<{ settings: Settings; address: Address }> = ({ settings, addre
       clearTimeout(clear);
     };
   }, [freshSeal, openListId]);
+
+  if (settingsOpen) return <SettingsScreen settings={settings} onClose={() => setSettingsOpen(false)} />;
 
   if (searching) {
     return (
@@ -126,7 +149,9 @@ const Screens: FC<{ settings: Settings; address: Address }> = ({ settings, addre
           rows={rows}
           subheader={
             <ScribeLine
-              standing={items.length === 0 ? standing.blank(address) : remaining === 0 ? standing.done(address) : ''}
+              standing={spoken(
+                items.length === 0 ? standing.blank(address) : remaining === 0 ? standing.done(address) : '',
+              )}
             />
           }
           onAdd={(texts, index) => {
@@ -154,7 +179,7 @@ const Screens: FC<{ settings: Settings; address: Address }> = ({ settings, addre
           onPullUp={
             items.some((item) => item.done)
               ? () => {
-                  say('strike');
+                  say(items.filter((item) => item.done).length >= BIG_CLEAR ? 'bigClear' : 'strike');
                   store.clearDone(openList.id);
                 }
               : undefined
@@ -176,6 +201,11 @@ const Screens: FC<{ settings: Settings; address: Address }> = ({ settings, addre
 
   if (!store.loaded) return null;
 
+  // A scroll with work left on it that nobody has touched for a week.
+  const dusty = store.lists.find(
+    (list) => openCount(itemsOf(list)) > 0 && list.touchedAt !== undefined && Date.now() - list.touchedAt > WEEK_MS,
+  );
+
   return (
     <>
       <GestureList
@@ -193,7 +223,9 @@ const Screens: FC<{ settings: Settings; address: Address }> = ({ settings, addre
         })}
         subheader={
           <ScribeLine
-            standing={greeted ? standing.decree(address) : standing.welcome(address)}
+            standing={spoken(
+              !greeted ? standing.welcome(address) : dusty ? standing.dust(dusty.name, address) : standing.decree(address),
+            )}
             onPress={() => settings.chooseAddress(null)}
           />
         }
@@ -214,11 +246,8 @@ const Screens: FC<{ settings: Settings; address: Address }> = ({ settings, addre
         <Pressable onPress={() => setSearching(true)} hitSlop={12}>
           <Text style={styles.deskLabel}>Search</Text>
         </Pressable>
-        <Pressable onPress={settings.nextTheme} hitSlop={12}>
-          <Text style={styles.deskLabel}>{themes[settings.theme].label}</Text>
-        </Pressable>
-        <Pressable onPress={settings.toggleSound} hitSlop={12}>
-          <Text style={styles.deskLabel}>{settings.sound ? 'Sound on' : 'Sound off'}</Text>
+        <Pressable onPress={() => setSettingsOpen(true)} hitSlop={12}>
+          <Text style={styles.deskLabel}>Settings</Text>
         </Pressable>
       </View>
       <UndoToast undo={store.undo} onUndo={undoLast} onDismiss={store.dismissUndo} offset={44} />

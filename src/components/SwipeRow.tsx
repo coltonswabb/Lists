@@ -64,6 +64,8 @@ type SwipeRowProps = {
   draggable: boolean;
   /** Rows that move when this one is dragged: itself, plus the rows under it if it is a heading. */
   groupSize: number;
+  /** For a heading: the only positions it may be dropped on, so it can never split another section. */
+  stops?: number[];
   reorder: ReorderState;
   gap: GapState;
   animateLayout: boolean;
@@ -92,6 +94,7 @@ export const SwipeRow: FC<SwipeRowProps> = ({
   rowCount,
   draggable,
   groupSize,
+  stops,
   reorder,
   gap,
   animateLayout,
@@ -181,7 +184,13 @@ export const SwipeRow: FC<SwipeRowProps> = ({
         lastNudge.value = now;
         scheduleOnRN(onEdge, edge);
       }
-      const to = Math.max(0, Math.min(rowCount - groupSize, target));
+      let to = Math.max(0, Math.min(rowCount - groupSize, target));
+      if (stops) {
+        // Snap to the nearest place a section may sit, so the preview shows where it will really land.
+        let nearest = index;
+        for (const stop of stops) if (Math.abs(stop - to) < Math.abs(nearest - to)) nearest = stop;
+        to = nearest;
+      }
       if (to !== reorder.to.value) {
         reorder.to.value = to;
         scheduleOnRN(tick);

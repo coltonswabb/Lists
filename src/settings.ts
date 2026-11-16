@@ -1,7 +1,15 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useCallback, useEffect, useState } from 'react';
 
-import { type Address, isAddress, setScribeAddress } from './scribe';
+import {
+  type Address,
+  isAddress,
+  isScribeMode,
+  type ScribeMode,
+  scribeModes,
+  setScribeAddress,
+  setScribeMode,
+} from './scribe';
 import { setSoundEnabled } from './sounds';
 import { isThemeName, type ThemeName, themeNames } from './theme';
 
@@ -12,6 +20,7 @@ export const useSettings = () => {
   const [theme, setTheme] = useState<ThemeName>('scriptorium');
   /** Null until the user has told the scribe how to address them. */
   const [address, setAddress] = useState<Address | null>(null);
+  const [scribe, setScribe] = useState<ScribeMode>('chatty');
   const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
@@ -28,6 +37,10 @@ export const useSettings = () => {
           setAddress(stored.address);
           setScribeAddress(stored.address);
         }
+        if (typeof stored === 'object' && stored !== null && 'scribe' in stored && isScribeMode(stored.scribe)) {
+          setScribe(stored.scribe);
+          setScribeMode(stored.scribe);
+        }
       })
       .catch(() => undefined)
       .finally(() => setLoaded(true));
@@ -35,8 +48,8 @@ export const useSettings = () => {
 
   useEffect(() => {
     if (!loaded) return;
-    AsyncStorage.setItem(STORAGE_KEY, JSON.stringify({ sound, theme, address })).catch(() => undefined);
-  }, [loaded, sound, theme, address]);
+    AsyncStorage.setItem(STORAGE_KEY, JSON.stringify({ sound, theme, address, scribe })).catch(() => undefined);
+  }, [loaded, sound, theme, address, scribe]);
 
   const toggleSound = useCallback(() => {
     setSound((on) => {
@@ -54,5 +67,13 @@ export const useSettings = () => {
     setAddress(value);
   }, []);
 
-  return { loaded, sound, toggleSound, theme, nextTheme, address, chooseAddress };
+  const nextScribeMode = useCallback(() => {
+    setScribe((current) => {
+      const next = scribeModes[(scribeModes.indexOf(current) + 1) % scribeModes.length] ?? current;
+      setScribeMode(next);
+      return next;
+    });
+  }, []);
+
+  return { loaded, sound, toggleSound, theme, nextTheme, address, chooseAddress, scribe, nextScribeMode };
 };

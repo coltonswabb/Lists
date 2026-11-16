@@ -1,6 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
+import { parseReminder } from './reminder';
 import type { Item, List } from './types';
 
 const STORAGE_KEY = 'lists/v1';
@@ -38,7 +39,9 @@ const parseEntry = (raw: string): { text: string; section: boolean } => {
 
 const newItem = (raw: string): Item => {
   const { text, section } = parseEntry(raw);
-  return section ? { id: newId(), text, done: false, section: true } : { id: newId(), text, done: false };
+  if (section) return { id: newId(), text, done: false, section: true };
+  const reminder = parseReminder(text);
+  return { id: newId(), text: reminder.text, done: false, remindAt: reminder.remindAt };
 };
 
 /** Shown on first launch only: each item teaches the gesture it names. */
@@ -56,6 +59,7 @@ const starterLists = (): List[] => [
       'Pull down to add a row',
       'Pinch apart to add a row',
       'A colon at the end adds a section',
+      'End with “@ 5pm” to be reminded',
       'Pull far down to close the scroll',
     ].map(newItem),
   },
@@ -164,7 +168,10 @@ export const useLists = () => {
 
   const applyToItems = useCallback(
     (listId: string, update: (items: Item[]) => Item[], undoLabel?: string) => {
-      apply((all) => all.map((l) => (l.id === listId ? { ...l, items: update(l.items) } : l)), undoLabel);
+      apply(
+        (all) => all.map((l) => (l.id === listId ? { ...l, items: update(l.items), touchedAt: Date.now() } : l)),
+        undoLabel,
+      );
     },
     [apply],
   );
@@ -183,7 +190,7 @@ export const useLists = () => {
 
   const addLists = useCallback(
     (names: string[], index: number) => {
-      apply((all) => insertAt(all, index, names.map((name) => ({ id: newId(), name, items: [] }))));
+      apply((all) => insertAt(all, index, names.map((name) => ({ id: newId(), name, items: [], touchedAt: Date.now() }))));
     },
     [apply],
   );
@@ -224,7 +231,7 @@ export const useLists = () => {
               ? i
               : entry.section
                 ? { id, text: entry.text, done: false, section: true, collapsed: i.collapsed }
-                : { id, text: entry.text, done: i.done },
+                : { id, done: i.done, ...parseReminder(entry.text) },
           ),
         ),
       );
@@ -271,7 +278,19 @@ export const useLists = () => {
 
   const clearDone = useCallback(
     (listId: string) => {
-      applyToItems(listId, (items) => items.filter((i) => !i.done), 'Cleared finished items');
+      // A section whose every item was finished has served its purpose and goes with them.
+      applyToItems(
+        listId,
+        (items) =>
+          items.filter((item, index) => {
+            if (!item.section) return !item.done;
+            let end = index + 1;
+            while (end < items.length && !items[end]?.section) end += 1;
+            const own = items.slice(index + 1, end);
+            return own.length === 0 || own.some((i) => !i.done);
+          }),
+        'Cleared finished items',
+      );
     },
     [applyToItems],
   );

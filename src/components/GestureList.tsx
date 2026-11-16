@@ -1,4 +1,13 @@
-import { type ComponentRef, type FC, type ReactNode, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import {
+  type ComponentRef,
+  type FC,
+  type ReactNode,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import {
   Pressable,
   ScrollView as NativeScrollView,
@@ -45,8 +54,9 @@ const PINCH_OPEN_AT = ROW_HEIGHT * 0.6;
 const PINCH_CLOSE_SCALE = 0.7;
 const SPRING = { damping: 24, stiffness: 240 } as const;
 const UNROLL_MS = 420;
-const ROLL_UP_MS = 240;
 const UNCLIPPED = 100000;
+/** Further than any finger can travel: makes one side of a gesture's activation range open-ended. */
+const FAR = 100000;
 /** Gap between one finished row sweeping away and the next, so a clear reads as a cascade. */
 const SWEEP_STAGGER_MS = 70;
 /** A fresh wax seal lands this long after the shelf appears, once the eye has found the scroll. */
@@ -69,6 +79,8 @@ export type GestureListRow = {
   /** A heading inside a scroll. Drawn with a painted initial; cannot be completed. */
   section?: boolean;
   badge?: string;
+  /** What the row's text becomes when opened for editing, if that differs from what is shown. */
+  editText?: string;
   /** Draws the badge in the accent colour: a reward mark rather than a count. */
   badgeAccent?: boolean;
   /** Shelf only: stamps the scroll with a wax seal in place of its badge. */
@@ -157,9 +169,12 @@ export const GestureList: FC<GestureListProps> = ({
   const contentHeight = useSharedValue(0);
   const viewportHeight = useSharedValue(0);
   // The top roll fattens as the scroll is wound onto it.
+  // It is also fat while the whole sheet is wound on: just before unrolling and just after rolling up.
+  const rolledUp = useSharedValue(variant === 'scroll' ? 1 : 0);
   const wound = useDerivedValue(() => {
     const range = contentHeight.value - viewportHeight.value;
-    return range > 0 ? Math.max(0, Math.min(1, scrollY.value / range)) : 0;
+    const scrolled = range > 0 ? Math.max(0, Math.min(1, scrollY.value / range)) : 0;
+    return Math.max(scrolled, rolledUp.value);
   });
   const dragFrom = useSharedValue(-1);
   const dragTo = useSharedValue(-1);
@@ -198,6 +213,25 @@ export const GestureList: FC<GestureListProps> = ({
   // As a scribe marks a new passage, the first open item under each heading begins with a red letter.
   const rubricated = rows.map((row, index) => !isShelf && !row.section && !row.done && rows[index - 1]?.section === true);
 
+  // Where a dragged heading may land: the top, the end, or just ahead of another heading.
+  // Kept stable between renders: a gesture whose configuration changes mid-touch is restarted,
+  // which would cancel a pull that is under way.
+  const shape = rows.map((row) => (row.section ? 'S' : 'i')).join('');
+  const sectionStops = useMemo(() => {
+    const sections = [...shape].map((mark) => mark === 'S');
+    return sections.map((isSection, index) => {
+      if (!isSection) return undefined;
+      let end = index + 1;
+      while (end < sections.length && !sections[end]) end += 1;
+      const rest = sections.filter((_, i) => i < index || i >= end);
+      const stops = [0, rest.length];
+      rest.forEach((section, at) => {
+        if (section) stops.push(at);
+      });
+      return stops;
+    });
+  }, [shape]);
+
   const itemRows = rows.filter((row) => !row.section);
   const sweepOrder = new Map(itemRows.filter((row) => row.done).map((row, position) => [row.id, position]));
   const finished = !isShelf && itemRows.length > 0 && itemRows.every((row) => row.done);
@@ -214,7 +248,7 @@ export const GestureList: FC<GestureListProps> = ({
   const leadFor = (row: GestureListRow, index: number): Lead => {
     if (isShelf) return { kind: 'initial', text: row.text, pigment: colors.ink, letter: colors.paperFrom };
     if (row.section) return { kind: 'initial', text: row.text, pigment: colors.accent, letter: colors.paperFrom };
-    if (row.done) return { kind: 'label', label: '✓', color: colors.inkFaded };
+    if (row.done) return { kind: 'done', color: colors.inkFaded };
     return { kind: 'label', label: roman(numbers[index] ?? 0), color: accentAt(colors, index, rowCount) };
   };
 
@@ -241,10 +275,11 @@ export const GestureList: FC<GestureListProps> = ({
   useEffect(() => {
     if (isShelf) return;
     play('paper');
+    rolledUp.value = withTiming(0, { duration: UNROLL_MS });
     sheetHeight.value = withTiming(initialHeight, { duration: UNROLL_MS, easing: Easing.out(Easing.cubic) }, () => {
       sheetHeight.value = UNCLIPPED;
     });
-  }, [isShelf, sheetHeight, initialHeight]);
+  }, [isShelf, sheetHeight, rolledUp, initialHeight]);
   const sheetStyle = useAnimatedStyle(() => ({ maxHeight: sheetHeight.value }));
 
   /** Rolls the sheet back up onto the top rod, then leaves. */
@@ -252,8 +287,11 @@ export const GestureList: FC<GestureListProps> = ({
     if (!onBack || leaving.current) return;
     leaving.current = true;
     play('paper');
+    // A long scroll takes longer to wind, up to a point.
+    const duration = Math.min(480, 220 + measuredHeight.current * 0.2);
+    rolledUp.value = withTiming(1, { duration });
     sheetHeight.value = measuredHeight.current;
-    sheetHeight.value = withTiming(0, { duration: ROLL_UP_MS, easing: Easing.in(Easing.cubic) }, () => {
+    sheetHeight.value = withTiming(0, { duration, easing: Easing.in(Easing.cubic) }, () => {
       scheduleOnRN(onBack);
     });
   };
@@ -300,7 +338,7 @@ export const GestureList: FC<GestureListProps> = ({
   const pan = usePanGesture({
     enabled: atTop && !busy && !dragging,
     maxPointers: 1,
-    activeOffsetY: 14,
+    activeOffsetY: [-FAR, 14],
     failOffsetX: [-14, 14],
     onActivate: () => {
       'worklet';
@@ -375,7 +413,8 @@ export const GestureList: FC<GestureListProps> = ({
   const pullUp = usePanGesture({
     enabled: onPullUp !== undefined && atBottom && !busy && !dragging,
     maxPointers: 1,
-    activeOffsetY: -14,
+    // Upward travel only: a pair leaves the downward side open-ended so a pull down never activates this.
+    activeOffsetY: [-14, FAR],
     failOffsetX: [-14, 14],
     onActivate: () => {
       'worklet';
@@ -593,7 +632,7 @@ export const GestureList: FC<GestureListProps> = ({
                     leadFor={draftLead}
                     paper={paperFor(index, row.done)}
                     placeholder={placeholder}
-                    initialText={row.section ? `${row.text}:` : row.text}
+                    initialText={row.section ? `${row.text}:` : (row.editText ?? row.text)}
                     rolled={isShelf}
                     onEnd={(text) => endEdit(row.id, text)}
                   />
@@ -606,6 +645,7 @@ export const GestureList: FC<GestureListProps> = ({
                     draggable={!row.done}
                     reorder={{ from: dragFrom, to: dragTo, span: dragSpan, dragY, scrollStart: dragScrollStart }}
                     groupSize={groupSizes[index] ?? 1}
+                    stops={sectionStops[index]}
                     gap={{ index: gapIndex, size: gapSize }}
                     animateLayout={!dragging}
                     sweepAfter={sweeping && row.done ? (sweepOrder.get(row.id) ?? 0) * SWEEP_STAGGER_MS : undefined}
@@ -647,7 +687,10 @@ export const GestureList: FC<GestureListProps> = ({
       {canGoBack && backLabel ? (
         <View style={[styles.foot, { paddingBottom: insets.bottom + 12 }]}>
           <Pressable onPress={leave} hitSlop={12} accessibilityRole="button">
-            <Text style={styles.footLabel}>{`‹  ${backLabel}`}</Text>
+            <View style={styles.footButton}>
+              <Text style={styles.footChevron}>‹</Text>
+              <Text style={styles.footLabel}>{backLabel}</Text>
+            </View>
           </Pressable>
         </View>
       ) : null}
@@ -718,5 +761,7 @@ const makeStyles = (colors: Palette) =>
     fontSize: 18,
   },
   foot: { flexDirection: 'row', paddingHorizontal: 20, paddingTop: 12 },
+  footButton: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  footChevron: { color: colors.onDesk, fontSize: 26, lineHeight: 28, opacity: 0.85 },
   footLabel: { color: colors.onDesk, fontFamily: fonts.bodyItalic, fontSize: 18, opacity: 0.85 },
 });

@@ -14,7 +14,8 @@ A gesture-driven list app built with Expo and React Native.
 - Holding a dragged row at the top or bottom edge scrolls the list.
 - "Search" on the shelf finds items across every scroll; "Sound" turns the effects on or off.
 - A scribe greets you and remarks on what you do. It asks how to address you on first launch; tap its line on the shelf to change that.
-- The theme name at the bottom of the shelf cycles through five paper themes.
+- End an item with "@ 5pm" or "@ tomorrow 9am" to be reminded of it.
+- "Settings" on the Library screen holds the paper theme, sound, how talkative the scribe is, and how it addresses you.
 - At the end of a scroll, keep pulling up to clear the finished items, which sweep off the sheet one after another. "Unmark all" resets a reusable list.
 - "Library" at the foot of a scroll rolls it up and returns to the shelf of scrolls.
 

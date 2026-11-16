@@ -7,20 +7,56 @@
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "dark",
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.coltonswabb.lists"
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
+        "backgroundColor": "#181614",
         "foregroundImage": "./assets/android-icon-foreground.png",
-        "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "package": "com.coltonswabb.lists"
     },
     "web": {
       "favicon": "./assets/favicon.png"
     },
-    "backgroundColor": "#181614"
+    "backgroundColor": "#181614",
+    "scheme": "lists",
+    "plugins": [
+      "expo-font",
+      "expo-notifications",
+      [
+        "expo-widgets",
+        {
+          "groupIdentifier": "group.com.coltonswabb.lists",
+          "widgets": [
+            {
+              "name": "ListsScroll",
+              "displayName": "Scroll",
+              "description": "What is left on your scroll, at a glance.",
+              "ios": {
+                "supportedFamilies": [
+                  "systemSmall",
+                  "systemMedium",
+                  "systemLarge"
+                ],
+                "initialLayout": "./src/widgets/ScrollWidget.tsx"
+              }
+            }
+          ],
+          "frequentUpdates": false
+        }
+      ],
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash-icon.png",
+          "imageWidth": 200,
+          "backgroundColor": "#181614"
+        }
+      ]
+    ]
   }
 }
