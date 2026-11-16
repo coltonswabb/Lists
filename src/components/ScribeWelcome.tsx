@@ -39,7 +39,8 @@ export const ScribeWelcome: FC<ScribeWelcomeProps> = ({ onChoose }) => {
 
 const makeStyles = (colors: Palette) =>
   StyleSheet.create({
-    screen: { flex: 1, paddingHorizontal: 28, backgroundColor: colors.desk },
+    // Transparent: the Desk behind every screen shows through.
+    screen: { flex: 1, paddingHorizontal: 28 },
     mark: {
       width: 56,
       height: 56,

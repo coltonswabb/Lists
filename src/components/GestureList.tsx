@@ -9,6 +9,7 @@ import {
   useState,
 } from 'react';
 import {
+  Image,
   Pressable,
   ScrollView as NativeScrollView,
   StyleSheet,
@@ -37,6 +38,7 @@ import Animated, {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { scheduleOnRN } from 'react-native-worklets';
 
+import { drawings, waxSeal } from '../art';
 import { success, thud, tick } from '../haptics';
 import { play } from '../sounds';
 import { useTheme } from '../ThemeContext';
@@ -44,6 +46,7 @@ import { accentAt, fonts, type Palette, paperAt, roman, ROW_HEIGHT } from '../th
 import { PaperOverlay } from './PaperOverlay';
 import { Roller, ROLLER_HEIGHT } from './Roller';
 import { RowInput } from './RowInput';
+import { LineArt } from './LineArt';
 import { LEAD_WIDTH, type Lead, RowLead } from './RowLead';
 import { SWEEP_MS, SwipeRow } from './SwipeRow';
 
@@ -250,7 +253,7 @@ export const GestureList: FC<GestureListProps> = ({
 
   const leadFor = (row: GestureListRow, index: number): Lead => {
     if (isShelf) return { kind: 'initial', text: row.text, pigment: colors.ink, letter: colors.paperFrom };
-    if (row.section) return { kind: 'initial', text: row.text, pigment: colors.accent, letter: colors.paperFrom };
+    if (row.section) return { kind: 'initial', text: row.text, pigment: colors.accent, letter: colors.paperFrom, flourish: colors.accent };
     if (row.done) return { kind: 'done', color: colors.inkFaded };
     return { kind: 'label', label: roman(numbers[index] ?? 0), color: accentAt(colors, index, rowCount) };
   };
@@ -534,10 +537,14 @@ export const GestureList: FC<GestureListProps> = ({
         </Text>
         {row.sealed ? (
           <Animated.View
-            style={styles.seal}
+            style={waxSeal ? styles.waxSeal : styles.seal}
             entering={row.stamp ? ZoomIn.delay(STAMP_DELAY_MS).springify().damping(11).stiffness(220) : undefined}
           >
-            <Text style={styles.sealMark}>✓</Text>
+            {waxSeal ? (
+              <Image source={waxSeal.source} style={styles.waxSealImage} accessibilityElementsHidden />
+            ) : (
+              <Text style={styles.sealMark}>✓</Text>
+            )}
           </Animated.View>
         ) : row.badge ? (
           <Text style={[styles.badge, row.badgeAccent && styles.badgeAccent]}>{row.badge}</Text>
@@ -651,7 +658,8 @@ export const GestureList: FC<GestureListProps> = ({
                 ) : (
                   <SwipeRow
                     key={row.id}
-                    color={isShelf ? colors.desk : paperFor(index, row.done)}
+                    // On the shelf the scrolls lie straight on the desk, so the row itself is see-through.
+                    color={isShelf ? 'transparent' : paperFor(index, row.done)}
                     index={index}
                     rowCount={rowCount}
                     draggable={!row.done}
@@ -691,12 +699,24 @@ export const GestureList: FC<GestureListProps> = ({
               {footer}
 
               <Pressable
-                style={[styles.tail, finished && finisArt ? styles.tailWithArt : null]}
+                style={[
+                  styles.tail,
+                  finished && finisArt ? styles.tailWithArt : null,
+                  rowCount === 0 && drawings['empty-shelf'] ? styles.tailEmpty : null,
+                ]}
                 accessibilityRole="button"
                 accessibilityLabel={isShelf ? 'Add a scroll' : 'Add a row'}
                 disabled={busy}
                 onPress={() => press(() => setAddIndex(endIndex))}
               >
+                {rowCount === 0 && !busy && drawings['empty-shelf'] ? (
+                  <LineArt
+                    drawing={drawings['empty-shelf']}
+                    width={isShelf ? 200 : 170}
+                    color={isShelf ? colors.onDeskFaded : colors.inkFaded}
+                    style={styles.emptyArt}
+                  />
+                ) : null}
                 {rowCount === 0 && !busy ? <Text style={styles.hint}>{emptyHint}</Text> : null}
                 {finished && !busy ? finisArt : null}
                 {finished && !busy ? <Text style={styles.finis}>❦  Finis  ❦</Text> : null}
@@ -719,7 +739,8 @@ export const GestureList: FC<GestureListProps> = ({
 
 const makeStyles = (colors: Palette) =>
   StyleSheet.create({
-  screen: { flex: 1, backgroundColor: colors.desk },
+  // Transparent: the Desk behind every screen shows through.
+  screen: { flex: 1 },
   fill: { flex: 1 },
   // Clipped, so rows lifted by a pull-up slide under the top roll instead of over the title.
   viewport: { flex: 1, overflow: 'hidden' },
@@ -765,12 +786,17 @@ const makeStyles = (colors: Palette) =>
     borderColor: colors.accent,
   },
   sealMark: { color: colors.onAction, fontSize: 14, fontWeight: '700' },
+  waxSeal: { width: 38, height: 38, marginLeft: 10 },
+  waxSealImage: { width: 38, height: 38 },
   finis: { color: colors.accent, fontFamily: fonts.bodyItalic, fontSize: 19 },
   tail: { minHeight: ROW_HEIGHT, alignItems: 'center', justifyContent: 'center' },
   // With a drawing, the close of the scroll is centred on the writing column, right of the margin rule.
   tailWithArt: { paddingTop: 18, paddingBottom: 14, gap: 4, paddingLeft: 16 + LEAD_WIDTH + 12, paddingRight: 16 },
   tapZone: { flexGrow: 1, minHeight: ROW_HEIGHT },
   hint: { color: colors.inkFaded, fontFamily: fonts.bodyItalic, fontSize: 18 },
+  emptyArt: { marginTop: 24, marginBottom: 12 },
+  // Room below the hint, which the bottom roll would otherwise cover.
+  tailEmpty: { paddingBottom: 30 },
   clearHint: {
     position: 'absolute',
     left: 0,

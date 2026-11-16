@@ -1,18 +1,22 @@
 import type { FC } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
+import { drawings } from '../art';
 import { useTheme } from '../ThemeContext';
 import { type Palette, fonts } from '../theme';
+import { LineArt } from './LineArt';
 
 export type Lead =
   /** A painted first letter, for things that have a name: scrolls and sections. */
-  | { kind: 'initial'; text: string; pigment: string; letter: string }
+  | { kind: 'initial'; text: string; pigment: string; letter: string; flourish?: string }
   /** A small margin label, for ordinary items: their number, or a mark once finished. */
   | { kind: 'label'; label: string; color: string }
   /** A drawn tick, for a finished item. */
   | { kind: 'done'; color: string };
 
 export const LEAD_WIDTH = 34;
+/** The flourish is drawn round an empty square about half its width, so it is twice the block's size. */
+const FLOURISH = LEAD_WIDTH * 1.9;
 
 export const RowLead: FC<{ lead: Lead }> = ({ lead }) => {
   const { styles } = useTheme(makeStyles);
@@ -32,8 +36,13 @@ export const RowLead: FC<{ lead: Lead }> = ({ lead }) => {
       </View>
     );
   }
+  const frame = lead.flourish ? drawings.flourish : undefined;
   return (
     <View style={[styles.cell, styles.block, { backgroundColor: lead.pigment }]}>
+      {frame && lead.flourish ? (
+        // Pen-flourishing round a painted initial, as a scribe would add to mark a new section.
+        <LineArt drawing={frame} width={FLOURISH} color={lead.flourish} style={styles.flourish} />
+      ) : null}
       <Text style={[styles.letter, { color: lead.letter }]}>{lead.text.trim().charAt(0).toUpperCase()}</Text>
     </View>
   );
@@ -54,4 +63,5 @@ const makeStyles = (colors: Palette) =>
   block: { alignItems: 'center', borderRadius: 2 },
   label: { fontFamily: fonts.label, fontSize: 15, letterSpacing: 0.6 },
   letter: { fontFamily: fonts.display, fontSize: 24, lineHeight: 28 },
+  flourish: { position: 'absolute', left: (LEAD_WIDTH - FLOURISH) / 2, top: (LEAD_WIDTH - FLOURISH) / 2, opacity: 0.55 },
 });

@@ -208,3 +208,10 @@ one needs isolating and converting to black line art by hand. Any you find are w
 
 All of it is checked in each of the five papers before it ships, and the SVG drawings stay as the
 fallback until then.
+
+## Status
+
+Imported and in use: all twelve marginal drawings, the quill, the flourish, the divider, the empty
+Library drawing, the wax seal, the parchment, and the Scriptorium and Night Vigil desks. Still to
+come: `desk-lapis`, `desk-verdant` and `desk-codex`; until they arrive, those papers keep their
+plain desk colour.

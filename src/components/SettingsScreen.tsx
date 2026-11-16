@@ -123,7 +123,8 @@ const PaperChoice: FC<PaperChoiceProps> = ({ name, chosen, onChoose }) => {
 
 const makeStyles = (colors: Palette) =>
   StyleSheet.create({
-    screen: { flex: 1, backgroundColor: colors.desk },
+    // Transparent: the Desk behind every screen shows through.
+  screen: { flex: 1 },
     header: {
       flexDirection: 'row',
       alignItems: 'center',

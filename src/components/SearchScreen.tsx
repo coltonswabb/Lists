@@ -62,7 +62,8 @@ export const SearchScreen: FC<SearchScreenProps> = ({ lists, onOpen, onClose }) 
 
 const makeStyles = (colors: Palette) =>
   StyleSheet.create({
-  screen: { flex: 1, backgroundColor: colors.desk },
+  // Transparent: the Desk behind every screen shows through.
+  screen: { flex: 1 },
   header: { flexDirection: 'row', alignItems: 'center', gap: 16, paddingHorizontal: 20, height: 56 },
   input: { flex: 1, color: colors.onDesk, fontFamily: fonts.body, fontSize: 21, padding: 0 },
   action: { color: colors.onDesk, fontFamily: fonts.bodyItalic, fontSize: 18 },

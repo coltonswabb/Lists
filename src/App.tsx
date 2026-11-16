@@ -9,6 +9,7 @@ import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-cont
 
 import { pickBackup, shareBackup } from './backup';
 import { ChronicleScreen } from './components/ChronicleScreen';
+import { Desk } from './components/Desk';
 import { GestureList, type GestureListRow, STAMP_DELAY_MS } from './components/GestureList';
 import { LEAD_WIDTH } from './components/RowLead';
 import { Marginalia } from './components/Marginalia';
@@ -395,6 +396,7 @@ export const App: FC = () => {
       <SafeAreaProvider>
         <ThemeProvider value={palette}>
           <StatusBar style="light" />
+          <Desk />
           {!fontsLoaded || !settings.loaded ? null : settings.address ? (
             <Screens settings={settings} address={settings.address} />
           ) : (

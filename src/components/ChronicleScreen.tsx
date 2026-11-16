@@ -1,12 +1,15 @@
 import type { FC } from 'react';
-import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Alert, Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { drawings, parchment, waxSeal } from '../art';
 import { capitalize, describeDay, isSameDay, officeOf } from '../calendar';
 import { type Address, addresses } from '../scribe';
 import { useTheme } from '../ThemeContext';
 import { fonts, type Palette } from '../theme';
 import type { ChronicleEntry, SealedList } from '../types';
+import { LineArt } from './LineArt';
+import { Tiled } from './Tiled';
 
 type ChronicleScreenProps = {
   entries: ChronicleEntry[];
@@ -43,7 +46,7 @@ const dayHeading = (date: Date, now: Date) => {
  * of the day, with the sealed scrolls themselves kept at the front.
  */
 export const ChronicleScreen: FC<ChronicleScreenProps> = ({ entries, sealed, address, onClose, onUnseal, onBurn }) => {
-  const { styles } = useTheme(makeStyles);
+  const { colors, styles } = useTheme(makeStyles);
   const insets = useSafeAreaInsets();
   const now = new Date();
   const days = byDay(entries);
@@ -84,9 +87,13 @@ export const ChronicleScreen: FC<ChronicleScreenProps> = ({ entries, sealed, add
                 accessibilityRole="button"
                 accessibilityLabel={`${scroll.name}, sealed on ${describeDay(new Date(scroll.sealedAt))}`}
               >
-                <View style={styles.seal}>
-                  <Text style={styles.sealMark}>✓</Text>
-                </View>
+                {waxSeal ? (
+                  <Image source={waxSeal.source} style={styles.waxSeal} accessibilityElementsHidden />
+                ) : (
+                  <View style={styles.seal}>
+                    <Text style={styles.sealMark}>✓</Text>
+                  </View>
+                )}
                 <View style={styles.fill}>
                   <Text style={styles.sealedName} numberOfLines={1}>
                     {scroll.name}
@@ -102,12 +109,19 @@ export const ChronicleScreen: FC<ChronicleScreenProps> = ({ entries, sealed, add
 
         <Text style={styles.heading}>The record</Text>
         <View style={styles.page}>
+          {parchment ? (
+            // The same mottle as a scroll's paper, so the record reads as a page of the same stock.
+            <Tiled source={parchment.source} tile={420} opacity={0.32} />
+          ) : null}
           {days.length === 0 ? (
             <Text style={styles.empty}>Nothing is yet set down, {addresses[address]}.</Text>
           ) : (
             days.map((day) => (
               <View key={day.date.toDateString()} style={styles.day}>
                 <Text style={styles.dayHeading}>{dayHeading(day.date, now)}</Text>
+                {drawings.divider ? (
+                  <LineArt drawing={drawings.divider} width={190} color={colors.accent} style={styles.divider} />
+                ) : null}
                 {day.entries.map((entry) => (
                   <View key={entry.id} style={styles.entry}>
                     <Text style={styles.office}>{officeOf(new Date(entry.at)).toUpperCase()}</Text>
@@ -138,7 +152,8 @@ export const ChronicleScreen: FC<ChronicleScreenProps> = ({ entries, sealed, add
 
 const makeStyles = (colors: Palette) =>
   StyleSheet.create({
-    screen: { flex: 1, backgroundColor: colors.desk },
+    // Transparent: the Desk behind every screen shows through.
+  screen: { flex: 1 },
     fill: { flex: 1 },
     header: {
       flexDirection: 'row',
@@ -181,9 +196,11 @@ const makeStyles = (colors: Palette) =>
       borderColor: colors.accent,
     },
     sealMark: { color: colors.onAction, fontSize: 14, fontWeight: '700' },
+    waxSeal: { width: 40, height: 40 },
     sealedName: { color: colors.ink, fontFamily: fonts.body, fontSize: 20 },
     sealedOn: { color: colors.inkFaded, fontFamily: fonts.bodyItalic, fontSize: 15 },
     page: {
+      overflow: 'hidden',
       marginHorizontal: 20,
       paddingHorizontal: 18,
       paddingVertical: 16,
@@ -192,7 +209,8 @@ const makeStyles = (colors: Palette) =>
     },
     empty: { color: colors.inkFaded, fontFamily: fonts.bodyItalic, fontSize: 18 },
     day: { marginBottom: 14 },
-    dayHeading: { color: colors.accent, fontFamily: fonts.display, fontSize: 22, marginBottom: 6 },
+    dayHeading: { color: colors.accent, fontFamily: fonts.display, fontSize: 22, marginBottom: 4 },
+    divider: { marginBottom: 8, opacity: 0.7 },
     entry: { flexDirection: 'row', alignItems: 'flex-start', paddingVertical: 5 },
     office: {
       width: 74,

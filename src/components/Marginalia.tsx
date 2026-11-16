@@ -87,6 +87,7 @@ const SHEET_INSET = 40;
 const COLUMN_START = 16 + LEAD_WIDTH + 12;
 const COLUMN_END = 16;
 const MAX_WIDTH = 280;
+const MAX_HEIGHT = 170;
 
 /**
  * A drawing for the margin of a finished scroll, after the creatures and vines medieval scribes drew
@@ -98,7 +99,12 @@ export const Marginalia: FC<MarginaliaProps> = ({ seed, ink, accent }) => {
   const pick = Math.abs(hash(seed));
   const drawing = marginalia[pick % Math.max(1, marginalia.length)];
   if (drawing) {
-    const width = Math.min(MAX_WIDTH, screenWidth - SHEET_INSET - COLUMN_START - COLUMN_END);
+    // Wide drawings fill the column; tall ones are held to the same height, so none crowds the page.
+    const width = Math.min(
+      MAX_WIDTH,
+      screenWidth - SHEET_INSET - COLUMN_START - COLUMN_END,
+      (MAX_HEIGHT * drawing.width) / drawing.height,
+    );
     return (
       <Image
         source={drawing.source}

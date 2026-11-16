@@ -2,9 +2,14 @@ import { LinearGradient } from 'expo-linear-gradient';
 import type { FC } from 'react';
 import { Image, StyleSheet, View } from 'react-native';
 
+import { parchment } from '../art';
 import { useTheme } from '../ThemeContext';
 import type { Palette } from '../theme';
 import { LEAD_WIDTH } from './RowLead';
+import { Tiled } from './Tiled';
+
+/** Points per parchment tile: wide enough that one tile spans the sheet, so its stains don't repeat across it. */
+const PARCHMENT_TILE = 420;
 
 const SHADOW = 'rgba(0,0,0,0.2)';
 const TONING = 'rgba(0,0,0,0.07)';
@@ -19,7 +24,11 @@ export const PaperOverlay: FC = () => {
   const { styles } = useTheme(makeStyles);
   return (
     <View pointerEvents="none" style={StyleSheet.absoluteFill}>
-      <Image source={require('../../assets/textures/grain.png')} resizeMode="repeat" style={styles.grain} />
+      {parchment ? (
+        <Tiled source={parchment.source} tile={PARCHMENT_TILE} opacity={0.32} />
+      ) : (
+        <Image source={require('../../assets/textures/grain.png')} resizeMode="repeat" style={styles.grain} />
+      )}
       <View style={styles.margin} />
       <LinearGradient colors={[TONING, CLEAR]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.left} />
       <LinearGradient colors={[CLEAR, TONING]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.right} />
