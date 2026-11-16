@@ -4,7 +4,8 @@ import Animated, { FadeInDown, FadeOutDown } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import type { Undo } from '../store';
-import { colors, fonts } from '../theme';
+import { useTheme } from '../ThemeContext';
+import { type Palette, fonts } from '../theme';
 
 const VISIBLE_MS = 5000;
 
@@ -17,6 +18,7 @@ type UndoToastProps = {
 };
 
 export const UndoToast: FC<UndoToastProps> = ({ undo, onUndo, onDismiss, offset }) => {
+  const { colors, styles } = useTheme(makeStyles);
   const insets = useSafeAreaInsets();
 
   useEffect(() => {
@@ -43,7 +45,8 @@ export const UndoToast: FC<UndoToastProps> = ({ undo, onUndo, onDismiss, offset 
   );
 };
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: Palette) =>
+  StyleSheet.create({
   toast: {
     position: 'absolute',
     left: 16,

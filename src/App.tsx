@@ -2,18 +2,19 @@ import { IBMPlexMono_500Medium } from '@expo-google-fonts/ibm-plex-mono';
 import { PirataOne_400Regular } from '@expo-google-fonts/pirata-one';
 import { useFonts } from 'expo-font';
 import { StatusBar } from 'expo-status-bar';
-import { type FC, useEffect, useState } from 'react';
+import { type FC, useEffect, useMemo, useState } from 'react';
 import { BackHandler, Pressable, StyleSheet, Text, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { GestureList, type GestureListRow } from './components/GestureList';
+import { GestureList, type GestureListRow, STAMP_DELAY_MS } from './components/GestureList';
 import { SearchScreen } from './components/SearchScreen';
 import { UndoToast } from './components/UndoToast';
 import { useSettings } from './settings';
+import { ThemeProvider, useTheme } from './ThemeContext';
 import { play } from './sounds';
 import { useLists } from './store';
-import { colors, fonts, roman } from './theme';
+import { fonts, type Palette, paletteOf, roman, themes } from './theme';
 import type { Item, List } from './types';
 
 const itemsOf = (list: List) => list.items.filter((item) => !item.section);
@@ -44,10 +45,14 @@ const scrollRows = (items: Item[]): { rows: GestureListRow[]; visible: Item[] } 
   return { rows, visible };
 };
 
-const Screens: FC = () => {
+type Settings = ReturnType<typeof useSettings>;
+
+const Screens: FC<{ settings: Settings }> = ({ settings }) => {
+  const { styles } = useTheme(makeStyles);
   const insets = useSafeAreaInsets();
   const store = useLists();
-  const settings = useSettings();
+  // The scroll whose last item was just finished: its seal is stamped on when the shelf next appears.
+  const [freshSeal, setFreshSeal] = useState<string | null>(null);
   const [openListId, setOpenListId] = useState<string | null>(null);
   const [searching, setSearching] = useState(false);
   const openList = store.lists.find((list) => list.id === openListId);
@@ -61,6 +66,16 @@ const Screens: FC = () => {
     });
     return () => subscription.remove();
   }, [openList, searching]);
+
+  useEffect(() => {
+    if (!freshSeal || openListId) return;
+    const stamp = setTimeout(() => play('seal'), STAMP_DELAY_MS);
+    const clear = setTimeout(() => setFreshSeal(null), STAMP_DELAY_MS + 1200);
+    return () => {
+      clearTimeout(stamp);
+      clearTimeout(clear);
+    };
+  }, [freshSeal, openListId]);
 
   if (searching) {
     return (
@@ -103,7 +118,9 @@ const Screens: FC = () => {
           }}
           onMove={(from, to) => store.moveItem(openList.id, positionOf(from), positionOf(to))}
           onComplete={(id) => {
-            if (!openList.items.find((item) => item.id === id)?.done) play('lute');
+            const finishing = !openList.items.find((item) => item.id === id)?.done;
+            if (finishing) play('lute');
+            if (finishing && remaining === 1) setFreshSeal(openList.id);
             store.toggleItem(openList.id, id);
           }}
           onPressLead={(id) => store.toggleSection(openList.id, id)}
@@ -141,7 +158,8 @@ const Screens: FC = () => {
         rows={store.lists.map((list) => {
           const items = itemsOf(list);
           const open = openCount(items);
-          return { id: list.id, text: list.name, badge: roman(open), sealed: items.length > 0 && open === 0 };
+          const sealed = items.length > 0 && open === 0;
+          return { id: list.id, text: list.name, badge: roman(open), sealed, stamp: sealed && list.id === freshSeal };
         })}
         onAdd={store.addLists}
         onRename={store.renameList}
@@ -154,10 +172,13 @@ const Screens: FC = () => {
       />
       <View style={[styles.controls, { paddingBottom: insets.bottom + 12 }]}>
         <Pressable onPress={() => setSearching(true)} hitSlop={12}>
-          <Text style={styles.label}>SEARCH</Text>
+          <Text style={styles.deskLabel}>SEARCH</Text>
+        </Pressable>
+        <Pressable onPress={settings.nextTheme} hitSlop={12}>
+          <Text style={styles.deskLabel}>{themes[settings.theme].label}</Text>
         </Pressable>
         <Pressable onPress={settings.toggleSound} hitSlop={12}>
-          <Text style={styles.label}>{settings.sound ? 'SOUND ON' : 'SOUND OFF'}</Text>
+          <Text style={styles.deskLabel}>{settings.sound ? 'SOUND ON' : 'SOUND OFF'}</Text>
         </Pressable>
       </View>
       <UndoToast undo={store.undo} onUndo={store.undoLast} onDismiss={store.dismissUndo} offset={44} />
@@ -167,19 +188,25 @@ const Screens: FC = () => {
 
 export const App: FC = () => {
   const [fontsLoaded] = useFonts({ PirataOne_400Regular, IBMPlexMono_500Medium });
+  const settings = useSettings();
+  const palette = useMemo(() => paletteOf(settings.theme), [settings.theme]);
   return (
-    <GestureHandlerRootView style={styles.root}>
+    <GestureHandlerRootView style={{ flex: 1, backgroundColor: palette.desk }}>
       <SafeAreaProvider>
-        <StatusBar style="light" />
-        {fontsLoaded ? <Screens /> : null}
+        <ThemeProvider value={palette}>
+          <StatusBar style="light" />
+          {fontsLoaded ? <Screens settings={settings} /> : null}
+        </ThemeProvider>
       </SafeAreaProvider>
     </GestureHandlerRootView>
   );
 };
 
-const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: colors.desk },
+const makeStyles = (colors: Palette) =>
+  StyleSheet.create({
   footer: { flexDirection: 'row', justifyContent: 'center', gap: 28, paddingTop: 20 },
   controls: { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 20, paddingTop: 12 },
   label: { color: colors.accent, fontFamily: fonts.label, fontSize: 11, letterSpacing: 1.2 },
+    // Labels that sit on the desk rather than on paper: the accent is tuned for paper and can be too dark here.
+    deskLabel: { color: colors.onDesk, fontFamily: fonts.label, fontSize: 11, letterSpacing: 1.2, opacity: 0.8 },
 });

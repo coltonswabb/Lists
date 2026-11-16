@@ -1,12 +1,15 @@
 import { type FC, useRef, useState } from 'react';
 import { StyleSheet, TextInput, View } from 'react-native';
 
-import { colors, ROW_HEIGHT } from '../theme';
+import { useTheme } from '../ThemeContext';
+import { type Palette, ROW_HEIGHT } from '../theme';
 import { type Lead, RowLead } from './RowLead';
 
 type RowInputProps = {
   /** What to show in the margin for the text typed so far. */
   leadFor: (text: string) => Lead;
+  /** The paper tone at this row's position on the scroll. */
+  paper: string;
   placeholder: string;
   initialText?: string;
   /** Drawn as a rolled scroll on the shelf rather than as a line on a sheet. */
@@ -20,7 +23,8 @@ type RowInputProps = {
   onEnd: (remaining: string) => void;
 };
 
-export const RowInput: FC<RowInputProps> = ({ leadFor, placeholder, initialText = '', rolled = false, onLines, onEnd }) => {
+export const RowInput: FC<RowInputProps> = ({ leadFor, paper, placeholder, initialText = '', rolled = false, onLines, onEnd }) => {
+  const { colors, styles } = useTheme(makeStyles);
   const [text, setText] = useState(initialText);
   const ended = useRef(false);
 
@@ -52,8 +56,8 @@ export const RowInput: FC<RowInputProps> = ({ leadFor, placeholder, initialText 
   };
 
   return (
-    <View style={[styles.row, rolled && styles.rolledRow]}>
-      <View style={[styles.inner, rolled && styles.rolledInner]}>
+    <View style={[styles.row, rolled ? styles.rolledRow : { backgroundColor: paper }]}>
+      <View style={[styles.inner, rolled && styles.rolledInner, rolled && { backgroundColor: paper }]}>
         <RowLead lead={leadFor(text)} />
         <TextInput
           autoFocus
@@ -72,18 +76,18 @@ export const RowInput: FC<RowInputProps> = ({ leadFor, placeholder, initialText 
   );
 };
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: Palette) =>
+  StyleSheet.create({
   row: {
     height: ROW_HEIGHT,
     justifyContent: 'center',
     paddingHorizontal: 16,
-    backgroundColor: colors.parchmentShade,
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: colors.rule,
   },
   rolledRow: { backgroundColor: 'transparent', borderBottomWidth: 0 },
   inner: { flexDirection: 'row', alignItems: 'center' },
-  rolledInner: { height: 48, paddingHorizontal: 12, borderRadius: 4, backgroundColor: colors.parchmentShade },
+  rolledInner: { height: 48, paddingHorizontal: 12, borderRadius: 4 },
   input: {
     flex: 1,
     color: colors.ink,

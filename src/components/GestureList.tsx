@@ -22,13 +22,16 @@ import Animated, {
   useSharedValue,
   withSpring,
   withTiming,
+  ZoomIn,
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { scheduleOnRN } from 'react-native-worklets';
 
 import { success, thud, tick } from '../haptics';
 import { play } from '../sounds';
-import { accentAt, colors, fonts, roman, ROW_HEIGHT } from '../theme';
+import { useTheme } from '../ThemeContext';
+import { accentAt, fonts, type Palette, paperAt, roman, ROW_HEIGHT } from '../theme';
+import { PaperOverlay } from './PaperOverlay';
 import { Roller } from './Roller';
 import { RowInput } from './RowInput';
 import { LEAD_WIDTH, type Lead, RowLead } from './RowLead';
@@ -43,6 +46,8 @@ const SPRING = { damping: 24, stiffness: 240 } as const;
 const UNROLL_MS = 420;
 const ROLL_UP_MS = 240;
 const UNCLIPPED = 100000;
+/** A fresh wax seal lands this long after the shelf appears, once the eye has found the scroll. */
+export const STAMP_DELAY_MS = 350;
 /** Average advance of the 18pt item text, used to size the strike drawn while swiping. */
 const CHAR_WIDTH = 9.4;
 
@@ -65,6 +70,8 @@ export type GestureListRow = {
   badgeAccent?: boolean;
   /** Shelf only: stamps the scroll with a wax seal in place of its badge. */
   sealed?: boolean;
+  /** The seal was just earned: press it on with a stamp instead of simply showing it. */
+  stamp?: boolean;
 };
 
 type GestureListProps = {
@@ -111,6 +118,7 @@ export const GestureList: FC<GestureListProps> = ({
   onRenameTitle,
   onBack,
 }) => {
+  const { colors, styles } = useTheme(makeStyles);
   const insets = useSafeAreaInsets();
   const { width: screenWidth } = useWindowDimensions();
   const scrollView = useRef<ComponentRef<typeof NativeScrollView>>(null);
@@ -161,18 +169,18 @@ export const GestureList: FC<GestureListProps> = ({
   };
 
   const leadFor = (row: GestureListRow, index: number): Lead => {
-    if (isShelf) return { kind: 'initial', text: row.text, pigment: colors.ink };
-    if (row.section) return { kind: 'initial', text: row.text, pigment: colors.accent };
+    if (isShelf) return { kind: 'initial', text: row.text, pigment: colors.ink, letter: colors.paperFrom };
+    if (row.section) return { kind: 'initial', text: row.text, pigment: colors.accent, letter: colors.paperFrom };
     if (row.done) return { kind: 'label', label: '✓', color: colors.inkFaded };
-    return { kind: 'label', label: roman(numbers[index] ?? 0), color: accentAt(index, rowCount) };
+    return { kind: 'label', label: roman(numbers[index] ?? 0), color: accentAt(colors, index, rowCount) };
   };
 
   // While typing, a trailing colon previews the row as a section.
   const draftLead = (text: string): Lead => {
     const trimmed = text.trim();
-    if (isShelf) return { kind: 'initial', text: trimmed, pigment: colors.ink };
+    if (isShelf) return { kind: 'initial', text: trimmed, pigment: colors.ink, letter: colors.paperFrom };
     if (trimmed.length > 1 && (trimmed.endsWith(':') || trimmed.startsWith('#'))) {
-      return { kind: 'initial', text: trimmed.replace(/^#+\s*/, ''), pigment: colors.accent };
+      return { kind: 'initial', text: trimmed.replace(/^#+\s*/, ''), pigment: colors.accent, letter: colors.paperFrom };
     }
     return { kind: 'label', label: '+', color: colors.accent };
   };
@@ -347,11 +355,17 @@ export const GestureList: FC<GestureListProps> = ({
     setTimeout(() => setDragging(false), 80);
   };
 
+  // The paper shades down the scroll; a row being written takes its place in that run like any other.
+  const paperTotal = rowCount + (addIndex === null ? 0 : 1);
+  const paperFor = (index: number, done = false) =>
+    paperAt(colors, index + (addIndex !== null && index >= addIndex ? 1 : 0), paperTotal, done);
+
   const input =
     addIndex === null ? null : (
       <RowInput
         key="new-row"
         leadFor={draftLead}
+        paper={paperAt(colors, addIndex, paperTotal)}
         placeholder={placeholder}
         rolled={isShelf}
         onLines={addLines}
@@ -370,15 +384,18 @@ export const GestureList: FC<GestureListProps> = ({
           {row.text}
         </Text>
         {row.sealed ? (
-          <View style={styles.seal}>
+          <Animated.View
+            style={styles.seal}
+            entering={row.stamp ? ZoomIn.delay(STAMP_DELAY_MS).springify().damping(11).stiffness(220) : undefined}
+          >
             <Text style={styles.sealMark}>✓</Text>
-          </View>
+          </Animated.View>
         ) : row.badge ? (
           <Text style={[styles.badge, row.badgeAccent && styles.badgeAccent]}>{row.badge}</Text>
         ) : null}
       </>
     );
-    return isShelf ? <View style={styles.rolled}>{content}</View> : content;
+    return isShelf ? <View style={[styles.rolled, { backgroundColor: paperFor(index) }]}>{content}</View> : content;
   };
 
   return (
@@ -411,7 +428,7 @@ export const GestureList: FC<GestureListProps> = ({
       </View>
       {isShelf ? null : (
         <View style={styles.topRoller}>
-          <Roller />
+          <Roller paper={colors.paperFrom} />
         </View>
       )}
       <GestureDetector gesture={gesture}>
@@ -450,6 +467,7 @@ export const GestureList: FC<GestureListProps> = ({
                   <RowInput
                     key={row.id}
                     leadFor={draftLead}
+                    paper={paperFor(index, row.done)}
                     placeholder={placeholder}
                     initialText={row.section ? `${row.text}:` : row.text}
                     rolled={isShelf}
@@ -458,7 +476,7 @@ export const GestureList: FC<GestureListProps> = ({
                 ) : (
                   <SwipeRow
                     key={row.id}
-                    color={isShelf ? colors.desk : row.done ? colors.parchmentShade : colors.parchment}
+                    color={isShelf ? colors.desk : paperFor(index, row.done)}
                     index={index}
                     rowCount={rowCount}
                     draggable={!row.done}
@@ -488,8 +506,13 @@ export const GestureList: FC<GestureListProps> = ({
                 {rowCount === 0 && !busy ? <Text style={styles.hint}>{emptyHint}</Text> : null}
                 {finished && !busy ? <Text style={styles.finis}>❦  FINIS  ❦</Text> : null}
               </Pressable>
+              {isShelf ? null : <PaperOverlay />}
             </Animated.View>
-            {isShelf ? null : <Roller />}
+            {isShelf ? null : (
+              <View style={styles.bottomRoller}>
+                <Roller paper={colors.paperTo} />
+              </View>
+            )}
             <Pressable style={styles.tapZone} disabled={busy} onPress={() => press(() => setAddIndex(endIndex))} />
           </ScrollView>
         </View>
@@ -498,21 +521,23 @@ export const GestureList: FC<GestureListProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: Palette) =>
+  StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.desk },
   fill: { flex: 1 },
   header: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 20, height: 56 },
-  back: { color: colors.accent, fontSize: 34, lineHeight: 36 },
+  back: { color: colors.onDesk, fontSize: 34, lineHeight: 36 },
   title: { color: colors.onDesk, fontFamily: fonts.display, fontSize: 30 },
   titleInput: { flex: 1, padding: 0 },
   readout: { color: colors.onDeskFaded, fontFamily: fonts.label, fontSize: 11, letterSpacing: 1.2 },
   content: { flexGrow: 1 },
-  topRoller: { zIndex: 1, marginBottom: -7 },
-  sheet: { marginHorizontal: 20, overflow: 'hidden', backgroundColor: colors.parchment },
+  topRoller: { zIndex: 1, marginBottom: -12 },
+  bottomRoller: { zIndex: 1, marginTop: -12 },
+  sheet: { marginHorizontal: 20, overflow: 'hidden', backgroundColor: colors.paperTo },
   shelf: { paddingTop: 4 },
   pullSpace: { justifyContent: 'flex-end', overflow: 'hidden' },
   pullRow: { height: ROW_HEIGHT, justifyContent: 'center', paddingHorizontal: 16, backgroundColor: colors.accent },
-  pullText: { color: colors.onAction, fontFamily: fonts.label, fontSize: 12, letterSpacing: 1.6 },
+  pullText: { color: colors.paperFrom, fontFamily: fonts.label, fontSize: 12, letterSpacing: 1.6 },
   rolled: {
     flex: 1,
     flexDirection: 'row',
@@ -523,7 +548,6 @@ const styles = StyleSheet.create({
     borderLeftWidth: 6,
     borderRightWidth: 6,
     borderColor: colors.gold,
-    backgroundColor: colors.parchment,
   },
   rowText: { color: colors.ink, fontSize: 18, fontWeight: '500' },
   sectionText: { fontFamily: fonts.display, fontSize: 26, fontWeight: '400' },

@@ -18,7 +18,8 @@ import Animated, {
 import { scheduleOnRN } from 'react-native-worklets';
 
 import { thud, tick } from '../haptics';
-import { colors, ROW_HEIGHT } from '../theme';
+import { useTheme } from '../ThemeContext';
+import { type Palette, ROW_HEIGHT } from '../theme';
 
 const TRIGGER_DISTANCE = 84;
 const TAP_SLOP = 8;
@@ -91,6 +92,7 @@ export const SwipeRow: FC<SwipeRowProps> = ({
   onDragStart,
   onDrop,
 }) => {
+  const { colors, styles } = useTheme(makeStyles);
   const { width, height } = useWindowDimensions();
   const offsetX = useSharedValue(0);
   const armed = useSharedValue(0);
@@ -239,7 +241,8 @@ export const SwipeRow: FC<SwipeRowProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: Palette) =>
+  StyleSheet.create({
   container: {
     height: ROW_HEIGHT,
     shadowColor: '#000',
