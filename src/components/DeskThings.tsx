@@ -38,13 +38,18 @@ type DeskThingsProps = {
   scrolls: number;
   /** The quill is taken up: start a new scroll. */
   onPen: () => void;
+  /** The candle is touched: turn day to night, or night to day. */
+  onCandle: () => void;
+  /** Whether it is night, for VoiceOver. */
+  night: boolean;
 };
 
 /**
  * The scribe's things, low on the Library's desk: a lit candle, and an inkwell whose quill is the
  * visible way to start a scroll. Tapping it dips the quill, and the candle gutters in the draught.
+ * Touching the candle turns day to night and back.
  */
-export const DeskThings: FC<DeskThingsProps> = ({ scrolls, onPen }) => {
+export const DeskThings: FC<DeskThingsProps> = ({ scrolls, onPen, onCandle, night }) => {
   const insets = useSafeAreaInsets();
   const { height: screen } = useWindowDimensions();
   const still = useReducedMotion();
@@ -98,7 +103,17 @@ export const DeskThings: FC<DeskThingsProps> = ({ scrolls, onPen }) => {
   return (
     <View pointerEvents="box-none" style={[styles.things, { bottom: insets.bottom + FOOT }]}>
       {candle ? (
-        <View pointerEvents="none" style={{ width: CANDLE, height: candleHeight }} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+        <Pressable
+          onPress={() => {
+            if (!still) flare.value = withSequence(withTiming(1, { duration: 160 }), withTiming(0, { duration: 520, easing: Easing.out(Easing.cubic) }));
+            onCandle();
+          }}
+          hitSlop={10}
+          accessibilityRole="switch"
+          accessibilityLabel="Night Vigil"
+          accessibilityState={{ checked: night }}
+          style={{ width: CANDLE, height: candleHeight }}
+        >
           <Animated.View
             style={[styles.glow, { left: CANDLE * WICK.x - GLOW / 2, top: candleHeight * WICK.y - GLOW / 2 - FLAME.height / 2 }, glowStyle]}
           >
@@ -135,7 +150,7 @@ export const DeskThings: FC<DeskThingsProps> = ({ scrolls, onPen }) => {
               <Path d="M15 34 C 17 40, 21 44, 20 50 C 19 55, 17 57, 15 57 C 13 57, 11 55, 10 50 C 9 45, 13 40, 15 34 Z" fill="#5a78c8" opacity={0.35} />
             </Svg>
           </Animated.View>
-        </View>
+        </Pressable>
       ) : (
         <View />
       )}

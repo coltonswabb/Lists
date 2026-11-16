@@ -9,6 +9,7 @@ import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-cont
 
 import { pickBackup, shareBackup } from './backup';
 import { ChronicleScreen } from './components/ChronicleScreen';
+import { DayNightVeil } from './components/DayNightVeil';
 import { DeskThings } from './components/DeskThings';
 import { tick } from './haptics';
 import { Desk } from './components/Desk';
@@ -68,7 +69,7 @@ const scrollRows = (items: Item[]): { rows: GestureListRow[]; visible: Item[] } 
 
 type Settings = ReturnType<typeof useSettings>;
 
-const Screens: FC<{ settings: Settings; address: Address }> = ({ settings, address }) => {
+const Screens: FC<{ settings: Settings; address: Address; onCandle: () => void }> = ({ settings, address, onCandle }) => {
   const { colors, styles } = useTheme(makeStyles);
   const insets = useSafeAreaInsets();
   const store = useLists();
@@ -374,6 +375,8 @@ const Screens: FC<{ settings: Settings; address: Address }> = ({ settings, addre
       />
       <DeskThings
         scrolls={store.lists.length}
+        onCandle={onCandle}
+        night={settings.theme === 'vigil'}
         onPen={() => {
           tick();
           say('penning');
@@ -404,6 +407,13 @@ export const App: FC = () => {
   });
   const settings = useSettings();
   const palette = useMemo(() => paletteOf(settings.theme), [settings.theme]);
+  // The sky being drawn over the desk while the candle turns day to night or back.
+  const [turning, setTurning] = useState<'night' | 'day' | null>(null);
+  const turnSky = () => {
+    if (turning) return;
+    tick();
+    setTurning(settings.theme === 'vigil' ? 'day' : 'night');
+  };
   return (
     <GestureHandlerRootView style={{ flex: 1, backgroundColor: palette.desk }}>
       <SafeAreaProvider>
@@ -411,10 +421,20 @@ export const App: FC = () => {
           <StatusBar style="light" />
           <Desk />
           {!fontsLoaded || !settings.loaded ? null : settings.address ? (
-            <Screens settings={settings} address={settings.address} />
+            <Screens settings={settings} address={settings.address} onCandle={turnSky} />
           ) : (
             <ScribeWelcome onChoose={settings.chooseAddress} />
           )}
+          {turning ? (
+            <DayNightVeil
+              to={turning}
+              onCovered={settings.toggleNight}
+              onDone={() => {
+                say(turning === 'night' ? 'nightfall' : 'daybreak');
+                setTurning(null);
+              }}
+            />
+          ) : null}
         </ThemeProvider>
       </SafeAreaProvider>
     </GestureHandlerRootView>

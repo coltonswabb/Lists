@@ -24,7 +24,21 @@ const remarks = {
   strike: ['Struck from the record.', 'Consider it forgotten, {t}.', 'It never was, {t}.'],
   finish: ['All is done, {t}. I shall fetch the wax.'],
   restore: ['As it was, {t}.', 'Restored, {t}.'],
-  penning: ['Penning, {t}.', 'I dip the quill, {t}.', 'The quill is ready, {t}.'],
+  penning: ['Penning, {t}.', 'I dip the quill, {t}.', 'Quill at hand, {t}.'],
+  nightfall: [
+    'Night is upon us, {t}.',
+    '{t} plans most fiercely by night.',
+    'Darkness, {t}. Excellent for secrets.',
+    'The owls keep the same hours, {t}.',
+    'I shall mind the candle, {t}. Mostly.',
+  ],
+  daybreak: [
+    'A new day dawns, {t}.',
+    'The cock crows, {t}. Rudely.',
+    'Morning already? I had only just sharpened the quill.',
+    'The sun returns, {t}, as promised.',
+    '{t} rises before the bakers.',
+  ],
   newScroll: ['A fresh scroll, {t}.', 'I have cut a new sheet, {t}.'],
   bigClear: ['A fine day’s work, {t}.', 'The page breathes again, {t}.'],
   seal: ['Sealed, and set down in the chronicle.', 'I have pressed the wax, {t}.'],
@@ -67,7 +81,11 @@ export const say = (remark: Remark) => {
   if (mode === 'silent' || (mode === 'quiet' && !worthSaying.includes(remark))) return;
   const options = remarks[remark];
   const line = options[Math.floor(Math.random() * options.length)] ?? options[0];
-  const spoken = line.replace('{t}', addresses[address]);
+  // A line may open with the form of address, which then takes a capital ("My liege plans…").
+  const title = addresses[address];
+  const spoken = line.startsWith('{t}')
+    ? line.replace('{t}', title.charAt(0).toUpperCase() + title.slice(1))
+    : line.replace('{t}', title);
   listeners.forEach((listener) => listener(spoken));
 };
 
