@@ -1,3 +1,5 @@
+import { feastOn } from './calendar';
+
 /** How the scribe addresses the user. Chosen once, on first launch. */
 export type Address = 'lord' | 'lady' | 'liege';
 
@@ -24,6 +26,9 @@ const remarks = {
   restore: ['As it was, {t}.', 'Restored, {t}.'],
   newScroll: ['A fresh scroll, {t}.', 'I have cut a new sheet, {t}.'],
   bigClear: ['A fine day’s work, {t}.', 'The page breathes again, {t}.'],
+  seal: ['Sealed, and set down in the chronicle.', 'I have pressed the wax, {t}.'],
+  renew: ['It shall be renewed each dawn, {t}.'],
+  moved: ['Carried over, {t}.', 'It is moved, {t}.'],
 } as const;
 
 export type Remark = keyof typeof remarks;
@@ -31,7 +36,7 @@ export type Remark = keyof typeof remarks;
 let address: Address = 'liege';
 let mode: ScribeMode = 'chatty';
 /** What a quiet scribe still thinks worth saying. */
-const worthSaying: Remark[] = ['finish', 'bigClear'];
+const worthSaying: Remark[] = ['finish', 'bigClear', 'seal'];
 
 export const setScribeMode = (value: ScribeMode) => {
   mode = value;
@@ -47,7 +52,8 @@ export const standing = {
   welcome: (to: Address, hour = new Date().getHours()) => {
     const greeting =
       hour < 5 ? 'Thou art up late' : hour < 12 ? 'Good morrow' : hour < 17 ? 'Good day' : hour < 22 ? 'Good even' : 'Thou art up late';
-    return `${greeting}, ${addresses[to]}.`;
+    const feast = feastOn(new Date());
+    return feast ? `${greeting}, ${addresses[to]}. ’Tis ${feast}.` : `${greeting}, ${addresses[to]}.`;
   },
   dust: (scroll: string, to: Address) => `“${scroll}” gathers dust, ${addresses[to]}.`,
   decree: (to: Address) => `What is thy decree, ${addresses[to]}?`,

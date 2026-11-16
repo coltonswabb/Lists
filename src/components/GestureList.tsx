@@ -109,7 +109,7 @@ type GestureListProps = {
   onDelete: (id: string) => void;
   onMove: (from: number, to: number) => void;
   onComplete?: (id: string) => void;
-  /** Tap on a row's margin mark, for rows where that differs from a tap on its text. */
+  /** Tap on a row's margin mark, when that should do something other than a tap on its text. */
   onPressLead?: (id: string) => void;
   /** Tap opens the row. Without it, tap renames the row. */
   onOpen?: (id: string) => void;
@@ -119,6 +119,8 @@ type GestureListProps = {
   backLabel?: string;
   /** Pulling up past the end of the rows clears the finished ones. Absent when there are none. */
   onPullUp?: () => void;
+  /** Drawn in the margin beside "Finis" once every item is done. */
+  finisArt?: ReactNode;
 };
 
 export const GestureList: FC<GestureListProps> = ({
@@ -141,6 +143,7 @@ export const GestureList: FC<GestureListProps> = ({
   onBack,
   backLabel,
   onPullUp,
+  finisArt,
 }) => {
   const { colors, styles } = useTheme(makeStyles);
   const insets = useSafeAreaInsets();
@@ -658,7 +661,7 @@ export const GestureList: FC<GestureListProps> = ({
                     onDelete={() => onDelete(row.id)}
                     onComplete={onComplete && !row.section ? () => onComplete(row.id) : undefined}
                     onPress={() => press(() => (onOpen ? onOpen(row.id) : setEditingId(row.id)))}
-                    onPressLead={onPressLead && row.section ? () => press(() => onPressLead(row.id)) : undefined}
+                    onPressLead={onPressLead ? () => press(() => onPressLead(row.id)) : undefined}
                     strikeWidth={strikeFor(row)}
                     scrollY={scrollY}
                     onEdge={nudgeScroll}
@@ -674,8 +677,13 @@ export const GestureList: FC<GestureListProps> = ({
 
               {footer}
 
-              <Pressable style={styles.tail} disabled={busy} onPress={() => press(() => setAddIndex(endIndex))}>
+              <Pressable
+                style={[styles.tail, finished && finisArt ? styles.tailWithArt : null]}
+                disabled={busy}
+                onPress={() => press(() => setAddIndex(endIndex))}
+              >
                 {rowCount === 0 && !busy ? <Text style={styles.hint}>{emptyHint}</Text> : null}
+                {finished && !busy ? finisArt : null}
                 {finished && !busy ? <Text style={styles.finis}>❦  Finis  ❦</Text> : null}
               </Pressable>
               {isShelf ? null : <PaperOverlay />}
@@ -753,7 +761,8 @@ const makeStyles = (colors: Palette) =>
   },
   sealMark: { color: colors.onAction, fontSize: 14, fontWeight: '700' },
   finis: { color: colors.accent, fontFamily: fonts.bodyItalic, fontSize: 19 },
-  tail: { height: ROW_HEIGHT, alignItems: 'center', justifyContent: 'center' },
+  tail: { minHeight: ROW_HEIGHT, alignItems: 'center', justifyContent: 'center' },
+  tailWithArt: { paddingTop: 18, paddingBottom: 14, gap: 4 },
   tapZone: { flexGrow: 1, minHeight: ROW_HEIGHT },
   hint: { color: colors.inkFaded, fontFamily: fonts.bodyItalic, fontSize: 18 },
   clearHint: {

@@ -2,9 +2,14 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { parseReminder } from './reminder';
-import type { Item, List } from './types';
+import type { ChronicleEntry, Item, List, SealedList } from './types';
 
 const STORAGE_KEY = 'lists/v1';
+const CHRONICLE_KEY = 'decree/chronicle/v1';
+/** The chronicle keeps this many entries; older ones fall away. */
+const CHRONICLE_LENGTH = 1000;
+/** Daily scrolls are renewed from this hour, so a late night still counts as the day before. */
+const DAWN_HOUR = 4;
 
 const newId = () => `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
 
@@ -58,6 +63,7 @@ const starterLists = (): List[] => [
       'Swipe left to cast it out',
       'Tap to amend the wording',
       'Hold, then drag to reorder',
+      'Tap its numeral to move it',
       'Writing:',
       'Pull down to pen a new line',
       'Pinch apart to write between',
@@ -67,6 +73,79 @@ const starterLists = (): List[] => [
     ].map(newItem),
   },
 ];
+
+const isSealed = (value: unknown): value is SealedList =>
+  isList(value) && 'sealedAt' in value && typeof value.sealedAt === 'number';
+
+const isEntry = (value: unknown): value is ChronicleEntry =>
+  typeof value === 'object' &&
+  value !== null &&
+  'id' in value &&
+  typeof value.id === 'string' &&
+  'at' in value &&
+  typeof value.at === 'number' &&
+  'kind' in value &&
+  (value.kind === 'done' || value.kind === 'sealed') &&
+  'text' in value &&
+  typeof value.text === 'string' &&
+  'scroll' in value &&
+  typeof value.scroll === 'string';
+
+type Chronicle = { entries: ChronicleEntry[]; sealed: SealedList[] };
+
+const parseChronicle = (raw: string | null): Chronicle => {
+  try {
+    const parsed: unknown = raw === null ? null : JSON.parse(raw);
+    if (typeof parsed !== 'object' || parsed === null) return { entries: [], sealed: [] };
+    const entries = 'entries' in parsed && Array.isArray(parsed.entries) ? parsed.entries.filter(isEntry) : [];
+    const sealed = 'sealed' in parsed && Array.isArray(parsed.sealed) ? parsed.sealed.filter(isSealed) : [];
+    return { entries, sealed };
+  } catch {
+    return { entries: [], sealed: [] };
+  }
+};
+
+/** The local calendar day, as YYYY-MM-DD. */
+const dayOf = (date: Date) =>
+  `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+
+/** The day a daily scroll should last have been renewed: today once dawn has passed, else yesterday. */
+const renewalDay = (now: Date) =>
+  dayOf(now.getHours() >= DAWN_HOUR ? now : new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1));
+
+/** Renews every daily scroll whose day has turned: all its items are unmarked. */
+const renewDue = (lists: List[], now = new Date()): List[] => {
+  const day = renewalDay(now);
+  return lists.map((list) =>
+    list.daily && list.renewedOn !== day
+      ? { ...list, renewedOn: day, items: list.items.map((item) => (item.done ? { ...item, done: false } : item)) }
+      : list,
+  );
+};
+
+const BACKUP_APP = 'decree';
+const BACKUP_VERSION = 1;
+
+/** Everything the scribe keeps, as one JSON document that `readBackup` can take back. */
+export const writeBackup = (state: { lists: List[] } & Chronicle): string =>
+  JSON.stringify(
+    { app: BACKUP_APP, version: BACKUP_VERSION, savedAt: new Date().toISOString(), ...state },
+    null,
+    2,
+  );
+
+/** A backup's contents, or null if the text is not a Decree backup. */
+export const readBackup = (text: string): ({ lists: List[] } & Chronicle) | null => {
+  try {
+    const parsed: unknown = JSON.parse(text);
+    if (typeof parsed !== 'object' || parsed === null) return null;
+    if (!('app' in parsed) || parsed.app !== BACKUP_APP || !('lists' in parsed) || !Array.isArray(parsed.lists)) return null;
+    const { entries, sealed } = parseChronicle(JSON.stringify(parsed));
+    return { lists: parsed.lists.filter(isList), entries, sealed };
+  } catch {
+    return null;
+  }
+};
 
 const parseLists = (raw: string | null): List[] => {
   if (raw === null) return starterLists();
@@ -136,38 +215,59 @@ const moveRow = (items: Item[], from: number, to: number): Item[] => {
   return insertAt(rest, at, group);
 };
 
-export type Undo = { label: string; lists: List[] };
+type Kept = { lists: List[] } & Chronicle;
+
+export type Undo = { label: string; before: Kept };
 
 export const useLists = () => {
-  const [lists, setLists] = useState<List[]>([]);
+  const [kept, setKept] = useState<Kept>({ lists: [], entries: [], sealed: [] });
   const [loaded, setLoaded] = useState(false);
   const [undo, setUndo] = useState<Undo | null>(null);
-  const current = useRef<List[]>([]);
+  const current = useRef<Kept>(kept);
 
   useEffect(() => {
-    AsyncStorage.getItem(STORAGE_KEY)
-      .then(parseLists)
-      .catch((): List[] => [])
-      .then((stored) => {
-        current.current = stored;
-        setLists(stored);
-        setLoaded(true);
-      });
+    Promise.all([
+      AsyncStorage.getItem(STORAGE_KEY)
+        .then(parseLists)
+        .catch((): List[] => []),
+      AsyncStorage.getItem(CHRONICLE_KEY)
+        .then(parseChronicle)
+        .catch((): Chronicle => ({ entries: [], sealed: [] })),
+    ]).then(([lists, chronicle]) => {
+      const stored = { lists: renewDue(lists), ...chronicle };
+      current.current = stored;
+      setKept(stored);
+      setLoaded(true);
+    });
   }, []);
 
   useEffect(() => {
     if (!loaded) return;
-    AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(lists)).catch(() => undefined);
-  }, [lists, loaded]);
+    AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(kept.lists)).catch(() => undefined);
+  }, [kept.lists, loaded]);
 
-  /** Applies a change. Passing `undoLabel` makes the change undoable under that label. */
-  const apply = useCallback((update: (lists: List[]) => List[], undoLabel?: string) => {
+  useEffect(() => {
+    if (!loaded) return;
+    AsyncStorage.setItem(CHRONICLE_KEY, JSON.stringify({ entries: kept.entries, sealed: kept.sealed })).catch(
+      () => undefined,
+    );
+  }, [kept.entries, kept.sealed, loaded]);
+
+  /** Applies a change to everything kept. Passing `undoLabel` makes the change undoable under that label. */
+  const applyAll = useCallback((update: (kept: Kept) => Kept, undoLabel?: string) => {
     const before = current.current;
     const after = update(before);
+    if (after === before) return;
     current.current = after;
-    setLists(after);
-    if (undoLabel) setUndo({ label: undoLabel, lists: before });
+    setKept(after);
+    if (undoLabel) setUndo({ label: undoLabel, before });
   }, []);
+
+  const apply = useCallback(
+    (update: (lists: List[]) => List[], undoLabel?: string) =>
+      applyAll((all) => ({ ...all, lists: update(all.lists) }), undoLabel),
+    [applyAll],
+  );
 
   const applyToItems = useCallback(
     (listId: string, update: (items: Item[]) => Item[], undoLabel?: string) => {
@@ -182,14 +282,22 @@ export const useLists = () => {
   const undoLast = useCallback(() => {
     setUndo((pending) => {
       if (pending) {
-        current.current = pending.lists;
-        setLists(pending.lists);
+        current.current = pending.before;
+        setKept(pending.before);
       }
       return null;
     });
   }, []);
 
   const dismissUndo = useCallback(() => setUndo(null), []);
+
+  /** Unmarks daily scrolls whose day has turned. Called when the app comes back to the front. */
+  const renew = useCallback(() => {
+    applyAll((all) => {
+      const lists = renewDue(all.lists);
+      return lists.some((list, index) => list !== all.lists[index]) ? { ...all, lists } : all;
+    });
+  }, [applyAll]);
 
   const addLists = useCallback(
     (names: string[], index: number) => {
@@ -205,13 +313,55 @@ export const useLists = () => {
 
   const deleteList = useCallback(
     (id: string) => {
-      const name = current.current.find((l) => l.id === id)?.name ?? 'list';
-      apply((all) => all.filter((l) => l.id !== id), `Struck “${name}”`);
+      const name = current.current.lists.find((l) => l.id === id)?.name ?? 'list';
+      apply((all) => all.filter((l) => l.id !== id), `Cast out “${name}”`);
     },
     [apply],
   );
 
   const moveList = useCallback((from: number, to: number) => apply((all) => move(all, from, to)), [apply]);
+
+  /** Takes a scroll off the shelf and keeps it, sealed, in the chronicle. */
+  const sealList = useCallback(
+    (id: string) => {
+      const list = current.current.lists.find((l) => l.id === id);
+      if (!list) return;
+      const now = Date.now();
+      applyAll(
+        (all) => ({
+          lists: all.lists.filter((l) => l.id !== id),
+          sealed: [{ ...list, sealedAt: now }, ...all.sealed],
+          entries: [...all.entries, { id: newId(), at: now, kind: 'sealed' as const, text: list.name, scroll: list.name }].slice(
+            -CHRONICLE_LENGTH,
+          ),
+        }),
+        `Sealed “${list.name}”`,
+      );
+    },
+    [applyAll],
+  );
+
+  /** Breaks a scroll's seal and puts it back at the top of the shelf. */
+  const unsealList = useCallback(
+    (id: string) => {
+      applyAll((all) => {
+        const found = all.sealed.find((l) => l.id === id);
+        if (!found) return all;
+        const { sealedAt: _sealedAt, ...list } = found;
+        return { ...all, sealed: all.sealed.filter((l) => l.id !== id), lists: [{ ...list, touchedAt: Date.now() }, ...all.lists] };
+      });
+    },
+    [applyAll],
+  );
+
+  /** Destroys a sealed scroll for good. Its lines in the chronicle remain. */
+  const burnSealed = useCallback(
+    (id: string) => {
+      const name = current.current.sealed.find((l) => l.id === id)?.name ?? 'scroll';
+      applyAll((all) => ({ ...all, sealed: all.sealed.filter((l) => l.id !== id) }), `Burned “${name}”`);
+    },
+    [applyAll],
+  );
 
   const addItems = useCallback(
     (listId: string, texts: string[], index: number) => {
@@ -242,18 +392,39 @@ export const useLists = () => {
     [applyToItems],
   );
 
+  /** Marks an item done or not. Marking it done writes a line in the chronicle; unmarking takes the line back. */
   const toggleItem = useCallback(
     (listId: string, id: string) => {
-      applyToItems(listId, (items) => sinkDone(items.map((i) => (i.id === id && !i.section ? { ...i, done: !i.done } : i))));
+      applyAll((all) => {
+        const list = all.lists.find((l) => l.id === listId);
+        const item = list?.items.find((i) => i.id === id);
+        if (!list || !item || item.section) return all;
+        const lists = all.lists.map((l) =>
+          l.id === listId
+            ? { ...l, items: sinkDone(l.items.map((i) => (i.id === id ? { ...i, done: !i.done } : i))), touchedAt: Date.now() }
+            : l,
+        );
+        let entries: ChronicleEntry[];
+        if (item.done) {
+          const last = all.entries.findLastIndex((e) => e.itemId === id);
+          entries = last < 0 ? all.entries : all.entries.filter((_, index) => index !== last);
+        } else {
+          entries = [
+            ...all.entries,
+            { id: newId(), at: Date.now(), kind: 'done' as const, text: item.text, scroll: list.name, itemId: id },
+          ].slice(-CHRONICLE_LENGTH);
+        }
+        return { ...all, lists, entries };
+      });
     },
-    [applyToItems],
+    [applyAll],
   );
 
   const deleteItem = useCallback(
     (listId: string, id: string) => {
-      const items = current.current.find((l) => l.id === listId)?.items ?? [];
+      const items = current.current.lists.find((l) => l.id === listId)?.items ?? [];
       const text = items.find((i) => i.id === id)?.text ?? 'item';
-      applyToItems(listId, (all) => all.filter((i) => i.id !== id), `Struck “${text}”`);
+      applyToItems(listId, (all) => all.filter((i) => i.id !== id), `Cast out “${text}”`);
     },
     [applyToItems],
   );
@@ -261,6 +432,27 @@ export const useLists = () => {
   const moveItem = useCallback(
     (listId: string, from: number, to: number) => applyToItems(listId, (items) => sinkDone(moveRow(items, from, to))),
     [applyToItems],
+  );
+
+  /** Carries an item to the top of another scroll. */
+  const sendItem = useCallback(
+    (fromListId: string, id: string, toListId: string) => {
+      const item = current.current.lists.find((l) => l.id === fromListId)?.items.find((i) => i.id === id);
+      if (!item || item.section || fromListId === toListId) return;
+      const now = Date.now();
+      apply(
+        (all) =>
+          all.map((l) =>
+            l.id === fromListId
+              ? { ...l, items: l.items.filter((i) => i.id !== id), touchedAt: now }
+              : l.id === toListId
+                ? { ...l, items: sinkDone([item, ...l.items]), touchedAt: now }
+                : l,
+          ),
+        `Moved “${item.text}”`,
+      );
+    },
+    [apply],
   );
 
   const toggleSection = useCallback(
@@ -277,6 +469,15 @@ export const useLists = () => {
       applyToItems(listId, (items) => items.map((i) => ({ ...i, done: false })), 'Unmarked every item');
     },
     [applyToItems],
+  );
+
+  /** Makes a scroll renew itself each dawn, or stop doing so. */
+  const setDaily = useCallback(
+    (listId: string, daily: boolean) => {
+      const day = renewalDay(new Date());
+      apply((all) => all.map((l) => (l.id === listId ? { ...l, daily, renewedOn: daily ? day : undefined } : l)));
+    },
+    [apply],
   );
 
   const clearDone = useCallback(
@@ -298,23 +499,42 @@ export const useLists = () => {
     [applyToItems],
   );
 
+  /** Everything kept, as a backup document. */
+  const backup = useCallback(() => writeBackup(current.current), []);
+
+  /** Replaces everything with a backup's contents. Undoable, in case the wrong file was chosen. */
+  const restore = useCallback(
+    (contents: Kept) => applyAll(() => ({ ...contents, lists: renewDue(contents.lists) }), 'Restored from the backup'),
+    [applyAll],
+  );
+
   return {
-    lists,
+    lists: kept.lists,
+    entries: kept.entries,
+    sealed: kept.sealed,
     loaded,
     undo,
     undoLast,
     dismissUndo,
+    renew,
     addLists,
     renameList,
     deleteList,
     moveList,
+    sealList,
+    unsealList,
+    burnSealed,
     addItems,
     renameItem,
     toggleItem,
     deleteItem,
     moveItem,
+    sendItem,
     toggleSection,
     uncheckAll,
+    setDaily,
     clearDone,
+    backup,
+    restore,
   };
 };

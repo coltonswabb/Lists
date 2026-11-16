@@ -3,14 +3,18 @@ import { PirataOne_400Regular } from '@expo-google-fonts/pirata-one';
 import { useFonts } from 'expo-font';
 import { StatusBar } from 'expo-status-bar';
 import { type FC, useEffect, useMemo, useState } from 'react';
-import { BackHandler, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Alert, AppState, BackHandler, Pressable, Share, StyleSheet, Text, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { pickBackup, shareBackup } from './backup';
+import { ChronicleScreen } from './components/ChronicleScreen';
 import { GestureList, type GestureListRow, STAMP_DELAY_MS } from './components/GestureList';
+import { Marginalia } from './components/Marginalia';
 import { ScribeLine } from './components/ScribeLine';
 import { ScribeWelcome } from './components/ScribeWelcome';
 import { SearchScreen } from './components/SearchScreen';
+import { SendSheet } from './components/SendSheet';
 import { SettingsScreen } from './components/SettingsScreen';
 import { UndoToast } from './components/UndoToast';
 import { formatReminder } from './reminder';
@@ -58,6 +62,24 @@ const scrollRows = (items: Item[]): { rows: GestureListRow[]; visible: Item[] } 
   return { rows, visible };
 };
 
+/** A scroll as plain text, for sharing: open items numbered, finished ones ticked, headings on their own lines. */
+const scrollAsText = (list: List) => {
+  const lines = [list.name, ''];
+  let number = 0;
+  for (const item of list.items) {
+    if (item.section) {
+      number = 0;
+      lines.push('', item.text.toUpperCase());
+    } else if (item.done) {
+      lines.push(`✓ ${item.text}`);
+    } else {
+      number += 1;
+      lines.push(`${roman(number)}. ${item.text}`);
+    }
+  }
+  return lines.join('\n').replace(/\n{3,}/g, '\n\n').trim();
+};
+
 type Settings = ReturnType<typeof useSettings>;
 
 const Screens: FC<{ settings: Settings; address: Address }> = ({ settings, address }) => {
@@ -65,6 +87,18 @@ const Screens: FC<{ settings: Settings; address: Address }> = ({ settings, addre
   const insets = useSafeAreaInsets();
   const store = useLists();
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [chronicleOpen, setChronicleOpen] = useState(false);
+  /** The item whose margin was tapped, to be carried to another scroll. */
+  const [sending, setSending] = useState<{ listId: string; itemId: string; text: string } | null>(null);
+  const { renew } = store;
+
+  // Daily scrolls renew at dawn, so a day can turn while the app sits in the background.
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (state) => {
+      if (state === 'active') renew();
+    });
+    return () => subscription.remove();
+  }, [renew]);
   /** A silent scribe says nothing at all, not even its standing lines. */
   const spoken = (line: string) => (settings.scribe === 'silent' ? '' : line);
 
@@ -91,15 +125,16 @@ const Screens: FC<{ settings: Settings; address: Address }> = ({ settings, addre
   const openList = store.lists.find((list) => list.id === openListId);
 
   useEffect(() => {
-    if (!openList && !searching && !settingsOpen) return;
+    if (!openList && !searching && !settingsOpen && !chronicleOpen) return;
     const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
       if (settingsOpen) setSettingsOpen(false);
+      else if (chronicleOpen) setChronicleOpen(false);
       else if (searching) setSearching(false);
       else setOpenListId(null);
       return true;
     });
     return () => subscription.remove();
-  }, [openList, searching, settingsOpen]);
+  }, [openList, searching, settingsOpen, chronicleOpen]);
 
   useEffect(() => {
     if (!freshSeal || openListId) return;
@@ -111,7 +146,63 @@ const Screens: FC<{ settings: Settings; address: Address }> = ({ settings, addre
     };
   }, [freshSeal, openListId]);
 
-  if (settingsOpen) return <SettingsScreen settings={settings} onClose={() => setSettingsOpen(false)} />;
+  const backUp = () => {
+    shareBackup(store.backup()).catch(() =>
+      Alert.alert('The backup could not be made', 'Nothing was changed. Try again in a moment.'),
+    );
+  };
+
+  const restoreFromFile = () => {
+    pickBackup()
+      .then((picked) => {
+        if (picked.kind === 'canceled') return;
+        if (picked.kind === 'invalid') {
+          Alert.alert('Not a Decree backup', 'That file holds no scrolls this scribe can read.');
+          return;
+        }
+        const { lists, sealed, entries } = picked.contents;
+        Alert.alert(
+          'Restore this backup?',
+          `It holds ${lists.length} scroll${lists.length === 1 ? '' : 's'}, ${sealed.length} sealed, and ${entries.length} lines of chronicle. They will replace everything now kept.`,
+          [
+            { text: 'Keep what I have', style: 'cancel' },
+            { text: 'Restore', style: 'destructive', onPress: () => store.restore(picked.contents) },
+          ],
+        );
+      })
+      .catch(() => Alert.alert('The backup could not be read', 'Nothing was changed.'));
+  };
+
+  if (settingsOpen) {
+    return (
+      <>
+        <SettingsScreen settings={settings} onClose={() => setSettingsOpen(false)} onBackup={backUp} onRestore={restoreFromFile} />
+        <UndoToast undo={store.undo} onUndo={undoLast} onDismiss={store.dismissUndo} offset={44} />
+      </>
+    );
+  }
+
+  if (chronicleOpen) {
+    return (
+      <>
+        <ChronicleScreen
+          entries={store.entries}
+          sealed={store.sealed}
+          address={address}
+          onClose={() => setChronicleOpen(false)}
+          onUnseal={(id) => {
+            say('restore');
+            store.unsealList(id);
+          }}
+          onBurn={(id) => {
+            play('seal');
+            store.burnSealed(id);
+          }}
+        />
+        <UndoToast undo={store.undo} onUndo={undoLast} onDismiss={store.dismissUndo} offset={44} />
+      </>
+    );
+  }
 
   if (searching) {
     return (
@@ -171,7 +262,12 @@ const Screens: FC<{ settings: Settings; address: Address }> = ({ settings, addre
             if (finishing && remaining === 1) setFreshSeal(openList.id);
             store.toggleItem(openList.id, id);
           }}
-          onPressLead={(id) => store.toggleSection(openList.id, id)}
+          onPressLead={(id) => {
+            const item = openList.items.find((i) => i.id === id);
+            if (!item) return;
+            if (item.section) store.toggleSection(openList.id, id);
+            else if (store.lists.length > 1) setSending({ listId: openList.id, itemId: id, text: item.text });
+          }}
           onRenameTitle={(name) => store.renameList(openList.id, name)}
           onBack={() => setOpenListId(null)}
           backLabel="Library"
@@ -183,15 +279,48 @@ const Screens: FC<{ settings: Settings; address: Address }> = ({ settings, addre
                 }
               : undefined
           }
+          finisArt={<Marginalia seed={openList.id} ink={colors.ink} accent={colors.accent} />}
           footer={
-            items.some((item) => item.done) ? (
+            items.length > 0 ? (
               <View style={styles.footer}>
-                <Pressable onPress={() => store.uncheckAll(openList.id)} hitSlop={10}>
-                  <Text style={styles.label}>Unmark all</Text>
+                <Pressable
+                  onPress={() => void Share.share({ message: scrollAsText(openList) })}
+                  hitSlop={10}
+                  accessibilityRole="button"
+                >
+                  <Text style={styles.label}>Share</Text>
                 </Pressable>
+                <Pressable
+                  onPress={() => {
+                    if (!openList.daily) say('renew');
+                    store.setDaily(openList.id, !openList.daily);
+                  }}
+                  hitSlop={10}
+                  accessibilityRole="switch"
+                  accessibilityState={{ checked: openList.daily === true }}
+                >
+                  <Text style={styles.label}>{openList.daily ? 'Renews at dawn ✓' : 'Renew at dawn'}</Text>
+                </Pressable>
+                {items.some((item) => item.done) ? (
+                  <Pressable onPress={() => store.uncheckAll(openList.id)} hitSlop={10} accessibilityRole="button">
+                    <Text style={styles.label}>Unmark all</Text>
+                  </Pressable>
+                ) : null}
               </View>
             ) : null
           }
+        />
+        <SendSheet
+          item={sending?.text ?? null}
+          scrolls={store.lists.filter((list) => list.id !== openList.id)}
+          onClose={() => setSending(null)}
+          onSend={(scrollId) => {
+            if (sending) {
+              say('moved');
+              store.sendItem(sending.listId, sending.itemId, scrollId);
+            }
+            setSending(null);
+          }}
         />
         <UndoToast undo={store.undo} onUndo={undoLast} onDismiss={store.dismissUndo} offset={44} />
       </>
@@ -240,12 +369,20 @@ const Screens: FC<{ settings: Settings; address: Address }> = ({ settings, addre
         }}
         onMove={store.moveList}
         onOpen={setOpenListId}
+        onComplete={(id) => {
+          play('seal');
+          say('seal');
+          store.sealList(id);
+        }}
       />
       <View style={[styles.controls, { paddingBottom: insets.bottom + 12 }]}>
-        <Pressable onPress={() => setSearching(true)} hitSlop={12}>
+        <Pressable onPress={() => setSearching(true)} hitSlop={12} accessibilityRole="button">
           <Text style={styles.deskLabel}>Search</Text>
         </Pressable>
-        <Pressable onPress={() => setSettingsOpen(true)} hitSlop={12}>
+        <Pressable onPress={() => setChronicleOpen(true)} hitSlop={12} accessibilityRole="button">
+          <Text style={styles.deskLabel}>Chronicle</Text>
+        </Pressable>
+        <Pressable onPress={() => setSettingsOpen(true)} hitSlop={12} accessibilityRole="button">
           <Text style={styles.deskLabel}>Settings</Text>
         </Pressable>
       </View>
@@ -280,7 +417,7 @@ export const App: FC = () => {
 
 const makeStyles = (colors: Palette) =>
   StyleSheet.create({
-  footer: { flexDirection: 'row', justifyContent: 'center', gap: 28, paddingTop: 20 },
+  footer: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', columnGap: 24, rowGap: 10, paddingTop: 20, paddingHorizontal: 12 },
   controls: { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 20, paddingTop: 12 },
   label: { color: colors.accent, fontFamily: fonts.bodyItalic, fontSize: 18 },
     // Labels that sit on the desk rather than on paper: the accent is tuned for paper and can be too dark here.

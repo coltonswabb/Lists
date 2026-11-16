@@ -13,10 +13,14 @@ const scribeLabels = { chatty: 'Chatty', quiet: 'Quiet', silent: 'Silent' } as c
 type SettingsScreenProps = {
   settings: ReturnType<typeof useSettings>;
   onClose: () => void;
+  /** Saves every scroll and the chronicle to a file, through the share sheet. */
+  onBackup: () => void;
+  /** Replaces everything with a chosen backup file. */
+  onRestore: () => void;
 };
 
 /** The papers are shown as themselves, so each can be judged before it is chosen. */
-export const SettingsScreen: FC<SettingsScreenProps> = ({ settings, onClose }) => {
+export const SettingsScreen: FC<SettingsScreenProps> = ({ settings, onClose, onBackup, onRestore }) => {
   const { styles } = useTheme(makeStyles);
   const insets = useSafeAreaInsets();
 
@@ -53,12 +57,21 @@ export const SettingsScreen: FC<SettingsScreenProps> = ({ settings, onClose }) =
         </View>
         <View style={styles.rows}>
           {rows.map((row) => (
-            <Pressable key={row.label} style={styles.row} onPress={row.onPress}>
+            <Pressable key={row.label} style={styles.row} onPress={row.onPress} accessibilityRole="button" accessibilityHint="Changes to the next choice">
               <Text style={styles.label}>{row.label}</Text>
               <Text style={styles.value}>{row.value}</Text>
             </Pressable>
           ))}
         </View>
+        <Text style={[styles.heading, styles.later]}>The library</Text>
+        <Pressable style={styles.row} onPress={onBackup} accessibilityRole="button">
+          <Text style={styles.label}>Back up</Text>
+          <Text style={styles.value}>to a file</Text>
+        </Pressable>
+        <Pressable style={styles.row} onPress={onRestore} accessibilityRole="button">
+          <Text style={styles.label}>Restore</Text>
+          <Text style={styles.value}>from a file</Text>
+        </Pressable>
       </ScrollView>
     </View>
   );
@@ -154,6 +167,7 @@ const makeStyles = (colors: Palette) =>
     seal: { width: 26, height: 26, borderRadius: 13, alignItems: 'center', justifyContent: 'center' },
     sealMark: { fontSize: 13, fontWeight: '700' },
     rows: { marginTop: 16 },
+    later: { marginTop: 16 },
     row: {
       height: 58,
       marginHorizontal: 20,

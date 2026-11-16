@@ -1,4 +1,4 @@
-import { type FC, useRef, useState } from 'react';
+import { type ComponentRef, type FC, useRef, useState } from 'react';
 import { StyleSheet, TextInput, View } from 'react-native';
 
 import { useTheme } from '../ThemeContext';
@@ -29,6 +29,12 @@ export const RowInput: FC<RowInputProps> = ({ leadFor, paper, placeholder, initi
   // What the input holds right now. On iOS a second Return can arrive before a re-render has cleared
   // the native field, so the state alone would hand the same line over twice.
   const latest = useRef(initialText);
+  const input = useRef<ComponentRef<typeof TextInput>>(null);
+  /**
+   * The text just handed over by Return. Keys typed straight after can reach the native field before it
+   * has been cleared, arriving as this text plus the new keys; the old part is dropped.
+   */
+  const submitted = useRef<string | null>(null);
   const ended = useRef(false);
 
   const show = (value: string) => {
@@ -49,12 +55,17 @@ export const RowInput: FC<RowInputProps> = ({ leadFor, paper, placeholder, initi
       end(line);
       return;
     }
+    submitted.current = latest.current;
+    input.current?.clear();
     show('');
     onLines([line]);
   };
 
   // The input is multiline so a pasted block keeps its line breaks: each line becomes a row.
-  const change = (value: string) => {
+  const change = (typed: string) => {
+    const stale = submitted.current;
+    const value = stale && typed.startsWith(stale) ? typed.slice(stale.length) : typed;
+    if (!stale || !typed.startsWith(stale)) submitted.current = null;
     if (!value.includes('\n')) {
       show(value);
       return;
@@ -75,6 +86,7 @@ export const RowInput: FC<RowInputProps> = ({ leadFor, paper, placeholder, initi
       <View style={[styles.inner, rolled && styles.rolledInner, rolled && { backgroundColor: paper }]}>
         <RowLead lead={leadFor(text)} />
         <TextInput
+          ref={input}
           autoFocus
           multiline
           scrollEnabled={false}
