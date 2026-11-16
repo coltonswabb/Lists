@@ -16,7 +16,6 @@ import { SealPress } from './components/SealPress';
 import { tick } from './haptics';
 import { Desk } from './components/Desk';
 import { GestureList, type GestureListActions, type GestureListRow, STAMP_DELAY_MS } from './components/GestureList';
-import { LEAD_WIDTH } from './components/RowLead';
 import { Marginalia } from './components/Marginalia';
 import { ScribeLine } from './components/ScribeLine';
 import { ScribeWelcome } from './components/ScribeWelcome';
@@ -289,55 +288,49 @@ const Screens: FC<{ settings: Settings; address: Address; onCandle: () => void }
           }
           leadActionLabel={store.lists.length > 1 ? 'Carry to another scroll' : undefined}
           finisArt={<Marginalia seed={openList.id} ink={colors.ink} accent={colors.accent} />}
-          footer={
-            items.length > 0 ? (
-              <View style={styles.footer}>
-                <Pressable
-                  onPress={() => {
-                    say(openList.daily ? 'renewOff' : 'renew');
-                    store.setDaily(openList.id, !openList.daily);
-                  }}
-                  hitSlop={8}
-                  style={[styles.stamp, openList.daily && styles.stampOn]}
-                  accessibilityRole="switch"
-                  accessibilityLabel="Renew at dawn"
-                  accessibilityState={{ checked: openList.daily === true }}
-                >
-                  <Text style={[styles.stampText, openList.daily && styles.stampTextOn]}>
-                    {openList.daily ? 'Renewed at dawn' : 'Renew at dawn'}
-                  </Text>
-                </Pressable>
-                <Pressable
-                  onPress={() => {
-                    // Kept already: the same stamp takes it back.
-                    if (keptAs) forgetPattern(keptAs.id);
-                    else {
-                      say('pattern');
-                      keepPattern(openList);
-                    }
-                  }}
-                  hitSlop={8}
-                  style={[styles.stamp, keptAs && styles.stampOn]}
-                  accessibilityRole="switch"
-                  accessibilityLabel="Keep as a pattern"
-                  accessibilityState={{ checked: keptAs !== undefined }}
-                >
-                  <Text style={[styles.stampText, keptAs && styles.stampTextOn]}>{keptAs ? 'Unkeep pattern' : 'Keep as a pattern'}</Text>
-                </Pressable>
-                {items.some((item) => item.done) ? (
-                  <Pressable
-                    onPress={() => store.uncheckAll(openList.id)}
-                    hitSlop={8}
-                    style={styles.stamp}
-                    accessibilityRole="button"
-                  >
-                    <Text style={styles.stampText}>Unmark all</Text>
-                  </Pressable>
-                ) : null}
-              </View>
-            ) : null
-          }
         />
+        {/* What can be done to the whole scroll stands at the foot of the desk, as the Library's own labels do. */}
+        <View style={[styles.controls, { paddingBottom: insets.bottom + 12 }]}>
+          {items.length > 0 ? (
+            <>
+              <Pressable
+                onPress={() => {
+                  say(openList.daily ? 'renewOff' : 'renew');
+                  store.setDaily(openList.id, !openList.daily);
+                }}
+                hitSlop={12}
+                accessibilityRole="switch"
+                accessibilityLabel="Renew at dawn"
+                accessibilityState={{ checked: openList.daily === true }}
+              >
+                <Text style={[styles.deskLabel, openList.daily && styles.deskLabelOn]}>
+                  {openList.daily ? 'Renewed at dawn' : 'Renew at dawn'}
+                </Text>
+              </Pressable>
+              <Pressable
+                onPress={() => {
+                  // Kept already: the same label takes it back.
+                  if (keptAs) forgetPattern(keptAs.id);
+                  else {
+                    say('pattern');
+                    keepPattern(openList);
+                  }
+                }}
+                hitSlop={12}
+                accessibilityRole="switch"
+                accessibilityLabel="Keep pattern"
+                accessibilityState={{ checked: keptAs !== undefined }}
+              >
+                <Text style={[styles.deskLabel, keptAs && styles.deskLabelOn]}>{keptAs ? 'Unkeep pattern' : 'Keep pattern'}</Text>
+              </Pressable>
+              {items.some((item) => item.done) ? (
+                <Pressable onPress={() => store.uncheckAll(openList.id)} hitSlop={12} accessibilityRole="button">
+                  <Text style={styles.deskLabel}>Unmark all</Text>
+                </Pressable>
+              ) : null}
+            </>
+          ) : null}
+        </View>
         <SendSheet
           item={sending?.text ?? null}
           scrolls={store.lists.filter((list) => list.id !== openList.id)}
@@ -504,20 +497,9 @@ export const App: FC = () => {
 
 const makeStyles = (colors: Palette) =>
   StyleSheet.create({
-  // The scroll's own actions sit in the writing column, right of the margin rule, as a scribe's
-  // stamped notes: small red capitals in a ruled frame, filled in once set.
-  footer: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, paddingTop: 18, paddingLeft: 16 + LEAD_WIDTH + 12, paddingRight: 16 },
-  stamp: {
-    paddingHorizontal: 8,
-    paddingVertical: 5,
-    borderRadius: 2,
-    borderWidth: StyleSheet.hairlineWidth * 2,
-    borderColor: colors.accent,
-  },
-  stampOn: { backgroundColor: colors.accent },
-  stampText: { color: colors.accent, fontFamily: fonts.label, fontSize: 12, letterSpacing: 0.9, textTransform: 'uppercase' },
-  stampTextOn: { color: colors.paperFrom },
   controls: { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 20, paddingTop: 12 },
     // Labels that sit on the desk rather than on paper: the accent is tuned for paper and can be too dark here.
     deskLabel: { color: colors.onDesk, fontFamily: fonts.bodyItalic, fontSize: 18, opacity: 0.85 },
+    // A label whose setting is on, in gold leaf.
+    deskLabelOn: { color: colors.complete, opacity: 1 },
 });
