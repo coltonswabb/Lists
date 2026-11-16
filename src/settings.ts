@@ -11,7 +11,7 @@ import {
   setScribeMode,
 } from './scribe';
 import { setSoundEnabled } from './sounds';
-import { isThemeName, type ThemeName, themeNames } from './theme';
+import { isThemeName, type ThemeName } from './theme';
 
 const STORAGE_KEY = 'lists/settings/v1';
 
@@ -58,9 +58,7 @@ export const useSettings = () => {
     });
   }, []);
 
-  const nextTheme = useCallback(() => {
-    setTheme((current) => themeNames[(themeNames.indexOf(current) + 1) % themeNames.length] ?? current);
-  }, []);
+  const chooseTheme = useCallback((value: ThemeName) => setTheme(value), []);
 
   const chooseAddress = useCallback((value: Address | null) => {
     if (value) setScribeAddress(value);
@@ -75,5 +73,5 @@ export const useSettings = () => {
     });
   }, []);
 
-  return { loaded, sound, toggleSound, theme, nextTheme, address, chooseAddress, scribe, nextScribeMode };
+  return { loaded, sound, toggleSound, theme, chooseTheme, address, chooseAddress, scribe, nextScribeMode };
 };
