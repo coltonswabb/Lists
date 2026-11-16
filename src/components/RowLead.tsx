@@ -15,7 +15,7 @@ export type Lead =
 export const LEAD_WIDTH = 34;
 
 export const RowLead: FC<{ lead: Lead }> = ({ lead }) => {
-  const { colors, styles } = useTheme(makeStyles);
+  const { styles } = useTheme(makeStyles);
   if (lead.kind === 'done') {
     return (
       <View style={styles.cell}>

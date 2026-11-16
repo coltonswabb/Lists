@@ -88,6 +88,8 @@ const Screens: FC<{ settings: Settings; address: Address }> = ({ settings, addre
   const store = useLists();
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [chronicleOpen, setChronicleOpen] = useState(false);
+  /** When this visit began: a scroll counts as dusty by that moment, so the shelf doesn't change as time ticks. */
+  const [openedAt] = useState(Date.now);
   /** The item whose margin was tapped, to be carried to another scroll. */
   const [sending, setSending] = useState<{ listId: string; itemId: string; text: string } | null>(null);
   const { renew } = store;
@@ -279,6 +281,7 @@ const Screens: FC<{ settings: Settings; address: Address }> = ({ settings, addre
                 }
               : undefined
           }
+          leadActionLabel={store.lists.length > 1 ? 'Carry to another scroll' : undefined}
           finisArt={<Marginalia seed={openList.id} ink={colors.ink} accent={colors.accent} />}
           footer={
             items.length > 0 ? (
@@ -331,7 +334,7 @@ const Screens: FC<{ settings: Settings; address: Address }> = ({ settings, addre
 
   // A scroll with work left on it that nobody has touched for a week.
   const dusty = store.lists.find(
-    (list) => openCount(itemsOf(list)) > 0 && list.touchedAt !== undefined && Date.now() - list.touchedAt > WEEK_MS,
+    (list) => openCount(itemsOf(list)) > 0 && list.touchedAt !== undefined && openedAt - list.touchedAt > WEEK_MS,
   );
 
   return (

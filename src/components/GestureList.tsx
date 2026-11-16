@@ -111,6 +111,8 @@ type GestureListProps = {
   onComplete?: (id: string) => void;
   /** Tap on a row's margin mark, when that should do something other than a tap on its text. */
   onPressLead?: (id: string) => void;
+  /** VoiceOver's name for a tap on an item's margin mark (a heading's always folds it). */
+  leadActionLabel?: string;
   /** Tap opens the row. Without it, tap renames the row. */
   onOpen?: (id: string) => void;
   onRenameTitle?: (title: string) => void;
@@ -144,6 +146,7 @@ export const GestureList: FC<GestureListProps> = ({
   backLabel,
   onPullUp,
   finisArt,
+  leadActionLabel,
 }) => {
   const { colors, styles } = useTheme(makeStyles);
   const insets = useSafeAreaInsets();
@@ -274,7 +277,7 @@ export const GestureList: FC<GestureListProps> = ({
   const sheetHeight = useSharedValue(isShelf ? UNCLIPPED : 0);
   const measuredHeight = useRef(0);
   const leaving = useRef(false);
-  const initialHeight = useRef(rowCount * ROW_HEIGHT + ROW_HEIGHT * 2).current;
+  const [initialHeight] = useState(() => rowCount * ROW_HEIGHT + ROW_HEIGHT * 2);
   useEffect(() => {
     if (isShelf) return;
     play('paper');
@@ -292,11 +295,13 @@ export const GestureList: FC<GestureListProps> = ({
     play('paper');
     // A long scroll takes longer to wind, up to a point.
     const duration = Math.min(480, 220 + measuredHeight.current * 0.2);
-    rolledUp.value = withTiming(1, { duration });
-    sheetHeight.value = measuredHeight.current;
-    sheetHeight.value = withTiming(0, { duration, easing: Easing.in(Easing.cubic) }, () => {
-      scheduleOnRN(onBack);
-    });
+    rolledUp.set(withTiming(1, { duration }));
+    sheetHeight.set(measuredHeight.current);
+    sheetHeight.set(
+      withTiming(0, { duration, easing: Easing.in(Easing.cubic) }, () => {
+        scheduleOnRN(onBack);
+      }),
+    );
   };
 
   // A row under the finger can still report a tap when a pull ends, so presses are ignored while pulling.
@@ -493,7 +498,7 @@ export const GestureList: FC<GestureListProps> = ({
   };
 
   const drop = (from: number, to: number) => {
-    if (from === to) dragFrom.value = -1;
+    if (from === to) dragFrom.set(-1);
     else onMove(from, to);
     // Layout animations stay off until the reordered rows have settled.
     setTimeout(() => setDragging(false), 80);
@@ -524,6 +529,7 @@ export const GestureList: FC<GestureListProps> = ({
         <Text
           style={[styles.rowText, styles.fill, row.section && styles.sectionText, row.done && styles.doneText]}
           numberOfLines={1}
+          maxFontSizeMultiplier={1.2}
         >
           {rubricated[index] ? <Text style={styles.rubric}>{row.text.charAt(0)}</Text> : null}
           {rubricated[index] ? row.text.slice(1) : row.text}
@@ -563,7 +569,7 @@ export const GestureList: FC<GestureListProps> = ({
         ) : null}
         {titleDraft === null ? (
           <Pressable style={styles.fill} disabled={!onRenameTitle || busy} onPress={() => setTitleDraft(title)}>
-            <Text style={styles.title} numberOfLines={1}>
+            <Text style={styles.title} numberOfLines={1} maxFontSizeMultiplier={1.2}>
               {title}
             </Text>
           </Pressable>
@@ -663,6 +669,15 @@ export const GestureList: FC<GestureListProps> = ({
                     onPress={() => press(() => (onOpen ? onOpen(row.id) : setEditingId(row.id)))}
                     onPressLead={onPressLead ? () => press(() => onPressLead(row.id)) : undefined}
                     strikeWidth={strikeFor(row)}
+                    label={[
+                      row.text,
+                      row.section ? 'heading' : row.done ? 'done' : '',
+                      row.sealed ? 'sealed' : row.badge && !row.section && !isShelf ? row.badge.toLowerCase() : '',
+                    ]
+                      .filter(Boolean)
+                      .join(', ')}
+                    completeActionLabel={isShelf ? 'Seal into the chronicle' : 'Strike done'}
+                    leadActionLabel={row.section ? (row.badge?.includes('···') ? 'Unfold' : 'Fold') : leadActionLabel}
                     scrollY={scrollY}
                     onEdge={nudgeScroll}
                     onDragStart={startDrag}
@@ -679,6 +694,8 @@ export const GestureList: FC<GestureListProps> = ({
 
               <Pressable
                 style={[styles.tail, finished && finisArt ? styles.tailWithArt : null]}
+                accessibilityRole="button"
+                accessibilityLabel={isShelf ? 'Add a scroll' : 'Add a row'}
                 disabled={busy}
                 onPress={() => press(() => setAddIndex(endIndex))}
               >
@@ -724,7 +741,7 @@ const makeStyles = (colors: Palette) =>
   titleInput: { flex: 1, padding: 0 },
   readout: { color: colors.onDeskFaded, fontFamily: fonts.label, fontSize: 14, letterSpacing: 1.2 },
   content: { flexGrow: 1 },
-  topRoller: { zIndex: 1, marginTop: -6, marginBottom: -ROLLER_HEIGHT / 2 },
+  topRoller: { zIndex: 1, marginBottom: -ROLLER_HEIGHT / 2 },
   bottomRoller: { zIndex: 1, marginTop: -ROLLER_HEIGHT / 2 },
   sheet: { marginHorizontal: 20, overflow: 'hidden', backgroundColor: colors.paperTo },
   shelf: { paddingTop: 4 },

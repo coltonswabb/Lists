@@ -18,7 +18,7 @@ type UndoToastProps = {
 };
 
 export const UndoToast: FC<UndoToastProps> = ({ undo, onUndo, onDismiss, offset }) => {
-  const { colors, styles } = useTheme(makeStyles);
+  const { styles } = useTheme(makeStyles);
   const insets = useSafeAreaInsets();
 
   useEffect(() => {

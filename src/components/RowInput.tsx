@@ -88,6 +88,7 @@ export const RowInput: FC<RowInputProps> = ({ leadFor, paper, placeholder, initi
         <TextInput
           ref={input}
           autoFocus
+          maxFontSizeMultiplier={1.2}
           multiline
           scrollEnabled={false}
           value={text}

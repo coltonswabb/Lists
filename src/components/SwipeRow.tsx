@@ -92,6 +92,12 @@ type SwipeRowProps = {
   onEdge: (direction: -1 | 1) => void;
   onDragStart: () => void;
   onDrop: (from: number, to: number) => void;
+  /** What VoiceOver reads for the row. */
+  label: string;
+  /** VoiceOver's name for what a tap on the margin mark does, when it does something. */
+  leadActionLabel?: string;
+  /** VoiceOver's name for a swipe right. */
+  completeActionLabel?: string;
 };
 
 export const SwipeRow: FC<SwipeRowProps> = ({
@@ -116,8 +122,11 @@ export const SwipeRow: FC<SwipeRowProps> = ({
   onEdge,
   onDragStart,
   onDrop,
+  label,
+  leadActionLabel,
+  completeActionLabel = 'Strike done',
 }) => {
-  const { colors, styles } = useTheme(makeStyles);
+  const { styles } = useTheme(makeStyles);
   const { width, height } = useWindowDimensions();
   const offsetX = useSharedValue(0);
   const armed = useSharedValue(0);
@@ -211,18 +220,18 @@ export const SwipeRow: FC<SwipeRowProps> = ({
     },
     onActivate: () => {
       'worklet';
-      dragY.value = 0;
-      scrollStart.value = scrollY.value;
-      reorder.from.value = index;
-      reorder.to.value = index;
-      reorder.span.value = groupSize;
+      dragY.set(0);
+      scrollStart.set(scrollY.value);
+      reorder.from.set(index);
+      reorder.to.set(index);
+      reorder.span.set(groupSize);
       lift.value = withTiming(1, { duration: 120 });
       scheduleOnRN(onDragStart);
     },
     onUpdate: (event) => {
       'worklet';
       if (reorder.from.value !== index) return;
-      dragY.value = event.translationY;
+      dragY.set(event.translationY);
       const travelled = event.translationY + scrollY.value - scrollStart.value;
       const target = Math.round(index + travelled / ROW_HEIGHT);
       const edge = event.absoluteY > height - EDGE ? 1 : event.absoluteY < EDGE * 1.6 ? -1 : 0;
@@ -239,7 +248,7 @@ export const SwipeRow: FC<SwipeRowProps> = ({
         to = nearest;
       }
       if (to !== reorder.to.value) {
-        reorder.to.value = to;
+        reorder.to.set(to);
         scheduleOnRN(tick);
       }
     },
@@ -249,10 +258,10 @@ export const SwipeRow: FC<SwipeRowProps> = ({
       const to = reorder.to.value;
       lift.value = withTiming(0, { duration: 120 });
       const scrolled = scrollY.value - scrollStart.value;
-      dragY.value = withTiming((to - index) * ROW_HEIGHT - scrolled, { duration: 120 }, () => {
+      dragY.set(withTiming((to - index) * ROW_HEIGHT - scrolled, { duration: 120 }, () => {
         // A group moving down lands after the row its last member has passed.
         scheduleOnRN(onDrop, index, to > index ? Math.min(rowCount - 1, to + groupSize - 1) : to);
-      });
+      }));
     },
   });
 
@@ -310,7 +319,26 @@ export const SwipeRow: FC<SwipeRowProps> = ({
         <Text style={styles.glyph}>✕</Text>
       </Animated.View>
       <GestureDetector gesture={gesture}>
-        <Animated.View style={[styles.row, { backgroundColor: color }, rowStyle]}>
+        <Animated.View
+          style={[styles.row, { backgroundColor: color }, rowStyle]}
+          // Gestures have no VoiceOver equivalent, so each is offered as a named action instead.
+          accessible
+          accessibilityRole="button"
+          accessibilityLabel={label}
+          accessibilityActions={[
+            { name: 'activate' },
+            ...(canComplete ? [{ name: 'complete', label: completeActionLabel }] : []),
+            { name: 'delete', label: 'Cast out' },
+            ...(onPressLead && leadActionLabel ? [{ name: 'lead', label: leadActionLabel }] : []),
+          ]}
+          onAccessibilityAction={(event) => {
+            const action = event.nativeEvent.actionName;
+            if (action === 'activate') onPress();
+            else if (action === 'complete') complete();
+            else if (action === 'delete') onDelete();
+            else if (action === 'lead') onPressLead?.();
+          }}
+        >
           {children}
           {strikeWidth > 0 ? (
             <Animated.View pointerEvents="none" style={[styles.strike, { width: strikeWidth }, strikeStyle]} />

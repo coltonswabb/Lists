@@ -32,7 +32,14 @@ export const ScribeLine: FC<ScribeLineProps> = ({ standing, onPress }) => {
   return (
     <Pressable style={styles.box} onPress={onPress} disabled={!onPress} hitSlop={6}>
       {line ? (
-        <Animated.Text key={remark ? remark.id : standing} entering={FadeIn.duration(220)} style={styles.line} numberOfLines={1}>
+        <Animated.Text
+          key={remark ? remark.id : standing}
+          entering={FadeIn.duration(220)}
+          style={styles.line}
+          numberOfLines={1}
+          maxFontSizeMultiplier={1.2}
+          accessibilityLiveRegion="polite"
+        >
           {`✒  ${line}`}
         </Animated.Text>
       ) : null}
