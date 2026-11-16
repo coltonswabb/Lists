@@ -19,7 +19,7 @@ A gesture-driven list app built with Expo and React Native.
 - "Settings" on the Library screen holds the paper theme, sound, how talkative the scribe is, and how it addresses you.
 - At the end of a scroll, keep pulling up to clear the finished items, which sweep off the sheet one after another. "Unmark all" resets a reusable list.
 - "Library" at the foot of a scroll rolls it up and returns to the shelf of scrolls.
-- At the foot of a scroll: "Share" sends it as text; "Renew at dawn" makes it a daily scroll whose items are unmarked again each morning.
+- At the foot of a scroll, "Renew at dawn" makes it a daily scroll whose items are unmarked again each morning.
 - A finished scroll earns a small drawing in its margin beside "Finis".
 - On the shelf, swipe a scroll right to seal it into the Chronicle. The Chronicle keeps sealed scrolls (return them to the shelf, or burn them) and a dated record of everything struck done, named by feast days ("the Monday after Martinmas") and marked with the hour of the office.
 - Settings can back up every scroll and the Chronicle to a file through the share sheet, and restore from one.

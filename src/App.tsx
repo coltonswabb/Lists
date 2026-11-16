@@ -3,13 +3,14 @@ import { PirataOne_400Regular } from '@expo-google-fonts/pirata-one';
 import { useFonts } from 'expo-font';
 import { StatusBar } from 'expo-status-bar';
 import { type FC, useEffect, useMemo, useState } from 'react';
-import { Alert, AppState, BackHandler, Pressable, Share, StyleSheet, Text, View } from 'react-native';
+import { Alert, AppState, BackHandler, Pressable, StyleSheet, Text, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { pickBackup, shareBackup } from './backup';
 import { ChronicleScreen } from './components/ChronicleScreen';
 import { GestureList, type GestureListRow, STAMP_DELAY_MS } from './components/GestureList';
+import { LEAD_WIDTH } from './components/RowLead';
 import { Marginalia } from './components/Marginalia';
 import { ScribeLine } from './components/ScribeLine';
 import { ScribeWelcome } from './components/ScribeWelcome';
@@ -60,24 +61,6 @@ const scrollRows = (items: Item[]): { rows: GestureListRow[]; visible: Item[] } 
     visible.push(item);
   });
   return { rows, visible };
-};
-
-/** A scroll as plain text, for sharing: open items numbered, finished ones ticked, headings on their own lines. */
-const scrollAsText = (list: List) => {
-  const lines = [list.name, ''];
-  let number = 0;
-  for (const item of list.items) {
-    if (item.section) {
-      number = 0;
-      lines.push('', item.text.toUpperCase());
-    } else if (item.done) {
-      lines.push(`✓ ${item.text}`);
-    } else {
-      number += 1;
-      lines.push(`${roman(number)}. ${item.text}`);
-    }
-  }
-  return lines.join('\n').replace(/\n{3,}/g, '\n\n').trim();
 };
 
 type Settings = ReturnType<typeof useSettings>;
@@ -291,26 +274,28 @@ const Screens: FC<{ settings: Settings; address: Address }> = ({ settings, addre
             items.length > 0 ? (
               <View style={styles.footer}>
                 <Pressable
-                  onPress={() => void Share.share({ message: scrollAsText(openList) })}
-                  hitSlop={10}
-                  accessibilityRole="button"
-                >
-                  <Text style={styles.label}>Share</Text>
-                </Pressable>
-                <Pressable
                   onPress={() => {
                     if (!openList.daily) say('renew');
                     store.setDaily(openList.id, !openList.daily);
                   }}
-                  hitSlop={10}
+                  hitSlop={8}
+                  style={[styles.stamp, openList.daily && styles.stampOn]}
                   accessibilityRole="switch"
+                  accessibilityLabel="Renew at dawn"
                   accessibilityState={{ checked: openList.daily === true }}
                 >
-                  <Text style={styles.label}>{openList.daily ? 'Renews at dawn ✓' : 'Renew at dawn'}</Text>
+                  <Text style={[styles.stampText, openList.daily && styles.stampTextOn]}>
+                    {openList.daily ? 'Renewed at dawn' : 'Renew at dawn'}
+                  </Text>
                 </Pressable>
                 {items.some((item) => item.done) ? (
-                  <Pressable onPress={() => store.uncheckAll(openList.id)} hitSlop={10} accessibilityRole="button">
-                    <Text style={styles.label}>Unmark all</Text>
+                  <Pressable
+                    onPress={() => store.uncheckAll(openList.id)}
+                    hitSlop={8}
+                    style={styles.stamp}
+                    accessibilityRole="button"
+                  >
+                    <Text style={styles.stampText}>Unmark all</Text>
                   </Pressable>
                 ) : null}
               </View>
@@ -424,9 +409,20 @@ export const App: FC = () => {
 
 const makeStyles = (colors: Palette) =>
   StyleSheet.create({
-  footer: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', columnGap: 24, rowGap: 10, paddingTop: 20, paddingHorizontal: 12 },
+  // The scroll's own actions sit in the writing column, right of the margin rule, as a scribe's
+  // stamped notes: small red capitals in a ruled frame, filled in once set.
+  footer: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, paddingTop: 18, paddingLeft: 16 + LEAD_WIDTH + 12, paddingRight: 16 },
+  stamp: {
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+    borderRadius: 2,
+    borderWidth: StyleSheet.hairlineWidth * 2,
+    borderColor: colors.accent,
+  },
+  stampOn: { backgroundColor: colors.accent },
+  stampText: { color: colors.accent, fontFamily: fonts.label, fontSize: 12, letterSpacing: 0.9, textTransform: 'uppercase' },
+  stampTextOn: { color: colors.paperFrom },
   controls: { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 20, paddingTop: 12 },
-  label: { color: colors.accent, fontFamily: fonts.bodyItalic, fontSize: 18 },
     // Labels that sit on the desk rather than on paper: the accent is tuned for paper and can be too dark here.
     deskLabel: { color: colors.onDesk, fontFamily: fonts.bodyItalic, fontSize: 18, opacity: 0.85 },
 });
