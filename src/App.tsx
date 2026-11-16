@@ -24,7 +24,7 @@ import { SendSheet } from './components/SendSheet';
 import { SettingsScreen } from './components/SettingsScreen';
 import { UndoToast } from './components/UndoToast';
 import { formatReminder } from './reminder';
-import { syncReminders } from './reminders';
+import { listenForReminderActions, syncReminders } from './reminders';
 import { readPatterns, usePatterns } from './patterns';
 import { type Address, say, standing } from './scribe';
 import { useSettings } from './settings';
@@ -51,7 +51,7 @@ const scrollRows = (items: Item[]): { rows: GestureListRow[]; visible: Item[] } 
     if (!item.section) {
       if (folded) return;
       // A reminder shows as its time, and reappears in the text when the row is edited so it survives the edit.
-      const reminder = item.remindAt && !item.done ? formatReminder(item.remindAt) : null;
+      const reminder = item.remindAt && !item.done ? formatReminder(item.remindAt, new Date(), item.repeat) : null;
       rows.push(reminder ? { ...item, badge: reminder.toUpperCase(), editText: `${item.text} @ ${reminder}` } : item);
       visible.push(item);
       return;
@@ -96,6 +96,23 @@ const Screens: FC<{ settings: Settings; address: Address; onCandle: () => void }
     });
     return () => subscription.remove();
   }, [renew]);
+  // The buttons on a reminder: strike the item, or be reminded again in an hour. The lists are read
+  // through a ref so that the listener is set up once, not again on every change.
+  const { toggleItem, remindLater } = store;
+  const listsNow = useRef(store.lists);
+  useEffect(() => {
+    listsNow.current = store.lists;
+  }, [store.lists]);
+  useEffect(
+    () =>
+      listenForReminderActions((action, listId, itemId) => {
+        if (action === 'strike') {
+          const item = listsNow.current.find((list) => list.id === listId)?.items.find((candidate) => candidate.id === itemId);
+          if (item && !item.done) toggleItem(listId, itemId);
+        } else remindLater(listId, itemId, Date.now() + 60 * 60 * 1000);
+      }),
+    [toggleItem, remindLater],
+  );
   /** A silent scribe says nothing at all, not even its standing lines. */
   const spoken = (line: string) => (settings.scribe === 'silent' ? '' : line);
 

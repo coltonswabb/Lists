@@ -8,7 +8,12 @@ export type Item = {
   collapsed?: boolean;
   /** When the scribe should remind the user of this item, as a timestamp. */
   remindAt?: number;
+  /** The reminder comes round again: every day at this time, or every week on this weekday (0 = Sunday). */
+  repeat?: Repeat;
 };
+
+/** When a repeating reminder falls. Without a weekday it is every day. */
+export type Repeat = { hour: number; minute: number; weekday?: number };
 
 export type List = {
   id: string;

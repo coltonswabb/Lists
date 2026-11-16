@@ -46,7 +46,7 @@ const newItem = (raw: string): Item => {
   const { text, section } = parseEntry(raw);
   if (section) return { id: newId(), text, done: false, section: true };
   const reminder = parseReminder(text);
-  return { id: newId(), text: reminder.text, done: false, remindAt: reminder.remindAt };
+  return { id: newId(), text: reminder.text, done: false, remindAt: reminder.remindAt, repeat: reminder.repeat };
 };
 
 /**
@@ -430,6 +430,13 @@ export const useLists = () => {
     [applyToItems],
   );
 
+  /** Puts an item's reminder off until the given moment, as when "later" is pressed on the reminder itself. */
+  const remindLater = useCallback(
+    (listId: string, id: string, at: number) =>
+      applyToItems(listId, (items) => items.map((i) => (i.id === id && !i.section ? { ...i, remindAt: at } : i))),
+    [applyToItems],
+  );
+
   /** Marks an item done or not. Marking it done writes a line in the chronicle; unmarking the same day takes the line back. */
   const toggleItem = useCallback(
     (listId: string, id: string) => {
@@ -568,6 +575,7 @@ export const useLists = () => {
     renew,
     addLists,
     addListFrom,
+    remindLater,
     renameList,
     deleteList,
     moveList,
