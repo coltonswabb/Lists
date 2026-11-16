@@ -30,7 +30,7 @@ export const App: FC = () => {
   return (
     <GestureHandlerRootView style={styles.root}>
       <SafeAreaProvider>
-        <StatusBar style="dark" />
+        <StatusBar style="light" />
         {!fontsLoaded ? null : openList ? (
           <GestureList
             key={openList.id}
@@ -85,7 +85,7 @@ export const App: FC = () => {
 };
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: colors.parchment },
-  footer: { flexDirection: 'row', justifyContent: 'center', gap: 28, paddingTop: 22 },
+  root: { flex: 1, backgroundColor: colors.desk },
+  footer: { flexDirection: 'row', justifyContent: 'center', gap: 28, paddingTop: 20 },
   footerAction: { color: colors.rubric, fontFamily: fonts.bodyItalic, fontSize: 17 },
 });

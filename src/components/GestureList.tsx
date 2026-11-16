@@ -1,4 +1,4 @@
-import { type FC, type ReactNode, useLayoutEffect, useRef, useState } from 'react';
+import { type FC, type ReactNode, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import {
   GestureDetector,
@@ -7,13 +7,21 @@ import {
   usePinchGesture,
   useSimultaneousGestures,
 } from 'react-native-gesture-handler';
-import Animated, { interpolate, useAnimatedStyle, useSharedValue, withSpring, withTiming } from 'react-native-reanimated';
+import Animated, {
+  Easing,
+  interpolate,
+  useAnimatedStyle,
+  useSharedValue,
+  withSpring,
+  withTiming,
+} from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { scheduleOnRN } from 'react-native-worklets';
 
 import { success, thud, tick } from '../haptics';
 import { colors, fonts, type PaletteName, ROW_HEIGHT, rowColor } from '../theme';
 import { Initial } from './Initial';
+import { Roller } from './Roller';
 import { RowInput } from './RowInput';
 import { SwipeRow } from './SwipeRow';
 
@@ -23,6 +31,8 @@ const BACK_DISTANCE = ROW_HEIGHT * 2.3;
 const PINCH_OPEN_AT = ROW_HEIGHT * 0.6;
 const PINCH_CLOSE_SCALE = 0.7;
 const SPRING = { damping: 24, stiffness: 240 } as const;
+const UNROLL_MS = 420;
+const UNCLIPPED = 100000;
 
 type PullAction = 'none' | 'create' | 'back';
 
@@ -193,13 +203,20 @@ export const GestureList: FC<GestureListProps> = ({
 
   const gesture = useSimultaneousGestures(pan, pinch);
 
+  // Opening a screen unrolls the sheet from the top roller; afterwards its height is unconstrained.
+  const sheetHeight = useSharedValue(0);
+  const initialHeight = useRef(rows.length * ROW_HEIGHT + ROW_HEIGHT * 2).current;
+  useEffect(() => {
+    sheetHeight.value = withTiming(initialHeight, { duration: UNROLL_MS, easing: Easing.out(Easing.cubic) }, () => {
+      sheetHeight.value = UNCLIPPED;
+    });
+  }, [sheetHeight, initialHeight]);
+  const sheetStyle = useAnimatedStyle(() => ({ maxHeight: sheetHeight.value }));
+
+  // Pulling draws fresh paper out from under the roller.
   const pullSpaceStyle = useAnimatedStyle(() => ({ height: pull.value }));
   const pullRowStyle = useAnimatedStyle(() => ({
-    opacity: interpolate(pull.value, [0, ROW_HEIGHT], [0.3, 1], 'clamp'),
-    transform: [
-      { perspective: 600 },
-      { rotateX: `${interpolate(pull.value, [0, ROW_HEIGHT], [-88, 0], 'clamp')}deg` },
-    ],
+    opacity: interpolate(pull.value, [0, ROW_HEIGHT], [0.4, 1], 'clamp'),
   }));
 
   // Each finished line becomes a row and the input moves below it, ready for the next one.
@@ -278,10 +295,13 @@ export const GestureList: FC<GestureListProps> = ({
             onSubmitEditing={endTitleEdit}
             onBlur={endTitleEdit}
             returnKeyType="done"
-            selectionColor={colors.rubric}
+            selectionColor={colors.gold}
             style={[styles.title, styles.titleInput]}
           />
         )}
+      </View>
+      <View style={styles.topRoller}>
+        <Roller />
       </View>
       <GestureDetector gesture={gesture}>
         <View style={styles.fill}>
@@ -299,6 +319,7 @@ export const GestureList: FC<GestureListProps> = ({
             }}
             contentContainerStyle={[styles.content, { paddingBottom: insets.bottom }]}
           >
+            <Animated.View style={[styles.sheet, sheetStyle]}>
             <Animated.View style={[styles.pullSpace, pullSpaceStyle]}>
               <Animated.View
                 style={[styles.pullRow, { backgroundColor: rowColor(palette, 0, activeCount + 1) }, pullRowStyle]}
@@ -345,9 +366,12 @@ export const GestureList: FC<GestureListProps> = ({
 
             {footer}
 
-            <Pressable style={styles.tapZone} disabled={busy} onPress={() => press(() => setAddIndex(activeCount))}>
+            <Pressable style={styles.tail} disabled={busy} onPress={() => press(() => setAddIndex(activeCount))}>
               {rows.length === 0 && !busy ? <Text style={styles.hint}>{emptyHint}</Text> : null}
             </Pressable>
+            </Animated.View>
+            <Roller />
+            <Pressable style={styles.tapZone} disabled={busy} onPress={() => press(() => setAddIndex(activeCount))} />
           </ScrollView>
         </View>
       </GestureDetector>
@@ -356,27 +380,22 @@ export const GestureList: FC<GestureListProps> = ({
 };
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: colors.parchment },
+  screen: { flex: 1, backgroundColor: colors.desk },
   fill: { flex: 1 },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    paddingHorizontal: 16,
-    height: 56,
-    borderBottomWidth: 2,
-    borderBottomColor: colors.rubric,
-  },
-  back: { color: colors.rubric, fontSize: 34, lineHeight: 36 },
-  title: { color: colors.ink, fontFamily: fonts.display, fontSize: 30 },
+  header: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 20, height: 56 },
+  back: { color: colors.gold, fontSize: 34, lineHeight: 36 },
+  title: { color: colors.parchment, fontFamily: fonts.display, fontSize: 30 },
   titleInput: { flex: 1, padding: 0 },
   content: { flexGrow: 1 },
+  topRoller: { zIndex: 1, marginBottom: -8 },
+  sheet: { marginHorizontal: 18, overflow: 'hidden', backgroundColor: colors.parchment },
+  tail: { height: ROW_HEIGHT, alignItems: 'center', justifyContent: 'center' },
   pullSpace: { justifyContent: 'flex-end', overflow: 'hidden' },
-  pullRow: { height: ROW_HEIGHT, justifyContent: 'center', paddingHorizontal: 16, transformOrigin: 'bottom' },
+  pullRow: { height: ROW_HEIGHT, justifyContent: 'center', paddingHorizontal: 16 },
   pullText: { color: colors.onPigment, fontFamily: fonts.bodyItalic, fontSize: 21 },
   rowText: { color: colors.ink, fontFamily: fonts.body, fontSize: 21 },
   doneText: { color: colors.inkFaded, textDecorationLine: 'line-through', textDecorationColor: colors.rubric },
   badge: { color: colors.rubric, fontFamily: fonts.display, fontSize: 22, marginLeft: 12 },
-  tapZone: { flexGrow: 1, minHeight: ROW_HEIGHT * 2, alignItems: 'center', paddingTop: 36 },
+  tapZone: { flexGrow: 1, minHeight: ROW_HEIGHT },
   hint: { color: colors.inkFaded, fontFamily: fonts.bodyItalic, fontSize: 18 },
 });

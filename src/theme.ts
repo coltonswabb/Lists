@@ -11,6 +11,8 @@ export const colors = {
   parchment: '#ece0c4',
   parchmentShade: '#dfd0ae',
   ink: '#2a2118',
+  /** The desk the scroll lies on. */
+  desk: '#1b1611',
   inkFaded: 'rgba(42,33,24,0.45)',
   rule: 'rgba(42,33,24,0.16)',
   gold: '#b8892b',

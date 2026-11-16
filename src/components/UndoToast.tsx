@@ -54,7 +54,7 @@ const styles = StyleSheet.create({
     borderRadius: 4,
     borderWidth: 1.5,
     borderColor: colors.gold,
-    backgroundColor: colors.ink,
+    backgroundColor: '#3a2e22',
   },
   label: { flex: 1, color: colors.parchment, fontFamily: fonts.bodyItalic, fontSize: 17 },
   action: { color: colors.gold, fontFamily: fonts.display, fontSize: 20 },
