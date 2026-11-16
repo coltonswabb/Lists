@@ -21,7 +21,7 @@ const CLEAR = 'rgba(0,0,0,0)';
  * shadow where the sheet curls away from each roll.
  */
 export const PaperOverlay: FC = () => {
-  const { styles } = useTheme(makeStyles);
+  const { colors, styles } = useTheme(makeStyles);
   return (
     <View pointerEvents="none" style={StyleSheet.absoluteFill}>
       {parchment ? (
@@ -32,6 +32,13 @@ export const PaperOverlay: FC = () => {
       <View style={styles.margin} />
       <LinearGradient colors={[TONING, CLEAR]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.left} />
       <LinearGradient colors={[CLEAR, TONING]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.right} />
+      {colors.name === 'vigil' ? (
+        // Night Vigil's sheet is ruled in gold down each side, as a book of hours is.
+        <>
+          <View style={[styles.gilt, styles.giltLeft]} />
+          <View style={[styles.gilt, styles.giltRight]} />
+        </>
+      ) : null}
       <LinearGradient colors={[SHADOW, CLEAR]} style={styles.top} />
       <LinearGradient colors={[CLEAR, SHADOW]} style={styles.bottom} />
     </View>
@@ -50,6 +57,9 @@ const makeStyles = (colors: Palette) =>
       backgroundColor: colors.accent,
       opacity: 0.3,
     },
+    gilt: { position: 'absolute', top: 0, bottom: 0, width: 1, backgroundColor: colors.accent, opacity: 0.55 },
+    giltLeft: { left: 9 },
+    giltRight: { right: 9 },
     left: { position: 'absolute', top: 0, bottom: 0, left: 0, width: 18 },
     right: { position: 'absolute', top: 0, bottom: 0, right: 0, width: 18 },
     top: { position: 'absolute', top: 0, left: 0, right: 0, height: 12 },

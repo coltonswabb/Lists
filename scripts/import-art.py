@@ -14,6 +14,9 @@ Turns art dropped in assets/incoming/ into files the app can use, named as in do
 - finial-<metal>, desk-inkwell, desk-candle: painted objects on white, cut out like the seal.
 - deckle-edge: a black-and-white mask of a torn paper edge becomes a narrow strip of "air" (opaque
   where there is no paper), which the app tints as the desk and lays over the sheet's sides.
+- sky-sun, sky-moon: painted and cut out; sky-wheel, sky-corner: line art; sky-night, sky-dawn:
+  full-bleed paintings kept as JPEGs. Together they are the turn between day and night.
+- vigil-stars: a tileable scatter of stars, keyed like line art but left untrimmed.
 - icon-<paper>: full-bleed app icons, copied to assets/icons/<paper>.png at 1024px. These replace
   what scripts/draw-icons.py drew, and only show after the next native build.
 
@@ -38,10 +41,15 @@ PAD = 12  # transparent pixels kept around the trimmed drawing
 # Lightness at or above PAPER is background; at or below INK is full-strength line. Between, partly
 # transparent, which keeps the anti-aliased edges of the pen strokes smooth.
 PAPER, INK = 235, 70
-SINGLES = ("quill", "flourish", "divider", "empty-shelf", "initial-frame", "tick", "strike", "nil-found")
+SINGLES = ("quill", "flourish", "divider", "empty-shelf", "initial-frame", "tick", "strike", "nil-found", "sky-wheel", "sky-corner")
 LINE_ART = re.compile(r"^(margin-\d+|" + "|".join(SINGLES) + r")$")
 # Painted objects cut out of a white ground, and the longest side each is scaled to.
-OBJECTS = {"wax-seal": 192, "finial-brass": 200, "finial-iron": 200, "desk-inkwell": 480, "desk-candle": 420}
+OBJECTS = {"wax-seal": 192, "finial-brass": 200, "finial-iron": 200, "desk-inkwell": 480, "desk-candle": 420, "sky-sun": 640, "sky-moon": 560}
+# Full-bleed paintings behind the turn of day and night, kept as JPEGs: they have no transparency and are large.
+SKIES = ("sky-night", "sky-dawn")
+SKY_HEIGHT = 1280
+# A tileable scatter of stars: keyed like line art, but never trimmed, or it would no longer tile.
+SCATTER, SCATTER_SIZE = "vigil-stars", 512
 ICON = re.compile(r"^icon-(scriptorium|vigil|lapis|verdant|codex)$")
 ICONS = ROOT / "assets" / "icons"
 DECKLE_HEIGHT = 1086
@@ -228,7 +236,7 @@ def desk_tile(source, target):
     subprocess.run(["sips", "-s", "format", "png", "-z", str(TILE_SIZE), str(TILE_SIZE), str(source), "--out", str(target)], check=True, capture_output=True)
 
 
-def key_line_art(source, target):
+def key_line_art(source, target, trimmed=True, max_width=MAX_WIDTH):
     width, height, channels, rows = load(source)
     alpha = []
     for row in rows:
@@ -242,6 +250,8 @@ def key_line_art(source, target):
     inked_cols = [x for x in range(width) if any(alpha[y][x] for y in inked_rows)]
     top, bottom = max(0, inked_rows[0] - PAD), min(height, inked_rows[-1] + 1 + PAD)
     left, right = max(0, inked_cols[0] - PAD), min(width, inked_cols[-1] + 1 + PAD)
+    if not trimmed:
+        top, bottom, left, right = 0, height, 0, width
     trimmed = []
     for y in range(top, bottom):
         row = bytearray()
@@ -249,8 +259,8 @@ def key_line_art(source, target):
             row += bytes((0, 0, 0, alpha[y][x]))
         trimmed.append(row)
     write_png(target, right - left, bottom - top, trimmed)
-    if right - left > MAX_WIDTH:
-        subprocess.run(["sips", "--resampleWidth", str(MAX_WIDTH), str(target)], check=True, capture_output=True)
+    if right - left > max_width:
+        subprocess.run(["sips", "--resampleWidth", str(max_width), str(target)], check=True, capture_output=True)
     size = subprocess.run(["sips", "-g", "pixelWidth", "-g", "pixelHeight", str(target)], check=True, capture_output=True, text=True).stdout
     w = int(re.search(r"pixelWidth: (\d+)", size).group(1))
     h = int(re.search(r"pixelHeight: (\d+)", size).group(1))
@@ -303,6 +313,20 @@ def write_module(drawings):
         if name in drawings:
             lines.append(f"  {name[5:]}: {entry(name, *drawings[name])},")
     lines.append("};")
+    lines += ["", "/** The sun and the moon, in their own colours, for the turn of day and night. */", "export const celestial: Partial<Record<'sun' | 'moon', Drawing>> = {"]
+    for name in ("sky-sun", "sky-moon"):
+        if name in drawings:
+            lines.append(f"  {name[4:]}: {entry(name, *drawings[name])},")
+    lines.append("};")
+    lines += ["", "/** Full-bleed skies painted behind the sun and the moon. */", "export const skies: Partial<Record<'night' | 'dawn', Drawing>> = {"]
+    for name in SKIES:
+        if name in drawings:
+            w, h = drawings[name]
+            lines.append(f"  {name[4:]}: {{ source: require('../assets/art/{name}.jpg'), width: {w}, height: {h} }},")
+    lines.append("};")
+    lines += ["", "/** A tileable scatter of stars, black on transparency, strewn in gold over Night Vigil's desk. */"]
+    scatter = drawings.get(SCATTER)
+    lines.append(f"export const starScatter: Drawing | undefined = {entry(SCATTER, *scatter) if scatter else 'undefined'};")
     lines += ["", "/** A vertical, tileable strip of torn edge: opaque where the paper is missing. Tinted as the desk. */"]
     deckle = drawings.get("deckle-edge")
     lines.append(f"export const deckle: Drawing | undefined = {entry('deckle-edge', *deckle) if deckle else 'undefined'};")
@@ -316,10 +340,18 @@ def main():
         target = ART / f"{name}.png"
         if source.suffix.lower() not in (".png", ".webp", ".jpg", ".jpeg"):
             continue
+        if name in SKIES:
+            painted = ART / f"{name}.jpg"
+            if not painted.exists() or painted.stat().st_mtime < source.stat().st_mtime:
+                subprocess.run(["sips", "-s", "format", "jpeg", "-s", "formatOptions", "78", "--resampleHeight", str(SKY_HEIGHT), str(source), "--out", str(painted)], check=True, capture_output=True)
+                print(f"imported {source.name} -> assets/art/{name}.jpg")
+            continue
         if target.exists() and target.stat().st_mtime > source.stat().st_mtime:
             continue  # already imported, and the source hasn't changed since
         if LINE_ART.match(name):
             key_line_art(source, target)
+        elif name == SCATTER:
+            key_line_art(source, target, trimmed=False, max_width=SCATTER_SIZE)
         elif ICON.match(name):
             icon = ICONS / f"{name[5:]}.png"
             if not icon.exists() or icon.stat().st_mtime < source.stat().st_mtime:
@@ -339,7 +371,7 @@ def main():
             continue
         w, h = size_of(target)
         print(f"imported {source.name} -> assets/art/{name}.png ({w}x{h})")
-    drawings = {png.stem: size_of(png) for png in ART.glob("*.png")}
+    drawings = {png.stem: size_of(png) for png in [*ART.glob("*.png"), *ART.glob("*.jpg")]}
     write_module(drawings)
     print(f"wrote {MODULE.relative_to(ROOT)} ({len(drawings)} drawings)")
 

@@ -112,9 +112,12 @@ export const paletteOf = (name: ThemeName) => {
     rule: alpha(spec.ink, 0.14),
     gold: spec.rod,
     onDeskFaded: alpha(spec.onDesk, 0.5),
-    complete: '#3f6b4f',
-    remove: '#8a2318',
-    onAction: '#f6efdf',
+    // The two pigments behind a swiped row, from a manuscript's box rather than a traffic light:
+    // gold leaf where a line is struck done, oxblood where it is cast out.
+    complete: '#c9a44e',
+    onComplete: '#2a2013',
+    remove: '#6b1a14',
+    onAction: '#f3dfae',
   };
 };
 

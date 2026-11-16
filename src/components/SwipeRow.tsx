@@ -1,5 +1,5 @@
 import { type FC, type ReactNode, useEffect } from 'react';
-import { StyleSheet, Text, useWindowDimensions } from 'react-native';
+import { Image, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import {
   GestureDetector,
   GestureStateManager,
@@ -20,7 +20,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { scheduleOnRN } from 'react-native-worklets';
 
-import { drawings } from '../art';
+import { drawings, starScatter } from '../art';
 import { thud, tick } from '../haptics';
 import { useTheme } from '../ThemeContext';
 import { type Palette, ROW_HEIGHT } from '../theme';
@@ -314,10 +314,24 @@ export const SwipeRow: FC<SwipeRowProps> = ({
       style={[styles.container, containerStyle]}
     >
       <Animated.View style={[styles.action, styles.complete, completeStyle]}>
-        <Text style={styles.glyph}>✓</Text>
+        {starScatter ? <Image source={starScatter.source} style={[styles.diaper, { width, height: width, tintColor: colors.onComplete }]} /> : null}
+        {drawings.tick ? (
+          <Image source={drawings.tick.source} resizeMode="contain" style={[styles.mark, { tintColor: colors.onComplete }]} />
+        ) : (
+          <Text style={[styles.glyph, { color: colors.onComplete }]}>✓</Text>
+        )}
       </Animated.View>
       <Animated.View style={[styles.action, styles.remove, deleteStyle]}>
-        <Text style={styles.glyph}>✕</Text>
+        {starScatter ? <Image source={starScatter.source} style={[styles.diaper, { width, height: width, tintColor: colors.onAction }]} /> : null}
+        {drawings.strike ? (
+          // Two strokes of the quill, crossed.
+          <View style={styles.mark}>
+            <Image source={drawings.strike.source} resizeMode="stretch" style={[styles.cross, { tintColor: colors.onAction, transform: [{ rotate: '45deg' }] }]} />
+            <Image source={drawings.strike.source} resizeMode="stretch" style={[styles.cross, { tintColor: colors.onAction, transform: [{ rotate: '-45deg' }] }]} />
+          </View>
+        ) : (
+          <Text style={styles.glyph}>✕</Text>
+        )}
       </Animated.View>
       <GestureDetector gesture={gesture}>
         <Animated.View
@@ -377,7 +391,11 @@ const makeStyles = (colors: Palette) =>
     borderBottomColor: colors.rule,
   },
   unruled: { borderBottomWidth: 0 },
-  action: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, justifyContent: 'center', paddingHorizontal: 24 },
+  action: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, justifyContent: 'center', paddingHorizontal: 24, overflow: 'hidden' },
+  // A faint strewing of stars across the pigment, as the grounds of painted initials are patterned.
+  diaper: { position: 'absolute', top: -40, left: 0, opacity: 0.16 },
+  mark: { width: 30, height: 30, alignItems: 'center', justifyContent: 'center' },
+  cross: { position: 'absolute', width: 32, height: 5 },
   complete: { backgroundColor: colors.complete, alignItems: 'flex-start' },
   remove: { backgroundColor: colors.remove, alignItems: 'flex-end' },
   strikeDrawn: { height: 7, backgroundColor: 'transparent' },

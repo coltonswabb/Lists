@@ -1,6 +1,6 @@
 import { LinearGradient } from 'expo-linear-gradient';
 import { type FC, useEffect } from 'react';
-import { StyleSheet, useWindowDimensions } from 'react-native';
+import { Image, StyleSheet, useWindowDimensions, View } from 'react-native';
 import Animated, {
   Easing,
   useAnimatedStyle,
@@ -10,31 +10,28 @@ import Animated, {
   withSequence,
   withTiming,
 } from 'react-native-reanimated';
-import Svg, { Circle, G, Line, Path } from 'react-native-svg';
 import { scheduleOnRN } from 'react-native-worklets';
 
-const FALL_MS = 420;
-const HOLD_MS = 380;
-const LIFT_MS = 520;
-const BODY = 112;
+import { celestial, drawings, skies } from '../art';
+import { LineArt } from './LineArt';
 
-const skies = {
-  night: ['#04060d', '#0e1430', '#1b2147'],
-  day: ['#f7dc9a', '#f0b560', '#d9783a'],
+const FALL_MS = 480;
+const HOLD_MS = 1150;
+const LIFT_MS = 620;
+const WHOLE_MS = FALL_MS + HOLD_MS + LIFT_MS;
+
+/** Each sky: the plain tones it falls back to, and the ink its wheel and corner-work are drawn in. */
+const looks = {
+  night: { tones: ['#04060d', '#0e1430', '#1b2147'], gilt: '#e9c35c', painting: 'night', body: 'moon' },
+  day: { tones: ['#f7dc9a', '#f0b560', '#d9783a'], gilt: '#8c3214', painting: 'dawn', body: 'sun' },
 } as const;
 
-/** Fixed, so the same few stars come out each night. Fractions of the screen. */
-const STARS = [
-  [0.12, 0.14, 1.6],
-  [0.31, 0.08, 1.1],
-  [0.52, 0.19, 1.9],
-  [0.74, 0.11, 1.3],
-  [0.88, 0.24, 1.5],
-  [0.2, 0.33, 1.2],
-  [0.63, 0.36, 1.0],
-  [0.42, 0.44, 1.4],
-  [0.84, 0.48, 1.1],
-  [0.09, 0.52, 1.3],
+/** The four corners of the page: the corner-work is drawn for the top left and turned over for the rest. */
+const corners = [
+  { top: 0, left: 0, flip: [1, 1] },
+  { top: 0, right: 0, flip: [-1, 1] },
+  { bottom: 0, left: 0, flip: [1, -1] },
+  { bottom: 0, right: 0, flip: [-1, -1] },
 ] as const;
 
 type DayNightVeilProps = {
@@ -46,14 +43,21 @@ type DayNightVeilProps = {
 };
 
 /**
- * The turn between day and night, played over everything when the candle is touched: the sky falls
- * across the desk, a moon or a sun climbs through it, and it lifts on the changed paper.
+ * The turn between day and night, played over everything when the candle is touched. A painted sky
+ * falls across the desk, framed in gilt corner-work; a wheel of stars turns behind the moon or the
+ * sun as it climbs to the middle of it; and the sky lifts on the changed paper.
  */
 export const DayNightVeil: FC<DayNightVeilProps> = ({ to, onCovered, onDone }) => {
   const { width, height } = useWindowDimensions();
   const still = useReducedMotion();
+  const look = looks[to];
+  const painting = skies[look.painting];
+  const body = celestial[look.body];
+  const wheel = drawings['sky-wheel'];
+  const corner = drawings['sky-corner'];
+
   const veil = useSharedValue(0);
-  const climb = useSharedValue(0);
+  const turn = useSharedValue(still ? 1 : 0);
 
   useEffect(() => {
     veil.value = withSequence(
@@ -67,66 +71,65 @@ export const DayNightVeil: FC<DayNightVeilProps> = ({ to, onCovered, onDone }) =
         }),
       ),
     );
-    climb.value = withTiming(1, { duration: FALL_MS + HOLD_MS + LIFT_MS, easing: Easing.out(Easing.cubic) });
+    if (!still) turn.value = withTiming(1, { duration: WHOLE_MS, easing: Easing.out(Easing.cubic) });
     // Played once, when the veil is put up.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  const wheelSize = Math.min(width * 1.18, height * 0.62);
+  const bodySize = wheelSize * 0.52;
+  const centre = { x: width / 2, y: height * 0.44 };
+  const cornerSize = Math.min(width * 0.5, 230);
+
   const veilStyle = useAnimatedStyle(() => ({ opacity: veil.value }));
-  const bodyStyle = useAnimatedStyle(() => {
-    // An arc from low on the left to high in the middle. Held at its height when motion is reduced.
-    const t = still ? 1 : climb.value;
-    return {
-      transform: [
-        { translateX: width * (0.16 + 0.34 * t) - BODY / 2 },
-        { translateY: height * (0.62 - 0.3 * Math.sin((t * Math.PI) / 2)) - BODY / 2 },
-        { rotate: `${(1 - t) * -24}deg` },
-      ],
-    };
-  });
+  const wheelStyle = useAnimatedStyle(() => ({
+    transform: [{ rotate: `${(1 - turn.value) * -70}deg` }, { scale: 0.92 + turn.value * 0.08 }],
+  }));
+  const bodyStyle = useAnimatedStyle(() => ({
+    opacity: Math.min(1, turn.value * 2.2),
+    transform: [
+      // Up from below the wheel's foot into its middle, settling as it turns upright.
+      { translateY: (1 - turn.value) * wheelSize * 0.42 },
+      { rotate: `${(1 - turn.value) * (to === 'day' ? -55 : -18)}deg` },
+      { scale: 0.82 + turn.value * 0.18 },
+    ],
+  }));
+  const cornerStyle = useAnimatedStyle(() => ({ opacity: Math.min(1, turn.value * 1.6) * 0.9 }));
 
   return (
     <Animated.View style={[StyleSheet.absoluteFill, veilStyle]} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
-      <LinearGradient colors={skies[to]} style={StyleSheet.absoluteFill} />
-      {to === 'night' ? (
-        <Svg width={width} height={height} style={StyleSheet.absoluteFill}>
-          {STARS.map(([x, y, r]) => (
-            <Circle key={`${x}-${y}`} cx={x * width} cy={y * height} r={r} fill="#eef0ff" opacity={0.85} />
-          ))}
-        </Svg>
+      <LinearGradient colors={look.tones} style={StyleSheet.absoluteFill} />
+      {painting ? <Image source={painting.source} resizeMode="cover" style={[StyleSheet.absoluteFill, { width, height }]} /> : null}
+
+      {wheel ? (
+        <Animated.View style={[styles.centred, { left: centre.x - wheelSize / 2, top: centre.y - wheelSize / 2, width: wheelSize, height: wheelSize }, wheelStyle]}>
+          <LineArt drawing={wheel} width={wheelSize} color={look.gilt} style={styles.wheel} />
+        </Animated.View>
       ) : null}
-      <Animated.View style={[styles.body, bodyStyle]}>
-        <Svg width={BODY} height={BODY} viewBox="0 0 100 100">
-          {to === 'night' ? (
-            // A crescent: a full disc with a bite taken from it.
-            <Path d="M62 8 A 44 44 0 1 0 92 62 A 34 34 0 1 1 62 8 Z" fill="#f3ecd2" />
-          ) : (
-            <G>
-              {Array.from({ length: 12 }, (_, ray) => {
-                const angle = (ray * Math.PI) / 6;
-                const long = ray % 2 === 0;
-                return (
-                  <Line
-                    key={ray}
-                    x1={50 + Math.cos(angle) * 30}
-                    y1={50 + Math.sin(angle) * 30}
-                    x2={50 + Math.cos(angle) * (long ? 48 : 41)}
-                    y2={50 + Math.sin(angle) * (long ? 48 : 41)}
-                    stroke="#fff3c4"
-                    strokeWidth={long ? 4 : 3}
-                    strokeLinecap="round"
-                  />
-                );
-              })}
-              <Circle cx={50} cy={50} r={24} fill="#fff6d0" />
-            </G>
-          )}
-        </Svg>
-      </Animated.View>
+
+      {body ? (
+        <Animated.View style={[styles.centred, { left: centre.x - bodySize / 2, top: centre.y - bodySize / 2, width: bodySize, height: bodySize }, bodyStyle]}>
+          <Image source={body.source} resizeMode="contain" style={{ width: bodySize, height: bodySize }} />
+        </Animated.View>
+      ) : null}
+
+      {corner
+        ? corners.map(({ flip, ...place }) => (
+            <Animated.View key={`${flip[0]}${flip[1]}`} style={[styles.corner, place, { transform: [{ scaleX: flip[0] }, { scaleY: flip[1] }] }, cornerStyle]}>
+              <View style={styles.cornerInset}>
+                <LineArt drawing={corner} width={cornerSize} color={look.gilt} />
+              </View>
+            </Animated.View>
+          ))
+        : null}
     </Animated.View>
   );
 };
 
 const styles = StyleSheet.create({
-  body: { position: 'absolute', left: 0, top: 0, width: BODY, height: BODY },
+  centred: { position: 'absolute', alignItems: 'center', justifyContent: 'center' },
+  wheel: { opacity: 0.8 },
+  corner: { position: 'absolute' },
+  // Clear of the screen's rounded corners.
+  cornerInset: { padding: 14 },
 });

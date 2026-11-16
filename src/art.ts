@@ -22,13 +22,15 @@ export const marginalia: Drawing[] = [
 ];
 
 /** Single line drawings by name, when they have been made. */
-export const drawings: Partial<Record<'quill' | 'flourish' | 'divider' | 'empty-shelf' | 'initial-frame' | 'tick' | 'strike' | 'nil-found', Drawing>> = {
+export const drawings: Partial<Record<'quill' | 'flourish' | 'divider' | 'empty-shelf' | 'initial-frame' | 'tick' | 'strike' | 'nil-found' | 'sky-wheel' | 'sky-corner', Drawing>> = {
   'divider': { source: require('../assets/art/divider.png'), width: 900, height: 66 },
   'empty-shelf': { source: require('../assets/art/empty-shelf.png'), width: 900, height: 883 },
   'flourish': { source: require('../assets/art/flourish.png'), width: 900, height: 898 },
   'initial-frame': { source: require('../assets/art/initial-frame.png'), width: 900, height: 900 },
   'nil-found': { source: require('../assets/art/nil-found.png'), width: 900, height: 677 },
   'quill': { source: require('../assets/art/quill.png'), width: 900, height: 811 },
+  'sky-corner': { source: require('../assets/art/sky-corner.png'), width: 900, height: 898 },
+  'sky-wheel': { source: require('../assets/art/sky-wheel.png'), width: 900, height: 899 },
   'strike': { source: require('../assets/art/strike.png'), width: 900, height: 35 },
   'tick': { source: require('../assets/art/tick.png'), width: 900, height: 690 },
 };
@@ -59,6 +61,21 @@ export const deskProps: Partial<Record<'inkwell' | 'candle', Drawing>> = {
   inkwell: { source: require('../assets/art/desk-inkwell.png'), width: 423, height: 480 },
   candle: { source: require('../assets/art/desk-candle.png'), width: 251, height: 420 },
 };
+
+/** The sun and the moon, in their own colours, for the turn of day and night. */
+export const celestial: Partial<Record<'sun' | 'moon', Drawing>> = {
+  sun: { source: require('../assets/art/sky-sun.png'), width: 634, height: 640 },
+  moon: { source: require('../assets/art/sky-moon.png'), width: 478, height: 560 },
+};
+
+/** Full-bleed skies painted behind the sun and the moon. */
+export const skies: Partial<Record<'night' | 'dawn', Drawing>> = {
+  night: { source: require('../assets/art/sky-night.jpg'), width: 853, height: 1280 },
+  dawn: { source: require('../assets/art/sky-dawn.jpg'), width: 853, height: 1280 },
+};
+
+/** A tileable scatter of stars, black on transparency, strewn in gold over Night Vigil's desk. */
+export const starScatter: Drawing | undefined = { source: require('../assets/art/vigil-stars.png'), width: 512, height: 512 };
 
 /** A vertical, tileable strip of torn edge: opaque where the paper is missing. Tinted as the desk. */
 export const deckle: Drawing | undefined = { source: require('../assets/art/deckle-edge.png'), width: 16, height: 1086 };
