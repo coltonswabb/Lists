@@ -11,6 +11,7 @@ import {
   setScribeMode,
 } from './scribe';
 import { setSoundEnabled } from './sounds';
+import { matchIconTo } from './appIcon';
 import { isThemeName, type ThemeName } from './theme';
 
 const STORAGE_KEY = 'lists/settings/v1';
@@ -58,7 +59,10 @@ export const useSettings = () => {
     });
   }, []);
 
-  const chooseTheme = useCallback((value: ThemeName) => setTheme(value), []);
+  const chooseTheme = useCallback((value: ThemeName) => {
+    setTheme(value);
+    void matchIconTo(value);
+  }, []);
 
   const chooseAddress = useCallback((value: Address | null) => {
     if (value) setScribeAddress(value);

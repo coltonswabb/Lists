@@ -57,7 +57,44 @@
           "backgroundColor": "#181614"
         }
       ],
-      "expo-sharing"
+      "expo-sharing",
+      [
+        "expo-alternate-app-icons",
+        [
+          {
+            "name": "Vigil",
+            "ios": "./assets/icons/vigil.png",
+            "android": {
+              "foregroundImage": "./assets/icons/vigil-foreground.png",
+              "backgroundColor": "#0c0b0a"
+            }
+          },
+          {
+            "name": "Lapis",
+            "ios": "./assets/icons/lapis.png",
+            "android": {
+              "foregroundImage": "./assets/icons/lapis-foreground.png",
+              "backgroundColor": "#10141d"
+            }
+          },
+          {
+            "name": "Verdant",
+            "ios": "./assets/icons/verdant.png",
+            "android": {
+              "foregroundImage": "./assets/icons/verdant-foreground.png",
+              "backgroundColor": "#121610"
+            }
+          },
+          {
+            "name": "Codex",
+            "ios": "./assets/icons/codex.png",
+            "android": {
+              "foregroundImage": "./assets/icons/codex-foreground.png",
+              "backgroundColor": "#120c16"
+            }
+          }
+        ]
+      ]
     ]
   }
 }
