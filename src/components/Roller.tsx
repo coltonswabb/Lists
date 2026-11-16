@@ -18,6 +18,10 @@ const CLEAR = 'rgba(0,0,0,0)';
 /** Where the light falls across a cylinder lit from above: a dim rim, a bright shoulder, then a long fall into shade. */
 const CURVE = [0, 0.2, 0.5, 0.86, 1] as const;
 
+/** Light from above on a roll lying on its side, laid over whatever colour the roll is. */
+export const ROLL_LIGHT = ['rgba(255,255,255,0.05)', 'rgba(255,255,255,0.26)', 'rgba(255,255,255,0)', 'rgba(0,0,0,0.12)', 'rgba(0,0,0,0.3)'] as const;
+export const ROLL_LIGHT_AT = [0, 0.16, 0.5, 0.84, 1] as const;
+
 /** A round thing's tones, top to bottom, from the one colour it is made of. */
 export const cylinderOf = (color: string, shade: string) =>
   [

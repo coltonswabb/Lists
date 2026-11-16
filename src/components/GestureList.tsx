@@ -50,7 +50,7 @@ import { accentAt, fonts, type Palette, paperAt, roman, ROW_HEIGHT } from '../th
 import { DeckleEdge } from './DeckleEdge';
 import { Finial, hasFinial } from './Finial';
 import { PaperOverlay } from './PaperOverlay';
-import { Roller, ROLLER_HEIGHT } from './Roller';
+import { ROLL_LIGHT, ROLL_LIGHT_AT, Roller, ROLLER_HEIGHT } from './Roller';
 import { RowInput } from './RowInput';
 import { LineArt } from './LineArt';
 import { LEAD_WIDTH, type Lead, RowLead } from './RowLead';
@@ -74,9 +74,6 @@ const SWEEP_STAGGER_MS = 70;
 export const STAMP_DELAY_MS = 350;
 /** Average advance of the 21pt item text, used to size the strike drawn while swiping. */
 const CHAR_WIDTH = 9.2;
-
-const ROLL_LIGHT = ['rgba(255,255,255,0.05)', 'rgba(255,255,255,0.26)', 'rgba(255,255,255,0)', 'rgba(0,0,0,0.12)', 'rgba(0,0,0,0.3)'] as const;
-const ROLL_LIGHT_AT = [0, 0.16, 0.5, 0.84, 1] as const;
 
 type PullAction = 'none' | 'create' | 'back';
 

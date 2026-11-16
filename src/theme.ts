@@ -104,11 +104,14 @@ export const mixColors = (from: string, to: string, t: number): string => {
 
 export const paletteOf = (name: ThemeName) => {
   const spec: ThemeSpec = themes[name];
+  // Pale ink on a dark paper loses more when faded than dark ink on a pale one, so it is faded less.
+  const [r, g, b] = toRgb(spec.paperFrom);
+  const darkPaper = r * 0.299 + g * 0.587 + b * 0.114 < 110;
   return {
     ...spec,
     name,
     parchment: spec.paperFrom,
-    inkFaded: alpha(spec.ink, 0.45),
+    inkFaded: alpha(spec.ink, darkPaper ? 0.62 : 0.45),
     rule: alpha(spec.ink, 0.14),
     gold: spec.rod,
     onDeskFaded: alpha(spec.onDesk, 0.5),

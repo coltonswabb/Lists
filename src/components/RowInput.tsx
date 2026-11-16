@@ -1,8 +1,11 @@
 import { type ComponentRef, type FC, useEffect, useRef, useState } from 'react';
+import { LinearGradient } from 'expo-linear-gradient';
 import { StyleSheet, TextInput, View } from 'react-native';
 
 import { useTheme } from '../ThemeContext';
 import { fonts, type Palette, ROW_HEIGHT } from '../theme';
+import { Finial, hasFinial } from './Finial';
+import { ROLL_LIGHT, ROLL_LIGHT_AT } from './Roller';
 import { type Lead, RowLead } from './RowLead';
 
 type RowInputProps = {
@@ -93,7 +96,10 @@ export const RowInput: FC<RowInputProps> = ({ leadFor, paper, placeholder, initi
 
   return (
     <View style={[styles.row, rolled ? styles.rolledRow : { backgroundColor: paper }]}>
+      {/* A scroll being named lies on the shelf like the others: rounded by the light, with its rod's ends showing. */}
+      {rolled && hasFinial(colors.name) ? <Finial paper={colors.name} side="left" length={34} tuck={18} /> : null}
       <View style={[styles.inner, rolled && styles.rolledInner, rolled && { backgroundColor: paper }]}>
+        {rolled ? <LinearGradient colors={ROLL_LIGHT} locations={ROLL_LIGHT_AT} style={styles.rollLight} pointerEvents="none" /> : null}
         <RowLead lead={leadFor(text)} />
         <TextInput
           ref={input}
@@ -112,6 +118,7 @@ export const RowInput: FC<RowInputProps> = ({ leadFor, paper, placeholder, initi
           style={styles.input}
         />
       </View>
+      {rolled && hasFinial(colors.name) ? <Finial paper={colors.name} side="right" length={34} tuck={18} /> : null}
     </View>
   );
 };
@@ -125,9 +132,10 @@ const makeStyles = (colors: Palette) =>
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: colors.rule,
   },
-  rolledRow: { backgroundColor: 'transparent', borderBottomWidth: 0 },
+  rolledRow: { backgroundColor: 'transparent', borderBottomWidth: 0, flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-start', paddingHorizontal: 2 },
   inner: { flexDirection: 'row', alignItems: 'center' },
-  rolledInner: { height: 48, paddingHorizontal: 12, borderRadius: 4 },
+  rolledInner: { flex: 1, height: 48, paddingHorizontal: 12, borderRadius: 3, zIndex: 1 },
+  rollLight: { ...StyleSheet.absoluteFill, borderRadius: 3 },
   input: {
     flex: 1,
     color: colors.ink,

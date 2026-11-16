@@ -7,7 +7,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { addresses } from '../scribe';
 import type { useSettings } from '../settings';
 import { useTheme } from '../ThemeContext';
-import { fonts, type Palette, type ThemeName, themeNames, themes } from '../theme';
+import { fonts, mixColors, type Palette, type ThemeName, themeNames, themes } from '../theme';
 
 const scribeLabels = { chatty: 'Chatty', quiet: 'Quiet', silent: 'Silent' } as const;
 
@@ -22,7 +22,7 @@ type SettingsScreenProps = {
 
 /** The papers are shown as themselves, so each can be judged before it is chosen. */
 export const SettingsScreen: FC<SettingsScreenProps> = ({ settings, onClose, onBackup, onRestore }) => {
-  const { styles } = useTheme(makeStyles);
+  const { colors, styles } = useTheme(makeStyles);
   const insets = useSafeAreaInsets();
 
   // Every other row is a setting and its current value; tapping the row moves to the next value.
@@ -44,7 +44,8 @@ export const SettingsScreen: FC<SettingsScreenProps> = ({ settings, onClose, onB
           <Text style={styles.action}>Close</Text>
         </Pressable>
       </View>
-      <ScrollView contentContainerStyle={{ paddingBottom: insets.bottom + 20 }}>
+      <View style={styles.body}>
+      <ScrollView contentContainerStyle={{ paddingTop: 6, paddingBottom: insets.bottom + 20 }}>
         <Text style={styles.heading}>Paper</Text>
         <View accessibilityRole="radiogroup">
           {themeNames.map((name) => (
@@ -84,6 +85,9 @@ export const SettingsScreen: FC<SettingsScreenProps> = ({ settings, onClose, onB
           <Text style={styles.value}>from a file</Text>
         </Pressable>
       </ScrollView>
+        {/* Rows slide away into the desk's shadow under the title, not off a hard edge. */}
+        <LinearGradient colors={[mixColors(colors.desk, '#000000', 0.45), 'rgba(0,0,0,0)']} style={styles.fade} pointerEvents="none" />
+      </View>
     </Animated.View>
   );
 };
@@ -144,6 +148,8 @@ const makeStyles = (colors: Palette) =>
       height: 56,
       marginBottom: 4,
     },
+    body: { flex: 1 },
+    fade: { position: 'absolute', top: 0, left: 0, right: 0, height: 18 },
     title: { color: colors.onDesk, fontFamily: fonts.display, fontSize: 30 },
     action: { color: colors.onDesk, fontFamily: fonts.bodyItalic, fontSize: 18 },
     heading: {

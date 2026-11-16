@@ -58,8 +58,9 @@ const makeStyles = (colors: Palette) =>
       opacity: 0.3,
     },
     gilt: { position: 'absolute', top: 0, bottom: 0, width: 1, backgroundColor: colors.accent, opacity: 0.55 },
-    giltLeft: { left: 9 },
-    giltRight: { right: 9 },
+    // Just inside the torn edge.
+    giltLeft: { left: 6 },
+    giltRight: { right: 6 },
     left: { position: 'absolute', top: 0, bottom: 0, left: 0, width: 18 },
     right: { position: 'absolute', top: 0, bottom: 0, right: 0, width: 18 },
     top: { position: 'absolute', top: 0, left: 0, right: 0, height: 12 },

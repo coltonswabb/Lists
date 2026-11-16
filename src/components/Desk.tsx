@@ -9,7 +9,7 @@ import { Tiled } from './Tiled';
 
 /** Points per tile: the 512px textures shown at about 1.5x, so the grain reads at a natural size. */
 const TILE = 340;
-const CORNER = 150;
+const CORNER = 170;
 const SHADE = 'rgba(0,0,0,0.45)';
 const CLEAR = 'rgba(0,0,0,0)';
 
@@ -41,8 +41,9 @@ export const Desk: FC = () => {
 };
 
 const styles = StyleSheet.create({
-  cornerLeft: { position: 'absolute', top: 44, left: 6, opacity: 0.4 },
-  cornerRight: { position: 'absolute', top: 44, right: 6, opacity: 0.4, transform: [{ scaleX: -1 }] },
+  // Hard into the corners of the screen, so the vinework reads as the desk's own edge.
+  cornerLeft: { position: 'absolute', top: 4, left: -5, opacity: 0.4 },
+  cornerRight: { position: 'absolute', top: 4, right: -5, opacity: 0.4, transform: [{ scaleX: -1 }] },
   top: { position: 'absolute', top: 0, left: 0, right: 0, height: 160 },
   bottom: { position: 'absolute', bottom: 0, left: 0, right: 0, height: 200 },
   left: { position: 'absolute', top: 0, bottom: 0, left: 0, width: 50 },
