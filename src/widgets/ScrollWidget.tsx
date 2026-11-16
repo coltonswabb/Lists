@@ -30,7 +30,7 @@ const ScrollWidget = (props: ScrollWidgetProps, environment: { widgetFamily?: st
   'widget';
 
   const family = environment.widgetFamily ?? 'systemSmall';
-  const link = 'lists://scroll';
+  const link = 'decree://scroll';
   const items = props.items ?? [];
   const shown = items.slice(0, family === 'systemLarge' ? 9 : family === 'systemMedium' ? 3 : 4);
   const numerals = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX'];

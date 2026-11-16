@@ -1,14 +1,14 @@
 {
   "expo": {
-    "name": "Lists",
-    "slug": "lists",
+    "name": "Decree",
+    "slug": "decree",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "dark",
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.coltonswabb.lists"
+      "bundleIdentifier": "com.coltonswabb.decree"
     },
     "android": {
       "adaptiveIcon": {
@@ -17,20 +17,20 @@
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false,
-      "package": "com.coltonswabb.lists"
+      "package": "com.coltonswabb.decree"
     },
     "web": {
       "favicon": "./assets/favicon.png"
     },
     "backgroundColor": "#181614",
-    "scheme": "lists",
+    "scheme": "decree",
     "plugins": [
       "expo-font",
       "expo-notifications",
       [
         "expo-widgets",
         {
-          "groupIdentifier": "group.com.coltonswabb.lists",
+          "groupIdentifier": "group.com.coltonswabb.decree",
           "widgets": [
             {
               "name": "ListsScroll",

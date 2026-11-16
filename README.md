@@ -1,4 +1,4 @@
-# Lists
+# Decree
 
 A gesture-driven list app built with Expo and React Native.
 
