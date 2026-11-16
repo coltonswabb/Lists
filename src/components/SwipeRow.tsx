@@ -1,4 +1,4 @@
-import type { FC, ReactNode } from 'react';
+import { type FC, type ReactNode, useEffect } from 'react';
 import { StyleSheet, Text, useWindowDimensions } from 'react-native';
 import {
   GestureDetector,
@@ -12,6 +12,7 @@ import Animated, {
   type SharedValue,
   useAnimatedStyle,
   useSharedValue,
+  withDelay,
   withSpring,
   withTiming,
 } from 'react-native-reanimated';
@@ -26,6 +27,7 @@ const TAP_SLOP = 8;
 const HOLD_TO_DRAG_MS = 320;
 const SPRING = { damping: 22, stiffness: 260 } as const;
 const SHIFT = { duration: 150 } as const;
+export const SWEEP_MS = 300;
 /** Width of the margin mark and its padding: a tap here is reported separately from a tap on the text. */
 const LEAD_ZONE = 62;
 /** Holding a dragged row this close to the top or bottom of the screen scrolls the list. */
@@ -65,6 +67,8 @@ type SwipeRowProps = {
   reorder: ReorderState;
   gap: GapState;
   animateLayout: boolean;
+  /** Set while finished rows are being cleared: the row starts sweeping off the sheet after this many milliseconds. */
+  sweepAfter?: number;
   onDelete: () => void;
   /** Swipe right. Rows without it only rubber-band in that direction. */
   onComplete?: () => void;
@@ -91,6 +95,7 @@ export const SwipeRow: FC<SwipeRowProps> = ({
   reorder,
   gap,
   animateLayout,
+  sweepAfter,
   onDelete,
   onComplete,
   onPress,
@@ -109,6 +114,12 @@ export const SwipeRow: FC<SwipeRowProps> = ({
   const lastNudge = useSharedValue(0);
   const lift = useSharedValue(0);
   const canComplete = onComplete !== undefined;
+
+  // Being cleared: the whole row sweeps off the sheet. Its owner removes it once the sweep has finished.
+  const sweep = useSharedValue(0);
+  useEffect(() => {
+    if (sweepAfter !== undefined) sweep.value = withDelay(sweepAfter, withTiming(1, { duration: SWEEP_MS }));
+  }, [sweepAfter, sweep]);
 
   const complete = () => {
     thud();
@@ -214,8 +225,9 @@ export const SwipeRow: FC<SwipeRowProps> = ({
     const dragShift = isDragged ? dragY.value + scrollY.value - scrollStart.value : from < 0 ? 0 : withTiming(aside * ROW_HEIGHT, SHIFT);
     return {
       zIndex: isDragged ? 10 : 0,
-      transform: [{ translateY: gapShift }, { translateY: dragShift }, { scale: 1 + (from === index ? lift.value * 0.03 : 0) }],
+      transform: [{ translateX: sweep.value * width }, { translateY: gapShift }, { translateY: dragShift }, { scale: 1 + (from === index ? lift.value * 0.03 : 0) }],
       shadowOpacity: lift.value * 0.35,
+      opacity: 1 - sweep.value * 0.6,
     };
   });
   const rowStyle = useAnimatedStyle(() => ({ transform: [{ translateX: offsetX.value }] }));
@@ -232,7 +244,7 @@ export const SwipeRow: FC<SwipeRowProps> = ({
 
   return (
     <Animated.View
-      layout={animateLayout ? LinearTransition.duration(220) : undefined}
+      layout={animateLayout ? LinearTransition.duration(260) : undefined}
       style={[styles.container, containerStyle]}
     >
       <Animated.View style={[styles.action, styles.complete, completeStyle]}>

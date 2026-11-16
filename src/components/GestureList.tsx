@@ -36,7 +36,7 @@ import { PaperOverlay } from './PaperOverlay';
 import { Roller, ROLLER_HEIGHT } from './Roller';
 import { RowInput } from './RowInput';
 import { LEAD_WIDTH, type Lead, RowLead } from './RowLead';
-import { SwipeRow } from './SwipeRow';
+import { SWEEP_MS, SwipeRow } from './SwipeRow';
 
 const PULL_RESISTANCE = 0.6;
 const PRESS_GUARD_MS = 150;
@@ -47,6 +47,8 @@ const SPRING = { damping: 24, stiffness: 240 } as const;
 const UNROLL_MS = 420;
 const ROLL_UP_MS = 240;
 const UNCLIPPED = 100000;
+/** Gap between one finished row sweeping away and the next, so a clear reads as a cascade. */
+const SWEEP_STAGGER_MS = 70;
 /** A fresh wax seal lands this long after the shelf appears, once the eye has found the scroll. */
 export const STAMP_DELAY_MS = 350;
 /** Average advance of the 21pt item text, used to size the strike drawn while swiping. */
@@ -136,6 +138,8 @@ export const GestureList: FC<GestureListProps> = ({
   const [atTop, setAtTop] = useState(true);
   const [atBottom, setAtBottom] = useState(true);
   const [clearArmed, setClearArmed] = useState(false);
+  // While true, finished rows are primed to sweep off the sheet one after another as they are removed.
+  const [sweeping, setSweeping] = useState(false);
   const extent = useRef({ content: 0, viewport: 0 });
   const updateEdges = (y: number) => {
     setAtTop(y <= 0);
@@ -195,6 +199,7 @@ export const GestureList: FC<GestureListProps> = ({
   const rubricated = rows.map((row, index) => !isShelf && !row.section && !row.done && rows[index - 1]?.section === true);
 
   const itemRows = rows.filter((row) => !row.section);
+  const sweepOrder = new Map(itemRows.filter((row) => row.done).map((row, position) => [row.id, position]));
   const finished = !isShelf && itemRows.length > 0 && itemRows.every((row) => row.done);
 
   // Sheet margins, row padding and the margin mark, on both sides of the text.
@@ -281,7 +286,15 @@ export const GestureList: FC<GestureListProps> = ({
       pulling.current = false;
     }, PRESS_GUARD_MS);
     setClearArmed(false);
-    if (clear) onPullUp?.();
+    if (!clear || !onPullUp) return;
+    // Finished rows sweep away one after another; only then are they actually removed.
+    const cascade = Math.max(0, sweepOrder.size - 1) * SWEEP_STAGGER_MS + SWEEP_MS;
+    play('paper');
+    setSweeping(true);
+    setTimeout(() => {
+      onPullUp();
+      setSweeping(false);
+    }, cascade);
   };
 
   const pan = usePanGesture({
@@ -595,6 +608,7 @@ export const GestureList: FC<GestureListProps> = ({
                     groupSize={groupSizes[index] ?? 1}
                     gap={{ index: gapIndex, size: gapSize }}
                     animateLayout={!dragging}
+                    sweepAfter={sweeping && row.done ? (sweepOrder.get(row.id) ?? 0) * SWEEP_STAGGER_MS : undefined}
                     onDelete={() => onDelete(row.id)}
                     onComplete={onComplete && !row.section ? () => onComplete(row.id) : undefined}
                     onPress={() => press(() => (onOpen ? onOpen(row.id) : setEditingId(row.id)))}

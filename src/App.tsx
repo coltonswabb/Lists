@@ -154,7 +154,6 @@ const Screens: FC<{ settings: Settings; address: Address }> = ({ settings, addre
           onPullUp={
             items.some((item) => item.done)
               ? () => {
-                  play('seal');
                   say('strike');
                   store.clearDone(openList.id);
                 }
@@ -166,14 +165,11 @@ const Screens: FC<{ settings: Settings; address: Address }> = ({ settings, addre
                 <Pressable onPress={() => store.uncheckAll(openList.id)} hitSlop={10}>
                   <Text style={styles.label}>Unmark all</Text>
                 </Pressable>
-                <Pressable onPress={() => store.clearDone(openList.id)} hitSlop={10}>
-                  <Text style={styles.label}>Clear the finished</Text>
-                </Pressable>
               </View>
             ) : null
           }
         />
-        <UndoToast undo={store.undo} onUndo={undoLast} onDismiss={store.dismissUndo} offset={0} />
+        <UndoToast undo={store.undo} onUndo={undoLast} onDismiss={store.dismissUndo} offset={44} />
       </>
     );
   }
