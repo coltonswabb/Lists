@@ -65,6 +65,8 @@ const PINCH_OPEN_AT = ROW_HEIGHT * 0.6;
 const PINCH_CLOSE_SCALE = 0.7;
 const SPRING = { damping: 24, stiffness: 240 } as const;
 const UNROLL_MS = 420;
+/** Room for everything below the last row: two rows' worth of stamps and the tallest finishing drawing. */
+const FOOT_ALLOWANCE = 460;
 const UNCLIPPED = 100000;
 /** Further than any finger can travel: makes one side of a gesture's activation range open-ended. */
 const FAR = 100000;
@@ -167,7 +169,7 @@ export const GestureList: FC<GestureListProps> = ({
 }) => {
   const { colors, styles } = useTheme(makeStyles);
   const insets = useSafeAreaInsets();
-  const { width: screenWidth } = useWindowDimensions();
+  const { width: screenWidth, height: screenHeight } = useWindowDimensions();
   const scrollView = useRef<ComponentRef<typeof NativeScrollView>>(null);
   const scrollOffset = useRef(0);
   const [atTop, setAtTop] = useState(true);
@@ -294,15 +296,22 @@ export const GestureList: FC<GestureListProps> = ({
   const sheetHeight = useSharedValue(isShelf ? UNCLIPPED : 0);
   const measuredHeight = useRef(0);
   const leaving = useRef(false);
-  const [initialHeight] = useState(() => rowCount * ROW_HEIGHT + ROW_HEIGHT * 2);
+  /**
+   * How far the sheet unrolls: past its rows, and past whatever stands at its foot (the stamps, and
+   * the drawing on a finished scroll), so that none of it is left to appear all at once when the
+   * unrolling ends. Erring long costs nothing, since the sheet stops at its own length; and there is
+   * no need to go further than the screen shows.
+   */
+  const [unrolledLength] = useState(() => Math.min(screenHeight, rowCount * ROW_HEIGHT + FOOT_ALLOWANCE));
   useEffect(() => {
     if (isShelf) return;
     play('paper');
     rolledUp.value = withTiming(0, { duration: UNROLL_MS });
-    sheetHeight.value = withTiming(initialHeight, { duration: UNROLL_MS, easing: Easing.out(Easing.cubic) }, () => {
+    const duration = Math.min(640, UNROLL_MS + unrolledLength * 0.22);
+    sheetHeight.value = withTiming(unrolledLength, { duration, easing: Easing.out(Easing.cubic) }, () => {
       sheetHeight.value = UNCLIPPED;
     });
-  }, [isShelf, sheetHeight, rolledUp, initialHeight]);
+  }, [isShelf, sheetHeight, rolledUp, unrolledLength]);
   const sheetStyle = useAnimatedStyle(() => ({ maxHeight: sheetHeight.value }));
 
   /** Rolls the sheet back up onto the top rod, then leaves. */
@@ -751,6 +760,7 @@ export const GestureList: FC<GestureListProps> = ({
                     width={isShelf ? 200 : 170}
                     color={isShelf ? colors.onDeskFaded : colors.inkFaded}
                     style={styles.emptyArt}
+                    inkIn={300}
                   />
                 ) : null}
                 {rowCount === 0 && !busy ? <Text style={styles.hint}>{emptyHint}</Text> : null}

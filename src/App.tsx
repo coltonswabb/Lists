@@ -221,6 +221,8 @@ const Screens: FC<{ settings: Settings; address: Address; onCandle: () => void }
     const { rows, visible } = scrollRows(openList.items);
     const items = itemsOf(openList);
     const remaining = openCount(items);
+    /** The pattern kept under this scroll's name, if there is one. */
+    const keptAs = patterns.find((pattern) => pattern.name === openList.name);
     // Rows are shown without folded items, so positions on screen are mapped back to positions in the scroll.
     const positionOf = (visibleIndex: number) => {
       const row = visible[visibleIndex];
@@ -307,17 +309,20 @@ const Screens: FC<{ settings: Settings; address: Address; onCandle: () => void }
                 </Pressable>
                 <Pressable
                   onPress={() => {
-                    say('pattern');
-                    keepPattern(openList);
+                    // Kept already: the same stamp takes it back.
+                    if (keptAs) forgetPattern(keptAs.id);
+                    else {
+                      say('pattern');
+                      keepPattern(openList);
+                    }
                   }}
                   hitSlop={8}
-                  style={[styles.stamp, patterns.some((pattern) => pattern.name === openList.name) && styles.stampOn]}
-                  accessibilityRole="button"
+                  style={[styles.stamp, keptAs && styles.stampOn]}
+                  accessibilityRole="switch"
                   accessibilityLabel="Keep as a pattern"
+                  accessibilityState={{ checked: keptAs !== undefined }}
                 >
-                  <Text style={[styles.stampText, patterns.some((pattern) => pattern.name === openList.name) && styles.stampTextOn]}>
-                    {patterns.some((pattern) => pattern.name === openList.name) ? 'Pattern kept' : 'Keep as a pattern'}
-                  </Text>
+                  <Text style={[styles.stampText, keptAs && styles.stampTextOn]}>{keptAs ? 'Unkeep pattern' : 'Keep as a pattern'}</Text>
                 </Pressable>
                 {items.some((item) => item.done) ? (
                   <Pressable

@@ -3,6 +3,7 @@ import { Image, useWindowDimensions } from 'react-native';
 import Svg, { Circle, Path } from 'react-native-svg';
 
 import { marginalia } from '../art';
+import { InkIn } from './InkIn';
 import { LEAD_WIDTH } from './RowLead';
 
 /**
@@ -88,6 +89,8 @@ const COLUMN_START = 16 + LEAD_WIDTH + 12;
 const COLUMN_END = 16;
 const MAX_WIDTH = 280;
 const MAX_HEIGHT = 170;
+/** Long enough for an opening scroll to have unrolled this far. */
+const INK_AFTER_MS = 420;
 
 /**
  * A drawing for the margin of a finished scroll, after the creatures and vines medieval scribes drew
@@ -105,14 +108,18 @@ export const Marginalia: FC<MarginaliaProps> = ({ seed, ink, accent }) => {
       screenWidth - SHEET_INSET - COLUMN_START - COLUMN_END,
       (MAX_HEIGHT * drawing.width) / drawing.height,
     );
+    const height = (width * drawing.height) / drawing.width;
     return (
-      <Image
-        source={drawing.source}
-        style={{ width, height: (width * drawing.height) / drawing.width, tintColor: ink }}
-        resizeMode="contain"
-        accessibilityElementsHidden
-        importantForAccessibility="no-hide-descendants"
-      />
+      // Drawn in once the scroll has unrolled, or once the last line has been struck.
+      <InkIn width={width} height={height} delay={INK_AFTER_MS}>
+        <Image
+          source={drawing.source}
+          style={{ width, height, tintColor: ink }}
+          resizeMode="contain"
+          accessibilityElementsHidden
+          importantForAccessibility="no-hide-descendants"
+        />
+      </InkIn>
     );
   }
   const draw = drawings[pick % drawings.length] ?? snail;

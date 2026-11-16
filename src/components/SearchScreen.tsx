@@ -60,7 +60,7 @@ export const SearchScreen: FC<SearchScreenProps> = ({ lists, onOpen, onClose }) 
         ))}
         {needle && matches.length === 0 ? (
           <View style={styles.nothing}>
-            {drawings['nil-found'] ? <LineArt drawing={drawings['nil-found']} width={210} color={colors.onDeskFaded} /> : null}
+            {drawings['nil-found'] ? <LineArt drawing={drawings['nil-found']} width={210} color={colors.onDeskFaded} inkIn={120} /> : null}
             <Text style={styles.none}>No line on any scroll reads so.</Text>
           </View>
         ) : null}
