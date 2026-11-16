@@ -18,11 +18,17 @@ const CLEAR = 'rgba(0,0,0,0)';
  * The surface every screen sits on: the paper's desk texture, tiled, with the edges falling into
  * shadow as if lit by one candle from above. Papers without a texture keep their plain desk colour.
  */
-export const Desk: FC = () => {
+type DeskProps = {
+  /** Shows the scribe's inkwell and candle. Only the Library has room for them; elsewhere they would sit under the page. */
+  furnished: boolean;
+};
+
+export const Desk: FC<DeskProps> = ({ furnished }) => {
   const colors = usePalette();
   const texture = desks[colors.name];
   const insets = useSafeAreaInsets();
-  const { inkwell, candle } = deskProps;
+  const inkwell = furnished ? deskProps.inkwell : undefined;
+  const candle = furnished ? deskProps.candle : undefined;
   // The scribe's things sit low on the desk, clear of the labels along its foot, under the same shadow as the wood.
   const foot = insets.bottom + 58;
   return (

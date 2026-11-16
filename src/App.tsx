@@ -66,7 +66,7 @@ const scrollRows = (items: Item[]): { rows: GestureListRow[]; visible: Item[] } 
 
 type Settings = ReturnType<typeof useSettings>;
 
-const Screens: FC<{ settings: Settings; address: Address }> = ({ settings, address }) => {
+const Screens: FC<{ settings: Settings; address: Address; onShelf: (showing: boolean) => void }> = ({ settings, address, onShelf }) => {
   const { colors, styles } = useTheme(makeStyles);
   const insets = useSafeAreaInsets();
   const store = useLists();
@@ -109,6 +109,12 @@ const Screens: FC<{ settings: Settings; address: Address }> = ({ settings, addre
   const [openListId, setOpenListId] = useState<string | null>(null);
   const [searching, setSearching] = useState(false);
   const openList = store.lists.find((list) => list.id === openListId);
+
+  const shelfShowing = !openList && !searching && !settingsOpen && !chronicleOpen;
+  useEffect(() => {
+    onShelf(shelfShowing);
+    return () => onShelf(false);
+  }, [onShelf, shelfShowing]);
 
   useEffect(() => {
     if (!openList && !searching && !settingsOpen && !chronicleOpen) return;
@@ -390,15 +396,17 @@ export const App: FC = () => {
     EBGaramond_500Medium_Italic,
   });
   const settings = useSettings();
+  // Whether the Library itself is showing, which is when the desk has its inkwell and candle out.
+  const [onShelf, setOnShelf] = useState(false);
   const palette = useMemo(() => paletteOf(settings.theme), [settings.theme]);
   return (
     <GestureHandlerRootView style={{ flex: 1, backgroundColor: palette.desk }}>
       <SafeAreaProvider>
         <ThemeProvider value={palette}>
           <StatusBar style="light" />
-          <Desk />
+          <Desk furnished={onShelf} />
           {!fontsLoaded || !settings.loaded ? null : settings.address ? (
-            <Screens settings={settings} address={settings.address} />
+            <Screens settings={settings} address={settings.address} onShelf={setOnShelf} />
           ) : (
             <ScribeWelcome onChoose={settings.chooseAddress} />
           )}

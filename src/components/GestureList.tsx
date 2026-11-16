@@ -799,7 +799,8 @@ const makeStyles = (colors: Palette) =>
   },
   rollLight: { ...StyleSheet.absoluteFill, borderRadius: 3 },
   rowText: { color: colors.ink, fontFamily: fonts.body, fontSize: 21 },
-  sectionText: { fontFamily: fonts.display, fontSize: 26 },
+  // Set off from its framed initial, whose vinework reaches past the painted block.
+  sectionText: { fontFamily: fonts.display, fontSize: 26, marginLeft: 12 },
   // Close enough set that two lines sit inside one row with air above and below.
   itemText: { lineHeight: 25 },
   rubric: { color: colors.accent },
