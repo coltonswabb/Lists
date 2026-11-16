@@ -767,7 +767,8 @@ const makeStyles = (colors: Palette) =>
   sealMark: { color: colors.onAction, fontSize: 14, fontWeight: '700' },
   finis: { color: colors.accent, fontFamily: fonts.bodyItalic, fontSize: 19 },
   tail: { minHeight: ROW_HEIGHT, alignItems: 'center', justifyContent: 'center' },
-  tailWithArt: { paddingTop: 18, paddingBottom: 14, gap: 4 },
+  // With a drawing, the close of the scroll is centred on the writing column, right of the margin rule.
+  tailWithArt: { paddingTop: 18, paddingBottom: 14, gap: 4, paddingLeft: 16 + LEAD_WIDTH + 12, paddingRight: 16 },
   tapZone: { flexGrow: 1, minHeight: ROW_HEIGHT },
   hint: { color: colors.inkFaded, fontFamily: fonts.bodyItalic, fontSize: 18 },
   clearHint: {

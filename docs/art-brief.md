@@ -194,8 +194,9 @@ one needs isolating and converting to black line art by hand. Any you find are w
 
 ## Once the files arrive
 
-1. A script keys out the white, trims the margins and writes `@2x`/`@3x` versions into
-   `assets/art/`.
+1. `python3 scripts/import-art.py` keys out the white, trims the margins, scales each drawing to at
+   most 900px wide into `assets/art/`, and rewrites `src/art.ts` so the app picks it up. Run it
+   again whenever new files land in `assets/incoming/`.
 2. Marginalia replace the SVG drawings, tinted with the paper's ink. Each finished scroll keeps the
    same drawing, now chosen from twelve, and they sit within the writing column rather than across
    the margin rule.

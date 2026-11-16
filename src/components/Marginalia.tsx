@@ -1,9 +1,13 @@
 import type { FC, ReactNode } from 'react';
+import { Image, useWindowDimensions } from 'react-native';
 import Svg, { Circle, Path } from 'react-native-svg';
 
+import { marginalia } from '../art';
+import { LEAD_WIDTH } from './RowLead';
+
 /**
- * Small drawings for the margin of a finished scroll, after the creatures and vines medieval scribes
- * drew beside their text. Line work in ink, with a touch of the accent.
+ * Stand-ins drawn in code, used only until drawings have been imported (scripts/import-art.py).
+ * Line work in ink, with a touch of the accent.
  */
 type Drawing = (ink: string, accent: string) => ReactNode;
 
@@ -78,8 +82,34 @@ type MarginaliaProps = {
   accent: string;
 };
 
+/** The sheet's side margins, and the writing column's insets (see FINIS_COLUMN in GestureList). */
+const SHEET_INSET = 40;
+const COLUMN_START = 16 + LEAD_WIDTH + 12;
+const COLUMN_END = 16;
+const MAX_WIDTH = 280;
+
+/**
+ * A drawing for the margin of a finished scroll, after the creatures and vines medieval scribes drew
+ * beside their text. Imported pen drawings are tinted with the paper's ink, so they read on every
+ * paper; each scroll keeps the same one.
+ */
 export const Marginalia: FC<MarginaliaProps> = ({ seed, ink, accent }) => {
-  const draw = drawings[Math.abs(hash(seed)) % drawings.length] ?? snail;
+  const { width: screenWidth } = useWindowDimensions();
+  const pick = Math.abs(hash(seed));
+  const drawing = marginalia[pick % Math.max(1, marginalia.length)];
+  if (drawing) {
+    const width = Math.min(MAX_WIDTH, screenWidth - SHEET_INSET - COLUMN_START - COLUMN_END);
+    return (
+      <Image
+        source={drawing.source}
+        style={{ width, height: (width * drawing.height) / drawing.width, tintColor: ink }}
+        resizeMode="contain"
+        accessibilityElementsHidden
+        importantForAccessibility="no-hide-descendants"
+      />
+    );
+  }
+  const draw = drawings[pick % drawings.length] ?? snail;
   return (
     <Svg width={120} height={80} viewBox="0 0 120 80" accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
       {draw(ink, accent)}
