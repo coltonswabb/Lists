@@ -1,5 +1,6 @@
 import type { FC } from 'react';
 import { Alert, Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import Animated, { FadeIn } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { drawings, parchment, waxSeal } from '../art';
@@ -68,7 +69,7 @@ export const ChronicleScreen: FC<ChronicleScreenProps> = ({ entries, sealed, add
   };
 
   return (
-    <View style={[styles.screen, { paddingTop: insets.top }]}>
+    <Animated.View entering={FadeIn.duration(200)} style={[styles.screen, { paddingTop: insets.top }]}>
       <View style={styles.header}>
         <Text style={styles.title}>Chronicle</Text>
         <Pressable onPress={onClose} hitSlop={14} accessibilityRole="button">
@@ -122,9 +123,14 @@ export const ChronicleScreen: FC<ChronicleScreenProps> = ({ entries, sealed, add
                 {drawings.divider ? (
                   <LineArt drawing={drawings.divider} width={190} color={colors.accent} style={styles.divider} />
                 ) : null}
-                {day.entries.map((entry) => (
-                  <View key={entry.id} style={styles.entry}>
-                    <Text style={styles.office}>{officeOf(new Date(entry.at)).toUpperCase()}</Text>
+                {day.entries.map((entry, index) => {
+                  // The hour is written once, beside the first line set down in it.
+                  const office = officeOf(new Date(entry.at));
+                  const earlier = day.entries[index - 1];
+                  const sameHour = earlier !== undefined && officeOf(new Date(earlier.at)) === office;
+                  return (
+                  <View key={entry.id} style={styles.entry} accessibilityLabel={`${office}, ${entry.kind === 'sealed' ? `sealed the scroll ${entry.text}` : `${entry.text}, from ${entry.scroll}`}`}>
+                    <Text style={styles.office}>{sameHour ? '' : office.toUpperCase()}</Text>
                     <View style={styles.fill}>
                       {entry.kind === 'sealed' ? (
                         <Text style={styles.entryText}>
@@ -140,13 +146,14 @@ export const ChronicleScreen: FC<ChronicleScreenProps> = ({ entries, sealed, add
                       )}
                     </View>
                   </View>
-                ))}
+                  );
+                })}
               </View>
             ))
           )}
         </View>
       </ScrollView>
-    </View>
+    </Animated.View>
   );
 };
 

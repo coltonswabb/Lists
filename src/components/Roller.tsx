@@ -1,3 +1,4 @@
+import { LinearGradient } from 'expo-linear-gradient';
 import type { FC } from 'react';
 import { StyleSheet, View } from 'react-native';
 import Animated, { type SharedValue, useAnimatedStyle } from 'react-native-reanimated';
@@ -7,6 +8,21 @@ import { mixColors, type Palette } from '../theme';
 
 const THIN = 22;
 const FULL = 34;
+const SHADOW = 'rgba(0,0,0,0.3)';
+const CLEAR = 'rgba(0,0,0,0)';
+
+/** Where the light falls across a cylinder lit from above: a dim rim, a bright shoulder, then a long fall into shade. */
+const CURVE = [0, 0.2, 0.5, 0.86, 1] as const;
+
+/** A round thing's tones, top to bottom, from the one colour it is made of. */
+export const cylinderOf = (color: string, shade: string) =>
+  [
+    mixColors(color, shade, 0.14),
+    mixColors(color, '#ffffff', 0.3),
+    color,
+    mixColors(color, shade, 0.34),
+    mixColors(color, shade, 0.55),
+  ] as const;
 
 type RollerProps = {
   /** The paper wound onto this rod, which takes the tone of the sheet where it meets it. */
@@ -16,23 +32,29 @@ type RollerProps = {
 };
 
 /**
- * One end of a scroll, drawn flat: the paper wound round its rod, with a turned handle at each side.
- * Three bands of tone stand in for the curve of the roll.
+ * One end of a scroll: the paper wound round its rod, with a turned handle at each side. The roll
+ * is shaded as a cylinder lit from above, and throws a soft shadow on whatever lies under it.
  */
 export const Roller: FC<RollerProps> = ({ paper, fullness }) => {
   const { colors, styles } = useTheme(makeStyles);
   const rollStyle = useAnimatedStyle(() => ({ height: THIN + (FULL - THIN) * (fullness?.value ?? 0) }));
+  const collar = cylinderOf(colors.gold, colors.desk);
   return (
     <View style={styles.roller}>
-      <View style={styles.knob} />
-      <View style={styles.collar} />
+      <View style={styles.knob}>
+        <View style={styles.glint} />
+      </View>
+      <LinearGradient colors={collar} locations={CURVE} style={styles.collar} />
       <Animated.View style={[styles.roll, rollStyle]}>
-        <View style={[styles.band, { flex: 3, backgroundColor: mixColors(paper, '#ffffff', 0.22) }]} />
-        <View style={[styles.band, { flex: 5, backgroundColor: paper }]} />
-        <View style={[styles.band, { flex: 3, backgroundColor: mixColors(paper, colors.desk, 0.28) }]} />
+        <LinearGradient colors={cylinderOf(paper, colors.desk)} locations={CURVE} style={styles.paper} />
+        {/* The edge of the wound sheet, seen where it laps over itself. */}
+        <View style={styles.lap} />
+        <LinearGradient colors={[SHADOW, CLEAR]} style={styles.shadow} pointerEvents="none" />
       </Animated.View>
-      <View style={styles.collar} />
-      <View style={styles.knob} />
+      <LinearGradient colors={collar} locations={CURVE} style={styles.collar} />
+      <View style={styles.knob}>
+        <View style={styles.glint} />
+      </View>
     </View>
   );
 };
@@ -43,8 +65,27 @@ export const ROLLER_HEIGHT = FULL + 2;
 const makeStyles = (colors: Palette) =>
   StyleSheet.create({
     roller: { flexDirection: 'row', alignItems: 'center', height: ROLLER_HEIGHT, marginHorizontal: 2 },
-    roll: { flex: 1, borderRadius: 3, overflow: 'hidden' },
-    band: { alignSelf: 'stretch' },
-    collar: { width: 4, height: 26, borderRadius: 1, backgroundColor: colors.gold },
+    roll: { flex: 1 },
+    paper: { ...StyleSheet.absoluteFill, borderRadius: 3 },
+    lap: {
+      position: 'absolute',
+      left: 0,
+      right: 0,
+      top: '62%',
+      height: StyleSheet.hairlineWidth,
+      backgroundColor: mixColors(colors.ink, colors.desk, 0.5),
+      opacity: 0.22,
+    },
+    shadow: { position: 'absolute', left: 4, right: 4, top: '100%', height: 9 },
+    collar: { width: 4, height: 26, borderRadius: 1 },
     knob: { width: 10, height: 10, borderRadius: 5, backgroundColor: colors.accent },
+    glint: {
+      position: 'absolute',
+      top: 2,
+      left: 2.5,
+      width: 3,
+      height: 3,
+      borderRadius: 1.5,
+      backgroundColor: 'rgba(255,255,255,0.45)',
+    },
   });

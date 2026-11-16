@@ -123,6 +123,22 @@ const renewDue = (lists: List[], now = new Date()): List[] => {
   );
 };
 
+/**
+ * Takes back the chronicle's line for each of these items, where it was written today: unmarking
+ * the same day is a correction. An older line stands, since the thing was done and the item is
+ * only being used again.
+ */
+const takeBack = (entries: ChronicleEntry[], itemIds: string[], now = new Date()): ChronicleEntry[] => {
+  const today = dayOf(now);
+  const drop = new Set<number>();
+  for (const id of itemIds) {
+    const last = entries.findLastIndex((entry) => entry.itemId === id);
+    const entry = entries[last];
+    if (entry && dayOf(new Date(entry.at)) === today) drop.add(last);
+  }
+  return drop.size === 0 ? entries : entries.filter((_, index) => !drop.has(index));
+};
+
 const BACKUP_APP = 'decree';
 const BACKUP_VERSION = 1;
 
@@ -392,7 +408,7 @@ export const useLists = () => {
     [applyToItems],
   );
 
-  /** Marks an item done or not. Marking it done writes a line in the chronicle; unmarking takes the line back. */
+  /** Marks an item done or not. Marking it done writes a line in the chronicle; unmarking the same day takes the line back. */
   const toggleItem = useCallback(
     (listId: string, id: string) => {
       applyAll((all) => {
@@ -406,8 +422,7 @@ export const useLists = () => {
         );
         let entries: ChronicleEntry[];
         if (item.done) {
-          const last = all.entries.findLastIndex((e) => e.itemId === id);
-          entries = last < 0 ? all.entries : all.entries.filter((_, index) => index !== last);
+          entries = takeBack(all.entries, [id]);
         } else {
           entries = [
             ...all.entries,
@@ -466,9 +481,17 @@ export const useLists = () => {
 
   const uncheckAll = useCallback(
     (listId: string) => {
-      applyToItems(listId, (items) => items.map((i) => ({ ...i, done: false })), 'Unmarked every item');
+      applyAll((all) => {
+        const list = all.lists.find((l) => l.id === listId);
+        if (!list) return all;
+        const struck = list.items.filter((i) => i.done).map((i) => i.id);
+        const lists = all.lists.map((l) =>
+          l.id === listId ? { ...l, items: l.items.map((i) => ({ ...i, done: false })), touchedAt: Date.now() } : l,
+        );
+        return { ...all, lists, entries: takeBack(all.entries, struck) };
+      }, 'Unmarked every item');
     },
-    [applyToItems],
+    [applyAll],
   );
 
   /** Makes a scroll renew itself each dawn, or stop doing so. */

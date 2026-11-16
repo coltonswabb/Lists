@@ -22,6 +22,8 @@ export const useSettings = () => {
   /** Null until the user has told the scribe how to address them. */
   const [address, setAddress] = useState<Address | null>(null);
   const [scribe, setScribe] = useState<ScribeMode>('chatty');
+  /** Whether the home screen icon follows the paper. Off by default: iOS interrupts with an alert on every change. */
+  const [matchIcon, setMatchIcon] = useState(false);
   const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
@@ -38,6 +40,9 @@ export const useSettings = () => {
           setAddress(stored.address);
           setScribeAddress(stored.address);
         }
+        if (typeof stored === 'object' && stored !== null && 'matchIcon' in stored && stored.matchIcon === true) {
+          setMatchIcon(true);
+        }
         if (typeof stored === 'object' && stored !== null && 'scribe' in stored && isScribeMode(stored.scribe)) {
           setScribe(stored.scribe);
           setScribeMode(stored.scribe);
@@ -49,8 +54,8 @@ export const useSettings = () => {
 
   useEffect(() => {
     if (!loaded) return;
-    AsyncStorage.setItem(STORAGE_KEY, JSON.stringify({ sound, theme, address, scribe })).catch(() => undefined);
-  }, [loaded, sound, theme, address, scribe]);
+    AsyncStorage.setItem(STORAGE_KEY, JSON.stringify({ sound, theme, address, scribe, matchIcon })).catch(() => undefined);
+  }, [loaded, sound, theme, address, scribe, matchIcon]);
 
   const toggleSound = useCallback(() => {
     setSound((on) => {
@@ -59,10 +64,19 @@ export const useSettings = () => {
     });
   }, []);
 
-  const chooseTheme = useCallback((value: ThemeName) => {
-    setTheme(value);
-    void matchIconTo(value);
-  }, []);
+  const chooseTheme = useCallback(
+    (value: ThemeName) => {
+      setTheme(value);
+      if (matchIcon) void matchIconTo(value);
+    },
+    [matchIcon],
+  );
+
+  /** Turning it on gives the app the current paper's icon; turning it off returns the app's own. */
+  const toggleMatchIcon = useCallback(() => {
+    void matchIconTo(matchIcon ? 'scriptorium' : theme);
+    setMatchIcon(!matchIcon);
+  }, [matchIcon, theme]);
 
   const chooseAddress = useCallback((value: Address | null) => {
     if (value) setScribeAddress(value);
@@ -77,5 +91,5 @@ export const useSettings = () => {
     });
   }, []);
 
-  return { loaded, sound, toggleSound, theme, chooseTheme, address, chooseAddress, scribe, nextScribeMode };
+  return { loaded, sound, toggleSound, theme, chooseTheme, matchIcon, toggleMatchIcon, address, chooseAddress, scribe, nextScribeMode };
 };

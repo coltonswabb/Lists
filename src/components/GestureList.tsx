@@ -27,6 +27,7 @@ import {
 } from 'react-native-gesture-handler';
 import Animated, {
   Easing,
+  FadeIn,
   interpolate,
   useAnimatedStyle,
   useDerivedValue,
@@ -35,6 +36,7 @@ import Animated, {
   withTiming,
   ZoomIn,
 } from 'react-native-reanimated';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { scheduleOnRN } from 'react-native-worklets';
 
@@ -51,6 +53,8 @@ import { LEAD_WIDTH, type Lead, RowLead } from './RowLead';
 import { SWEEP_MS, SwipeRow } from './SwipeRow';
 
 const PULL_RESISTANCE = 0.6;
+/** How far the sheet must be lifted before letting go clears the finished rows: a deliberate pull, not a stray scroll. */
+const CLEAR_AT = ROW_HEIGHT * 1.8;
 const PRESS_GUARD_MS = 150;
 const BACK_DISTANCE = ROW_HEIGHT * 2.3;
 const PINCH_OPEN_AT = ROW_HEIGHT * 0.6;
@@ -66,6 +70,9 @@ const SWEEP_STAGGER_MS = 70;
 export const STAMP_DELAY_MS = 350;
 /** Average advance of the 21pt item text, used to size the strike drawn while swiping. */
 const CHAR_WIDTH = 9.2;
+
+const ROLL_LIGHT = ['rgba(255,255,255,0.05)', 'rgba(255,255,255,0.26)', 'rgba(255,255,255,0)', 'rgba(0,0,0,0.12)', 'rgba(0,0,0,0.3)'] as const;
+const ROLL_LIGHT_AT = [0, 0.16, 0.5, 0.84, 1] as const;
 
 type PullAction = 'none' | 'create' | 'back';
 
@@ -433,7 +440,7 @@ export const GestureList: FC<GestureListProps> = ({
       'worklet';
       const distance = Math.max(0, -event.translationY) * PULL_RESISTANCE;
       raise.value = distance;
-      const next = distance > ROW_HEIGHT;
+      const next = distance > CLEAR_AT;
       if (next !== raiseArmed.value) {
         raiseArmed.value = next;
         scheduleOnRN(armClear, next);
@@ -449,7 +456,7 @@ export const GestureList: FC<GestureListProps> = ({
   });
   const raiseStyle = useAnimatedStyle(() => ({ transform: [{ translateY: -raise.value }] }));
   const clearHintStyle = useAnimatedStyle(() => ({
-    opacity: interpolate(raise.value, [0, ROW_HEIGHT * 0.6], [0, 1], 'clamp'),
+    opacity: interpolate(raise.value, [0, CLEAR_AT * 0.4], [0, 1], 'clamp'),
   }));
 
   const gesture = useSimultaneousGestures(pan, pullUp, pinch);
@@ -528,8 +535,9 @@ export const GestureList: FC<GestureListProps> = ({
       <>
         <RowLead lead={leadFor(row, index)} />
         <Text
-          style={[styles.rowText, styles.fill, row.section && styles.sectionText, row.done && styles.doneText]}
-          numberOfLines={1}
+          style={[styles.rowText, styles.fill, row.section ? styles.sectionText : !isShelf && styles.itemText, row.done && styles.doneText]}
+          // A long item runs onto a second line before it is cut short.
+          numberOfLines={isShelf || row.section ? 1 : 2}
           maxFontSizeMultiplier={1.2}
         >
           {rubricated[index] ? <Text style={styles.rubric}>{row.text.charAt(0)}</Text> : null}
@@ -557,7 +565,11 @@ export const GestureList: FC<GestureListProps> = ({
       <View style={styles.rolledScroll}>
         <View style={styles.knob} />
         <View style={styles.collar} />
-        <View style={[styles.rolled, { backgroundColor: paperFor(index) }]}>{content}</View>
+        <View style={[styles.rolled, { backgroundColor: paperFor(index) }]}>
+          {/* Light from above: the roll is brighter along its shoulder and falls into shade beneath. */}
+          <LinearGradient colors={ROLL_LIGHT} locations={ROLL_LIGHT_AT} style={styles.rollLight} pointerEvents="none" />
+          {content}
+        </View>
         <View style={styles.collar} />
         <View style={styles.knob} />
       </View>
@@ -565,7 +577,7 @@ export const GestureList: FC<GestureListProps> = ({
   };
 
   return (
-    <View style={[styles.screen, { paddingTop: insets.top }]}>
+    <Animated.View entering={FadeIn.duration(180)} style={[styles.screen, { paddingTop: insets.top }]}>
       <View style={styles.header}>
         {canGoBack ? (
           <Pressable onPress={leave} hitSlop={14} accessibilityRole="button" accessibilityLabel="Close scroll">
@@ -600,7 +612,7 @@ export const GestureList: FC<GestureListProps> = ({
       )}
       <GestureDetector gesture={gesture}>
         <View style={styles.viewport}>
-          <Animated.Text style={[styles.clearHint, clearHintStyle]}>
+          <Animated.Text style={[styles.clearHint, { bottom: insets.bottom + 10 }, clearHintStyle]}>
             {clearArmed ? 'Release to clear the finished' : 'Pull to clear the finished'}
           </Animated.Text>
           <Animated.View style={[styles.fill, raiseStyle]}>
@@ -733,7 +745,7 @@ export const GestureList: FC<GestureListProps> = ({
           </Animated.View>
         </View>
       </GestureDetector>
-    </View>
+    </Animated.View>
   );
 };
 
@@ -768,8 +780,11 @@ const makeStyles = (colors: Palette) =>
     paddingHorizontal: 12,
     borderRadius: 3,
   },
+  rollLight: { ...StyleSheet.absoluteFill, borderRadius: 3 },
   rowText: { color: colors.ink, fontFamily: fonts.body, fontSize: 21 },
   sectionText: { fontFamily: fonts.display, fontSize: 26 },
+  // Close enough set that two lines sit inside one row with air above and below.
+  itemText: { lineHeight: 25 },
   rubric: { color: colors.accent },
   doneText: { color: colors.inkFaded, textDecorationLine: 'line-through', textDecorationColor: colors.accent },
   badge: { color: colors.inkFaded, fontFamily: fonts.label, fontSize: 14, letterSpacing: 1, marginLeft: 12 },
@@ -791,7 +806,7 @@ const makeStyles = (colors: Palette) =>
   finis: { color: colors.accent, fontFamily: fonts.bodyItalic, fontSize: 19 },
   tail: { minHeight: ROW_HEIGHT, alignItems: 'center', justifyContent: 'center' },
   // With a drawing, the close of the scroll is centred on the writing column, right of the margin rule.
-  tailWithArt: { paddingTop: 18, paddingBottom: 14, gap: 4, paddingLeft: 16 + LEAD_WIDTH + 12, paddingRight: 16 },
+  tailWithArt: { paddingTop: 18, paddingBottom: 30, gap: 4, paddingLeft: 16 + LEAD_WIDTH + 12, paddingRight: 16 },
   tapZone: { flexGrow: 1, minHeight: ROW_HEIGHT },
   hint: { color: colors.inkFaded, fontFamily: fonts.bodyItalic, fontSize: 18 },
   emptyArt: { marginTop: 24, marginBottom: 12 },
@@ -801,7 +816,6 @@ const makeStyles = (colors: Palette) =>
     position: 'absolute',
     left: 0,
     right: 0,
-    bottom: 14,
     textAlign: 'center',
     color: colors.onDesk,
     fontFamily: fonts.bodyItalic,

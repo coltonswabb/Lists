@@ -1,6 +1,7 @@
 import { LinearGradient } from 'expo-linear-gradient';
 import type { FC } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import Animated, { FadeIn } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { addresses } from '../scribe';
@@ -36,7 +37,7 @@ export const SettingsScreen: FC<SettingsScreenProps> = ({ settings, onClose, onB
   ];
 
   return (
-    <View style={[styles.screen, { paddingTop: insets.top }]}>
+    <Animated.View entering={FadeIn.duration(200)} style={[styles.screen, { paddingTop: insets.top }]}>
       <View style={styles.header}>
         <Text style={styles.title}>Settings</Text>
         <Pressable onPress={onClose} hitSlop={14}>
@@ -55,7 +56,17 @@ export const SettingsScreen: FC<SettingsScreenProps> = ({ settings, onClose, onB
             />
           ))}
         </View>
-        <View style={styles.rows}>
+        <Pressable
+          style={styles.row}
+          onPress={settings.toggleMatchIcon}
+          accessibilityRole="switch"
+          accessibilityState={{ checked: settings.matchIcon }}
+        >
+          <Text style={styles.label}>App icon</Text>
+          <Text style={styles.value}>{settings.matchIcon ? 'matches the paper' : 'stays as it is'}</Text>
+        </Pressable>
+        <Text style={[styles.heading, styles.later]}>The scribe</Text>
+        <View>
           {rows.map((row) => (
             <Pressable key={row.label} style={styles.row} onPress={row.onPress} accessibilityRole="button" accessibilityHint="Changes to the next choice">
               <Text style={styles.label}>{row.label}</Text>
@@ -73,7 +84,7 @@ export const SettingsScreen: FC<SettingsScreenProps> = ({ settings, onClose, onB
           <Text style={styles.value}>from a file</Text>
         </Pressable>
       </ScrollView>
-    </View>
+    </Animated.View>
   );
 };
 
@@ -167,7 +178,6 @@ const makeStyles = (colors: Palette) =>
     sealRoom: { width: 44, alignItems: 'center' },
     seal: { width: 26, height: 26, borderRadius: 13, alignItems: 'center', justifyContent: 'center' },
     sealMark: { fontSize: 13, fontWeight: '700' },
-    rows: { marginTop: 16 },
     later: { marginTop: 16 },
     row: {
       height: 58,

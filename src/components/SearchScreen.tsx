@@ -1,5 +1,6 @@
 import { type FC, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import Animated, { FadeIn } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useTheme } from '../ThemeContext';
@@ -27,7 +28,7 @@ export const SearchScreen: FC<SearchScreenProps> = ({ lists, onOpen, onClose }) 
     : [];
 
   return (
-    <View style={[styles.screen, { paddingTop: insets.top }]}>
+    <Animated.View entering={FadeIn.duration(200)} style={[styles.screen, { paddingTop: insets.top }]}>
       <View style={styles.header}>
         <TextInput
           autoFocus
@@ -47,16 +48,17 @@ export const SearchScreen: FC<SearchScreenProps> = ({ lists, onOpen, onClose }) 
         {needle ? <Text style={styles.count}>{`${roman(matches.length)} FOUND`}</Text> : null}
         {matches.map(({ list, item }) => (
           <Pressable key={item.id} style={styles.row} onPress={() => onOpen(list.id)}>
-            <Text style={[styles.text, item.done && styles.done]} numberOfLines={1}>
+            <Text style={[styles.text, item.done && styles.done]} numberOfLines={2}>
               {item.text}
             </Text>
             <Text style={styles.source} numberOfLines={1}>
-              {list.name.toUpperCase()}
+              from {list.name}
             </Text>
           </Pressable>
         ))}
+        {needle && matches.length === 0 ? <Text style={styles.none}>No line on any scroll reads so.</Text> : null}
       </ScrollView>
-    </View>
+    </Animated.View>
   );
 };
 
@@ -76,17 +78,17 @@ const makeStyles = (colors: Palette) =>
     paddingBottom: 8,
   },
   row: {
-    height: ROW_HEIGHT,
+    minHeight: ROW_HEIGHT,
     marginHorizontal: 20,
     marginBottom: 6,
     paddingHorizontal: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
+    paddingVertical: 9,
+    justifyContent: 'center',
     borderRadius: 4,
     backgroundColor: colors.parchment,
   },
-  text: { flex: 1, color: colors.ink, fontFamily: fonts.body, fontSize: 21 },
+  text: { color: colors.ink, fontFamily: fonts.body, fontSize: 21 },
   done: { color: colors.inkFaded, textDecorationLine: 'line-through', textDecorationColor: colors.accent },
-  source: { maxWidth: 120, color: colors.inkFaded, fontFamily: fonts.label, fontSize: 13, letterSpacing: 1 },
+  source: { color: colors.inkFaded, fontFamily: fonts.bodyItalic, fontSize: 15 },
+  none: { marginTop: 28, textAlign: 'center', color: colors.onDeskFaded, fontFamily: fonts.bodyItalic, fontSize: 18 },
 });

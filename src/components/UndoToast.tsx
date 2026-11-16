@@ -7,7 +7,7 @@ import type { Undo } from '../store';
 import { useTheme } from '../ThemeContext';
 import { type Palette, fonts } from '../theme';
 
-const VISIBLE_MS = 5000;
+const VISIBLE_MS = 8000;
 
 type UndoToastProps = {
   undo: Undo | null;
