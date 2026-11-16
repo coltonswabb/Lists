@@ -70,6 +70,10 @@ const starterLists = (): List[] => [
       'End with a colon for a heading',
       'Write “@ 5pm” to be reminded',
       'Pull far down to roll me up',
+      // Back in the Library, where the scribe's things stand.
+      'On the desk:',
+      'Tap the inkwell for a scroll',
+      'Touch the candle for night',
     ].map(newItem),
   },
 ];
