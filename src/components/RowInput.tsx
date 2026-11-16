@@ -1,15 +1,16 @@
 import { type FC, useRef, useState } from 'react';
 import { StyleSheet, TextInput, View } from 'react-native';
 
-import { colors, fonts, ROW_HEIGHT } from '../theme';
-import { Initial, type MarkerKind } from './Initial';
+import { colors, ROW_HEIGHT } from '../theme';
+import { type Lead, RowLead } from './RowLead';
 
 type RowInputProps = {
-  /** Pigment for the row's initial. */
-  color: string;
-  marker: MarkerKind;
+  /** What to show in the margin for the text typed so far. */
+  leadFor: (text: string) => Lead;
   placeholder: string;
   initialText?: string;
+  /** Drawn as a rolled scroll on the shelf rather than as a line on a sheet. */
+  rolled?: boolean;
   /**
    * Rapid entry: every finished line (Return, or each line of a pasted block) is reported and the
    * input stays open for the next one. Without it the first Return ends the edit.
@@ -19,7 +20,7 @@ type RowInputProps = {
   onEnd: (remaining: string) => void;
 };
 
-export const RowInput: FC<RowInputProps> = ({ color, marker, placeholder, initialText = '', onLines, onEnd }) => {
+export const RowInput: FC<RowInputProps> = ({ leadFor, placeholder, initialText = '', rolled = false, onLines, onEnd }) => {
   const [text, setText] = useState(initialText);
   const ended = useRef(false);
 
@@ -51,20 +52,22 @@ export const RowInput: FC<RowInputProps> = ({ color, marker, placeholder, initia
   };
 
   return (
-    <View style={styles.row}>
-      <Initial text={text} pigment={color} kind={marker} />
-      <TextInput
-        autoFocus
-        multiline
-        scrollEnabled={false}
-        value={text}
-        onChangeText={change}
-        onBlur={() => end(text)}
-        placeholder={placeholder}
-        placeholderTextColor={colors.inkFaded}
-        selectionColor={colors.rubric}
-        style={styles.input}
-      />
+    <View style={[styles.row, rolled && styles.rolledRow]}>
+      <View style={[styles.inner, rolled && styles.rolledInner]}>
+        <RowLead lead={leadFor(text)} />
+        <TextInput
+          autoFocus
+          multiline
+          scrollEnabled={false}
+          value={text}
+          onChangeText={change}
+          onBlur={() => end(text)}
+          placeholder={placeholder}
+          placeholderTextColor={colors.inkFaded}
+          selectionColor={colors.accent}
+          style={styles.input}
+        />
+      </View>
     </View>
   );
 };
@@ -72,20 +75,22 @@ export const RowInput: FC<RowInputProps> = ({ color, marker, placeholder, initia
 const styles = StyleSheet.create({
   row: {
     height: ROW_HEIGHT,
-    flexDirection: 'row',
-    alignItems: 'center',
+    justifyContent: 'center',
     paddingHorizontal: 16,
     backgroundColor: colors.parchmentShade,
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: colors.rule,
   },
+  rolledRow: { backgroundColor: 'transparent', borderBottomWidth: 0 },
+  inner: { flexDirection: 'row', alignItems: 'center' },
+  rolledInner: { height: 48, paddingHorizontal: 12, borderRadius: 4, backgroundColor: colors.parchmentShade },
   input: {
     flex: 1,
     color: colors.ink,
-    fontFamily: fonts.body,
-    fontSize: 21,
+    fontSize: 18,
+    fontWeight: '500',
     padding: 0,
-    height: 28,
+    height: 24,
     textAlignVertical: 'center',
   },
 });

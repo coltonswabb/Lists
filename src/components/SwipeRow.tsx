@@ -45,8 +45,9 @@ type SwipeRowProps = {
   color: string;
   children: ReactNode;
   index: number;
-  /** Rows with an index below this can be dragged, and only among themselves. */
-  reorderLimit: number;
+  /** Number of rows in the list; a dragged row can land on any of them. */
+  rowCount: number;
+  draggable: boolean;
   reorder: ReorderState;
   gap: GapState;
   animateLayout: boolean;
@@ -62,7 +63,8 @@ export const SwipeRow: FC<SwipeRowProps> = ({
   color,
   children,
   index,
-  reorderLimit,
+  rowCount,
+  draggable,
   reorder,
   gap,
   animateLayout,
@@ -114,7 +116,7 @@ export const SwipeRow: FC<SwipeRowProps> = ({
   });
 
   const drag = usePanGesture({
-    enabled: index < reorderLimit && reorderLimit > 1,
+    enabled: draggable && rowCount > 1,
     maxPointers: 1,
     activateAfterLongPress: HOLD_TO_DRAG_MS,
     onActivate: () => {
@@ -130,7 +132,7 @@ export const SwipeRow: FC<SwipeRowProps> = ({
       if (reorder.from.value !== index) return;
       dragY.value = event.translationY;
       const target = Math.round(index + event.translationY / ROW_HEIGHT);
-      const to = Math.max(0, Math.min(reorderLimit - 1, target));
+      const to = Math.max(0, Math.min(rowCount - 1, target));
       if (to !== reorder.to.value) {
         reorder.to.value = to;
         scheduleOnRN(tick);
@@ -202,7 +204,6 @@ export const SwipeRow: FC<SwipeRowProps> = ({
 const styles = StyleSheet.create({
   container: {
     height: ROW_HEIGHT,
-    backgroundColor: colors.parchment,
     shadowColor: '#000',
     shadowRadius: 12,
     shadowOffset: { width: 0, height: 6 },
@@ -218,5 +219,5 @@ const styles = StyleSheet.create({
   action: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, justifyContent: 'center', paddingHorizontal: 24 },
   complete: { backgroundColor: colors.complete, alignItems: 'flex-start' },
   remove: { backgroundColor: colors.remove, alignItems: 'flex-end' },
-  glyph: { color: colors.onPigment, fontSize: 24, fontWeight: '700' },
+  glyph: { color: colors.onAction, fontSize: 24, fontWeight: '700' },
 });

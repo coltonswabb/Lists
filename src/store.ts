@@ -28,7 +28,18 @@ const isList = (value: unknown): value is List =>
   Array.isArray(value.items) &&
   value.items.every(isItem);
 
-const newItem = (text: string): Item => ({ id: newId(), text, done: false });
+/** "Produce:" or "# Produce" names a section; anything else is an ordinary item. */
+const parseEntry = (raw: string): { text: string; section: boolean } => {
+  const text = raw.trim();
+  if (text.startsWith('#')) return { text: text.replace(/^#+\s*/, ''), section: true };
+  if (text.length > 1 && text.endsWith(':')) return { text: text.slice(0, -1).trim(), section: true };
+  return { text, section: false };
+};
+
+const newItem = (raw: string): Item => {
+  const { text, section } = parseEntry(raw);
+  return section ? { id: newId(), text, done: false, section: true } : { id: newId(), text, done: false };
+};
 
 /** Shown on first launch only: each item teaches the gesture it names. */
 const starterLists = (): List[] => [
@@ -36,13 +47,16 @@ const starterLists = (): List[] => [
     id: newId(),
     name: 'Read me first',
     items: [
+      'Gestures:',
       'Swipe me right to complete',
       'Swipe me left to delete',
       'Tap me to rename',
       'Hold and drag me to reorder',
+      'Adding:',
       'Pull down to add a row',
-      'Pinch apart to add between rows',
-      'Pull far down to go back',
+      'Pinch apart to add a row',
+      'A colon at the end adds a section',
+      'Pull far down to close the scroll',
     ].map(newItem),
   },
 ];
@@ -57,8 +71,19 @@ const parseLists = (raw: string | null): List[] => {
   }
 };
 
-/** Unfinished items stay on top in their order; finished ones sink below them. */
-const sinkDone = (items: Item[]) => [...items.filter((i) => !i.done), ...items.filter((i) => i.done)];
+/** Within each section, unfinished items stay on top in their order and finished ones sink below them. */
+const sinkDone = (items: Item[]): Item[] => {
+  const groups: Item[][] = [[]];
+  for (const item of items) {
+    if (item.section) groups.push([item]);
+    else groups[groups.length - 1]?.push(item);
+  }
+  return groups.flatMap((group) => [
+    ...group.filter((i) => i.section),
+    ...group.filter((i) => !i.section && !i.done),
+    ...group.filter((i) => !i.section && i.done),
+  ]);
+};
 
 const insertAt = <T,>(array: T[], index: number, added: T[]): T[] => {
   const at = Math.max(0, Math.min(index, array.length));
@@ -155,14 +180,26 @@ export const useLists = () => {
 
   const renameItem = useCallback(
     (listId: string, id: string, text: string) => {
-      applyToItems(listId, (items) => items.map((i) => (i.id === id ? { ...i, text } : i)));
+      // Renaming goes through the same parser, so adding or removing the colon turns an item into a section or back.
+      const entry = parseEntry(text);
+      applyToItems(listId, (items) =>
+        sinkDone(
+          items.map((i) =>
+            i.id !== id
+              ? i
+              : entry.section
+                ? { id, text: entry.text, done: false, section: true }
+                : { id, text: entry.text, done: i.done },
+          ),
+        ),
+      );
     },
     [applyToItems],
   );
 
   const toggleItem = useCallback(
     (listId: string, id: string) => {
-      applyToItems(listId, (items) => sinkDone(items.map((i) => (i.id === id ? { ...i, done: !i.done } : i))));
+      applyToItems(listId, (items) => sinkDone(items.map((i) => (i.id === id && !i.section ? { ...i, done: !i.done } : i))));
     },
     [applyToItems],
   );
@@ -177,7 +214,7 @@ export const useLists = () => {
   );
 
   const moveItem = useCallback(
-    (listId: string, from: number, to: number) => applyToItems(listId, (items) => move(items, from, to)),
+    (listId: string, from: number, to: number) => applyToItems(listId, (items) => sinkDone(move(items, from, to))),
     [applyToItems],
   );
 
@@ -190,7 +227,7 @@ export const useLists = () => {
 
   const clearDone = useCallback(
     (listId: string) => {
-      applyToItems(listId, (items) => items.filter((i) => !i.done), 'Struck the finished items');
+      applyToItems(listId, (items) => items.filter((i) => !i.done), 'Cleared finished items');
     },
     [applyToItems],
   );

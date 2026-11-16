@@ -13,7 +13,7 @@ export const Roller: FC = () => (
 );
 
 const styles = StyleSheet.create({
-  roller: { flexDirection: 'row', alignItems: 'center', height: 16, marginHorizontal: 6 },
-  rod: { flex: 1, height: 12, backgroundColor: colors.gold },
-  knob: { width: 10, height: 16, borderRadius: 4, backgroundColor: colors.rubric },
+  roller: { flexDirection: 'row', alignItems: 'center', height: 14, marginHorizontal: 8 },
+  rod: { flex: 1, height: 10, backgroundColor: colors.gold },
+  knob: { width: 8, height: 14, borderRadius: 2, backgroundColor: colors.accent },
 });

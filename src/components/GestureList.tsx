@@ -19,10 +19,10 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { scheduleOnRN } from 'react-native-worklets';
 
 import { success, thud, tick } from '../haptics';
-import { colors, fonts, type PaletteName, ROW_HEIGHT, rowColor } from '../theme';
-import { Initial, type MarkerKind } from './Initial';
+import { accentAt, colors, fonts, roman, ROW_HEIGHT } from '../theme';
 import { Roller } from './Roller';
 import { RowInput } from './RowInput';
+import { type Lead, RowLead } from './RowLead';
 import { SwipeRow } from './SwipeRow';
 
 const PULL_RESISTANCE = 0.6;
@@ -32,27 +32,35 @@ const PINCH_OPEN_AT = ROW_HEIGHT * 0.6;
 const PINCH_CLOSE_SCALE = 0.7;
 const SPRING = { damping: 24, stiffness: 240 } as const;
 const UNROLL_MS = 420;
+const ROLL_UP_MS = 240;
 const UNCLIPPED = 100000;
 
 type PullAction = 'none' | 'create' | 'back';
 
 const pullLabels = {
-  none: 'Pull to inscribe',
-  create: 'Release to inscribe',
-  back: 'Release to return',
+  none: 'PULL TO ADD',
+  create: 'RELEASE TO ADD',
+  back: 'RELEASE TO CLOSE',
 } as const satisfies Record<PullAction, string>;
 
 export type GestureListRow = {
   id: string;
   text: string;
   done?: boolean;
+  /** A heading inside a scroll. Drawn with a painted initial; cannot be completed. */
+  section?: boolean;
   badge?: string;
 };
 
 type GestureListProps = {
   title: string;
-  palette: PaletteName;
-  marker: MarkerKind;
+  /** Small status label beside the title, in the manner of an instrument's display. */
+  readout: string;
+  /**
+   * `shelf` shows every row as a rolled-up scroll lying on the desk.
+   * `scroll` shows the rows as lines on one unrolled sheet.
+   */
+  variant: 'shelf' | 'scroll';
   rows: GestureListRow[];
   placeholder: string;
   emptyHint: string;
@@ -70,8 +78,8 @@ type GestureListProps = {
 
 export const GestureList: FC<GestureListProps> = ({
   title,
-  palette,
-  marker,
+  readout,
+  variant,
   rows,
   placeholder,
   emptyHint,
@@ -101,16 +109,77 @@ export const GestureList: FC<GestureListProps> = ({
   const gapIndex = useSharedValue(-1);
   const gapSize = useSharedValue(0);
 
+  const isShelf = variant === 'shelf';
   const canGoBack = onBack !== undefined;
   const busy = addIndex !== null || editingId !== null || titleDraft !== null;
-  const firstDone = rows.findIndex((row) => row.done);
-  const activeCount = firstDone === -1 ? rows.length : firstDone;
+  const rowCount = rows.length;
   const order = rows.map((row) => row.id).join('|');
+
+  // New rows from a tap land after the last unfinished row, ahead of any finished ones at the bottom.
+  let endIndex = rowCount;
+  while (endIndex > 0 && rows[endIndex - 1]?.done) endIndex -= 1;
+
+  // Items are numbered within their section; a section shows how many of its items are still open.
+  const numbers: number[] = [];
+  const openInSection: number[] = [];
+  let sectionAt = -1;
+  let count = 0;
+  rows.forEach((row, index) => {
+    if (row.section) {
+      sectionAt = index;
+      count = 0;
+      openInSection[index] = 0;
+      return;
+    }
+    count += 1;
+    numbers[index] = count;
+    if (!row.done && sectionAt >= 0) openInSection[sectionAt] = (openInSection[sectionAt] ?? 0) + 1;
+  });
+
+  const leadFor = (row: GestureListRow, index: number): Lead => {
+    if (isShelf) return { kind: 'initial', text: row.text, pigment: colors.ink };
+    if (row.section) return { kind: 'initial', text: row.text, pigment: colors.accent };
+    if (row.done) return { kind: 'label', label: '✓', color: colors.inkFaded };
+    return { kind: 'label', label: roman(numbers[index] ?? 0), color: accentAt(index, rowCount) };
+  };
+
+  // While typing, a trailing colon previews the row as a section.
+  const draftLead = (text: string): Lead => {
+    const trimmed = text.trim();
+    if (isShelf) return { kind: 'initial', text: trimmed, pigment: colors.ink };
+    if (trimmed.length > 1 && (trimmed.endsWith(':') || trimmed.startsWith('#'))) {
+      return { kind: 'initial', text: trimmed.replace(/^#+\s*/, ''), pigment: colors.accent };
+    }
+    return { kind: 'label', label: '+', color: colors.accent };
+  };
 
   // Rows keep their drag offsets until the new order has rendered, so the drop doesn't flicker.
   useLayoutEffect(() => {
     dragFrom.value = -1;
   }, [order, dragFrom]);
+
+  // Opening a scroll unrolls its sheet from the top rod; afterwards its height is unconstrained.
+  const sheetHeight = useSharedValue(isShelf ? UNCLIPPED : 0);
+  const measuredHeight = useRef(0);
+  const leaving = useRef(false);
+  const initialHeight = useRef(rowCount * ROW_HEIGHT + ROW_HEIGHT * 2).current;
+  useEffect(() => {
+    if (isShelf) return;
+    sheetHeight.value = withTiming(initialHeight, { duration: UNROLL_MS, easing: Easing.out(Easing.cubic) }, () => {
+      sheetHeight.value = UNCLIPPED;
+    });
+  }, [isShelf, sheetHeight, initialHeight]);
+  const sheetStyle = useAnimatedStyle(() => ({ maxHeight: sheetHeight.value }));
+
+  /** Rolls the sheet back up onto the top rod, then leaves. */
+  const leave = () => {
+    if (!onBack || leaving.current) return;
+    leaving.current = true;
+    sheetHeight.value = measuredHeight.current;
+    sheetHeight.value = withTiming(0, { duration: ROLL_UP_MS, easing: Easing.in(Easing.cubic) }, () => {
+      scheduleOnRN(onBack);
+    });
+  };
 
   // A row under the finger can still report a tap when a pull ends, so presses are ignored while pulling.
   const pulling = useRef(false);
@@ -132,7 +201,7 @@ export const GestureList: FC<GestureListProps> = ({
     }, PRESS_GUARD_MS);
     setPullAction('none');
     if (action === 'create') setAddIndex(0);
-    if (action === 'back') onBack?.();
+    if (action === 'back') leave();
   };
 
   const pan = usePanGesture({
@@ -172,16 +241,16 @@ export const GestureList: FC<GestureListProps> = ({
   };
   const pinchBack = () => {
     thud();
-    onBack?.();
+    leave();
   };
 
-  // Pinch apart opens a gap between two rows for a new one; pinch together leaves the list.
+  // Pinch apart opens a gap between two rows for a new one; pinch together closes the scroll.
   const pinch = usePinchGesture({
     enabled: !busy && !dragging,
     onActivate: (event) => {
       'worklet';
       const row = Math.round((event.focalY + scrollY.value) / ROW_HEIGHT);
-      gapIndex.value = Math.max(0, Math.min(activeCount, row));
+      gapIndex.value = Math.max(0, Math.min(rowCount, row));
     },
     onUpdate: (event) => {
       'worklet';
@@ -205,17 +274,7 @@ export const GestureList: FC<GestureListProps> = ({
 
   const gesture = useSimultaneousGestures(pan, pinch);
 
-  // Opening a screen unrolls the sheet from the top roller; afterwards its height is unconstrained.
-  const sheetHeight = useSharedValue(0);
-  const initialHeight = useRef(rows.length * ROW_HEIGHT + ROW_HEIGHT * 2).current;
-  useEffect(() => {
-    sheetHeight.value = withTiming(initialHeight, { duration: UNROLL_MS, easing: Easing.out(Easing.cubic) }, () => {
-      sheetHeight.value = UNCLIPPED;
-    });
-  }, [sheetHeight, initialHeight]);
-  const sheetStyle = useAnimatedStyle(() => ({ maxHeight: sheetHeight.value }));
-
-  // Pulling draws fresh paper out from under the roller.
+  // Pulling draws fresh paper out from under the rod.
   const pullSpaceStyle = useAnimatedStyle(() => ({ height: pull.value }));
   const pullRowStyle = useAnimatedStyle(() => ({
     opacity: interpolate(pull.value, [0, ROW_HEIGHT], [0.4, 1], 'clamp'),
@@ -260,27 +319,41 @@ export const GestureList: FC<GestureListProps> = ({
     setTimeout(() => setDragging(false), 80);
   };
 
-  const colorTotal = activeCount + (addIndex === null ? 0 : 1);
-  const colorAt = (index: number) =>
-    rowColor(palette, index + (addIndex !== null && index >= addIndex ? 1 : 0), colorTotal);
-
   const input =
     addIndex === null ? null : (
       <RowInput
         key="new-row"
-        color={rowColor(palette, addIndex, colorTotal)}
-        marker={marker}
+        leadFor={draftLead}
         placeholder={placeholder}
+        rolled={isShelf}
         onLines={addLines}
         onEnd={endAdd}
       />
     );
 
+  const rowContent = (row: GestureListRow, index: number) => {
+    const sectionOpen = openInSection[index];
+    const badge = row.section ? (sectionOpen ? roman(sectionOpen) : '') : row.badge;
+    const content = (
+      <>
+        <RowLead lead={leadFor(row, index)} />
+        <Text
+          style={[styles.rowText, styles.fill, row.section && styles.sectionText, row.done && styles.doneText]}
+          numberOfLines={1}
+        >
+          {row.text}
+        </Text>
+        {badge ? <Text style={styles.badge}>{badge}</Text> : null}
+      </>
+    );
+    return isShelf ? <View style={styles.rolled}>{content}</View> : content;
+  };
+
   return (
     <View style={[styles.screen, { paddingTop: insets.top }]}>
       <View style={styles.header}>
         {canGoBack ? (
-          <Pressable onPress={onBack} hitSlop={14} accessibilityRole="button" accessibilityLabel="Back to lists">
+          <Pressable onPress={leave} hitSlop={14} accessibilityRole="button" accessibilityLabel="Close scroll">
             <Text style={styles.back}>‹</Text>
           </Pressable>
         ) : null}
@@ -298,14 +371,17 @@ export const GestureList: FC<GestureListProps> = ({
             onSubmitEditing={endTitleEdit}
             onBlur={endTitleEdit}
             returnKeyType="done"
-            selectionColor={colors.gold}
+            selectionColor={colors.accent}
             style={[styles.title, styles.titleInput]}
           />
         )}
+        <Text style={styles.readout}>{readout}</Text>
       </View>
-      <View style={styles.topRoller}>
-        <Roller />
-      </View>
+      {isShelf ? null : (
+        <View style={styles.topRoller}>
+          <Roller />
+        </View>
+      )}
       <GestureDetector gesture={gesture}>
         <View style={styles.fill}>
           <ScrollView
@@ -322,60 +398,60 @@ export const GestureList: FC<GestureListProps> = ({
             }}
             contentContainerStyle={[styles.content, { paddingBottom: insets.bottom }]}
           >
-            <Animated.View style={[styles.sheet, sheetStyle]}>
-            <Animated.View style={[styles.pullSpace, pullSpaceStyle]}>
-              <Animated.View
-                style={[styles.pullRow, { backgroundColor: rowColor(palette, 0, activeCount + 1) }, pullRowStyle]}
-              >
-                <Text style={styles.pullText}>{pullLabels[pullAction]}</Text>
+            <Animated.View
+              style={[isShelf ? styles.shelf : styles.sheet, sheetStyle]}
+              onLayout={(event) => {
+                measuredHeight.current = event.nativeEvent.layout.height;
+              }}
+            >
+              <Animated.View style={[styles.pullSpace, pullSpaceStyle]}>
+                <Animated.View style={[styles.pullRow, pullRowStyle]}>
+                  <Text style={styles.pullText}>{pullLabels[pullAction]}</Text>
+                </Animated.View>
               </Animated.View>
+
+              {rows.flatMap((row, index) => [
+                addIndex === index ? input : null,
+                editingId === row.id ? (
+                  <RowInput
+                    key={row.id}
+                    leadFor={draftLead}
+                    placeholder={placeholder}
+                    initialText={row.section ? `${row.text}:` : row.text}
+                    rolled={isShelf}
+                    onEnd={(text) => endEdit(row.id, text)}
+                  />
+                ) : (
+                  <SwipeRow
+                    key={row.id}
+                    color={isShelf ? colors.desk : row.done ? colors.parchmentShade : colors.parchment}
+                    index={index}
+                    rowCount={rowCount}
+                    draggable={!row.done}
+                    reorder={{ from: dragFrom, to: dragTo }}
+                    gap={{ index: gapIndex, size: gapSize }}
+                    animateLayout={!dragging}
+                    onDelete={() => onDelete(row.id)}
+                    onComplete={onComplete && !row.section ? () => onComplete(row.id) : undefined}
+                    onPress={() => press(() => (onOpen ? onOpen(row.id) : setEditingId(row.id)))}
+                    onDragStart={startDrag}
+                    onDrop={drop}
+                  >
+                    {rowContent(row, index)}
+                  </SwipeRow>
+                ),
+              ])}
+
+              {addIndex !== null && addIndex >= rowCount ? input : null}
+
+              {footer}
+
+              <Pressable style={styles.tail} disabled={busy} onPress={() => press(() => setAddIndex(endIndex))}>
+                {rowCount === 0 && !busy ? <Text style={styles.hint}>{emptyHint}</Text> : null}
+              </Pressable>
             </Animated.View>
-
-            {rows.flatMap((row, index) => [
-              addIndex === index ? input : null,
-              editingId === row.id ? (
-                <RowInput
-                  key={row.id}
-                  color={colorAt(index)}
-                  marker={marker}
-                  placeholder={placeholder}
-                  initialText={row.text}
-                  onEnd={(text) => endEdit(row.id, text)}
-                />
-              ) : (
-                <SwipeRow
-                  key={row.id}
-                  color={row.done ? colors.parchmentShade : colors.parchment}
-                  index={index}
-                  reorderLimit={activeCount}
-                  reorder={{ from: dragFrom, to: dragTo }}
-                  gap={{ index: gapIndex, size: gapSize }}
-                  animateLayout={!dragging}
-                  onDelete={() => onDelete(row.id)}
-                  onComplete={onComplete ? () => onComplete(row.id) : undefined}
-                  onPress={() => press(() => (onOpen ? onOpen(row.id) : setEditingId(row.id)))}
-                  onDragStart={startDrag}
-                  onDrop={drop}
-                >
-                  <Initial text={row.text} pigment={colorAt(index)} kind={marker} faded={row.done} />
-                  <Text style={[styles.rowText, styles.fill, row.done && styles.doneText]} numberOfLines={1}>
-                    {row.text}
-                  </Text>
-                  {row.badge ? <Text style={styles.badge}>{row.badge}</Text> : null}
-                </SwipeRow>
-              ),
-            ])}
-
-            {addIndex !== null && addIndex >= rows.length ? input : null}
-
-            {footer}
-
-            <Pressable style={styles.tail} disabled={busy} onPress={() => press(() => setAddIndex(activeCount))}>
-              {rows.length === 0 && !busy ? <Text style={styles.hint}>{emptyHint}</Text> : null}
-            </Pressable>
-            </Animated.View>
-            <Roller />
-            <Pressable style={styles.tapZone} disabled={busy} onPress={() => press(() => setAddIndex(activeCount))} />
+            {isShelf ? null : <Roller />}
+            <Pressable style={styles.tapZone} disabled={busy} onPress={() => press(() => setAddIndex(endIndex))} />
           </ScrollView>
         </View>
       </GestureDetector>
@@ -387,19 +463,34 @@ const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.desk },
   fill: { flex: 1 },
   header: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 20, height: 56 },
-  back: { color: colors.gold, fontSize: 34, lineHeight: 36 },
-  title: { color: colors.parchment, fontFamily: fonts.display, fontSize: 30 },
+  back: { color: colors.accent, fontSize: 34, lineHeight: 36 },
+  title: { color: colors.onDesk, fontFamily: fonts.display, fontSize: 30 },
   titleInput: { flex: 1, padding: 0 },
+  readout: { color: colors.onDeskFaded, fontFamily: fonts.label, fontSize: 11, letterSpacing: 1.2 },
   content: { flexGrow: 1 },
-  topRoller: { zIndex: 1, marginBottom: -8 },
-  sheet: { marginHorizontal: 18, overflow: 'hidden', backgroundColor: colors.parchment },
-  tail: { height: ROW_HEIGHT, alignItems: 'center', justifyContent: 'center' },
+  topRoller: { zIndex: 1, marginBottom: -7 },
+  sheet: { marginHorizontal: 20, overflow: 'hidden', backgroundColor: colors.parchment },
+  shelf: { paddingTop: 4 },
   pullSpace: { justifyContent: 'flex-end', overflow: 'hidden' },
-  pullRow: { height: ROW_HEIGHT, justifyContent: 'center', paddingHorizontal: 16 },
-  pullText: { color: colors.onPigment, fontFamily: fonts.bodyItalic, fontSize: 21 },
-  rowText: { color: colors.ink, fontFamily: fonts.body, fontSize: 21 },
-  doneText: { color: colors.inkFaded, textDecorationLine: 'line-through', textDecorationColor: colors.rubric },
-  badge: { color: colors.rubric, fontFamily: fonts.display, fontSize: 22, marginLeft: 12 },
+  pullRow: { height: ROW_HEIGHT, justifyContent: 'center', paddingHorizontal: 16, backgroundColor: colors.accent },
+  pullText: { color: colors.onAction, fontFamily: fonts.label, fontSize: 12, letterSpacing: 1.6 },
+  rolled: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    height: 48,
+    paddingHorizontal: 12,
+    borderRadius: 4,
+    borderLeftWidth: 6,
+    borderRightWidth: 6,
+    borderColor: colors.gold,
+    backgroundColor: colors.parchment,
+  },
+  rowText: { color: colors.ink, fontSize: 18, fontWeight: '500' },
+  sectionText: { fontFamily: fonts.display, fontSize: 26, fontWeight: '400' },
+  doneText: { color: colors.inkFaded, textDecorationLine: 'line-through', textDecorationColor: colors.accent },
+  badge: { color: colors.inkFaded, fontFamily: fonts.label, fontSize: 11, letterSpacing: 1, marginLeft: 12 },
+  tail: { height: ROW_HEIGHT, alignItems: 'center', justifyContent: 'center' },
   tapZone: { flexGrow: 1, minHeight: ROW_HEIGHT },
-  hint: { color: colors.inkFaded, fontFamily: fonts.bodyItalic, fontSize: 18 },
+  hint: { color: colors.inkFaded, fontFamily: fonts.label, fontSize: 11, letterSpacing: 1.2 },
 });

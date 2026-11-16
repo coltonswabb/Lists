@@ -1,4 +1,4 @@
-import { IMFellEnglish_400Regular, IMFellEnglish_400Regular_Italic } from '@expo-google-fonts/im-fell-english';
+import { IBMPlexMono_500Medium } from '@expo-google-fonts/ibm-plex-mono';
 import { PirataOne_400Regular } from '@expo-google-fonts/pirata-one';
 import { useFonts } from 'expo-font';
 import { StatusBar } from 'expo-status-bar';
@@ -10,13 +10,17 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { GestureList } from './components/GestureList';
 import { UndoToast } from './components/UndoToast';
 import { useLists } from './store';
-import { colors, fonts } from './theme';
+import { colors, fonts, roman } from './theme';
 
 export const App: FC = () => {
   const store = useLists();
-  const [fontsLoaded] = useFonts({ PirataOne_400Regular, IMFellEnglish_400Regular, IMFellEnglish_400Regular_Italic });
+  const [fontsLoaded] = useFonts({ PirataOne_400Regular, IBMPlexMono_500Medium });
   const [openListId, setOpenListId] = useState<string | null>(null);
   const openList = store.lists.find((list) => list.id === openListId);
+  const openItems = openList?.items.filter((item) => !item.section) ?? [];
+  const remaining = openItems.filter((item) => !item.done).length;
+  // Latin in the readout only, as on an instrument's faceplate: "things" left, or "the end".
+  const openReadout = openItems.length > 0 && remaining === 0 ? 'FINIS' : `${roman(remaining)} RES`;
 
   useEffect(() => {
     if (!openList) return;
@@ -35,10 +39,10 @@ export const App: FC = () => {
           <GestureList
             key={openList.id}
             title={openList.name}
-            palette="items"
-            marker="stripe"
+            variant="scroll"
+            readout={openReadout}
             placeholder="New item"
-            emptyHint="Pull down or tap to inscribe an item"
+            emptyHint="PULL DOWN OR TAP TO ADD"
             rows={openList.items}
             onAdd={(texts, index) => store.addItems(openList.id, texts, index)}
             onRename={(id, text) => store.renameItem(openList.id, id, text)}
@@ -51,10 +55,10 @@ export const App: FC = () => {
               openList.items.some((item) => item.done) ? (
                 <View style={styles.footer}>
                   <Pressable onPress={() => store.uncheckAll(openList.id)} hitSlop={10}>
-                    <Text style={styles.footerAction}>Unmark all</Text>
+                    <Text style={styles.footerAction}>UNMARK ALL</Text>
                   </Pressable>
                   <Pressable onPress={() => store.clearDone(openList.id)} hitSlop={10}>
-                    <Text style={styles.footerAction}>Strike the finished</Text>
+                    <Text style={styles.footerAction}>CLEAR DONE</Text>
                   </Pressable>
                 </View>
               ) : null
@@ -64,14 +68,14 @@ export const App: FC = () => {
           <GestureList
             key="lists"
             title="Scrolls"
-            palette="lists"
-            marker="initial"
+            variant="shelf"
+            readout={`${roman(store.lists.length)} ROTULI`}
             placeholder="New scroll"
-            emptyHint="Pull down or tap to begin a scroll"
+            emptyHint="PULL DOWN OR TAP TO ADD A SCROLL"
             rows={store.lists.map((list) => ({
               id: list.id,
               text: list.name,
-              badge: String(list.items.filter((item) => !item.done).length),
+              badge: roman(list.items.filter((item) => !item.done && !item.section).length),
             }))}
             onAdd={store.addLists}
             onRename={store.renameList}
@@ -89,5 +93,5 @@ export const App: FC = () => {
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.desk },
   footer: { flexDirection: 'row', justifyContent: 'center', gap: 28, paddingTop: 20 },
-  footerAction: { color: colors.rubric, fontFamily: fonts.bodyItalic, fontSize: 17 },
+  footerAction: { color: colors.accent, fontFamily: fonts.label, fontSize: 11, letterSpacing: 1.2 },
 });
