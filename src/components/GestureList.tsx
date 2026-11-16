@@ -2,7 +2,9 @@ import {
   type ComponentRef,
   type FC,
   type ReactNode,
+  type RefObject,
   useEffect,
+  useImperativeHandle,
   useLayoutEffect,
   useMemo,
   useRef,
@@ -84,6 +86,12 @@ const pullLabels = {
   back: 'Release to close',
 } as const satisfies Record<PullAction, string>;
 
+/** What a parent may ask of the list from outside it. */
+export type GestureListActions = {
+  /** Opens a new row for writing at the end of the unfinished ones, as a tap on the empty desk does. */
+  add: () => void;
+};
+
 export type GestureListRow = {
   id: string;
   text: string;
@@ -131,6 +139,8 @@ type GestureListProps = {
   onBack?: () => void;
   /** Pulling up past the end of the rows clears the finished ones. Absent when there are none. */
   onPullUp?: () => void;
+  /** Filled with the things a parent may ask of the list. */
+  actions?: RefObject<GestureListActions | null>;
   /** Drawn in the margin beside "Finis" once every item is done. */
   finisArt?: ReactNode;
 };
@@ -156,6 +166,7 @@ export const GestureList: FC<GestureListProps> = ({
   onPullUp,
   finisArt,
   leadActionLabel,
+  actions,
 }) => {
   const { colors, styles } = useTheme(makeStyles);
   const insets = useSafeAreaInsets();
@@ -322,6 +333,8 @@ export const GestureList: FC<GestureListProps> = ({
   const press = (action: () => void) => {
     if (!pulling.current && !busy) action();
   };
+
+  useImperativeHandle(actions, () => ({ add: () => press(() => setAddIndex(endIndex)) }));
 
   const arm = (action: PullAction) => {
     setPullAction(action);

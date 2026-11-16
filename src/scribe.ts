@@ -24,6 +24,7 @@ const remarks = {
   strike: ['Struck from the record.', 'Consider it forgotten, {t}.', 'It never was, {t}.'],
   finish: ['All is done, {t}. I shall fetch the wax.'],
   restore: ['As it was, {t}.', 'Restored, {t}.'],
+  penning: ['Penning, {t}.', 'I dip the quill, {t}.', 'The quill is ready, {t}.'],
   newScroll: ['A fresh scroll, {t}.', 'I have cut a new sheet, {t}.'],
   bigClear: ['A fine day’s work, {t}.', 'The page breathes again, {t}.'],
   seal: ['Sealed, and set down in the chronicle.', 'I have pressed the wax, {t}.'],

@@ -1,4 +1,4 @@
-import { type ComponentRef, type FC, useRef, useState } from 'react';
+import { type ComponentRef, type FC, useEffect, useRef, useState } from 'react';
 import { StyleSheet, TextInput, View } from 'react-native';
 
 import { useTheme } from '../ThemeContext';
@@ -36,6 +36,16 @@ export const RowInput: FC<RowInputProps> = ({ leadFor, paper, placeholder, initi
    */
   const submitted = useRef<string | null>(null);
   const ended = useRef(false);
+
+  // autoFocus alone does not take when the row is opened from outside the list (the inkwell), so ask again.
+  useEffect(() => {
+    const timers = [60, 250, 600].map((delay) =>
+      setTimeout(() => {
+        if (!input.current?.isFocused()) input.current?.focus();
+      }, delay),
+    );
+    return () => timers.forEach(clearTimeout);
+  }, []);
 
   const show = (value: string) => {
     latest.current = value;

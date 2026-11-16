@@ -2,15 +2,17 @@ import { EBGaramond_500Medium, EBGaramond_500Medium_Italic } from '@expo-google-
 import { PirataOne_400Regular } from '@expo-google-fonts/pirata-one';
 import { useFonts } from 'expo-font';
 import { StatusBar } from 'expo-status-bar';
-import { type FC, useEffect, useMemo, useState } from 'react';
+import { type FC, useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, AppState, BackHandler, Pressable, StyleSheet, Text, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { pickBackup, shareBackup } from './backup';
 import { ChronicleScreen } from './components/ChronicleScreen';
+import { DeskThings } from './components/DeskThings';
+import { tick } from './haptics';
 import { Desk } from './components/Desk';
-import { GestureList, type GestureListRow, STAMP_DELAY_MS } from './components/GestureList';
+import { GestureList, type GestureListActions, type GestureListRow, STAMP_DELAY_MS } from './components/GestureList';
 import { LEAD_WIDTH } from './components/RowLead';
 import { Marginalia } from './components/Marginalia';
 import { ScribeLine } from './components/ScribeLine';
@@ -66,7 +68,7 @@ const scrollRows = (items: Item[]): { rows: GestureListRow[]; visible: Item[] } 
 
 type Settings = ReturnType<typeof useSettings>;
 
-const Screens: FC<{ settings: Settings; address: Address; onShelf: (showing: boolean) => void }> = ({ settings, address, onShelf }) => {
+const Screens: FC<{ settings: Settings; address: Address }> = ({ settings, address }) => {
   const { colors, styles } = useTheme(makeStyles);
   const insets = useSafeAreaInsets();
   const store = useLists();
@@ -110,11 +112,7 @@ const Screens: FC<{ settings: Settings; address: Address; onShelf: (showing: boo
   const [searching, setSearching] = useState(false);
   const openList = store.lists.find((list) => list.id === openListId);
 
-  const shelfShowing = !openList && !searching && !settingsOpen && !chronicleOpen;
-  useEffect(() => {
-    onShelf(shelfShowing);
-    return () => onShelf(false);
-  }, [onShelf, shelfShowing]);
+  const shelf = useRef<GestureListActions>(null);
 
   useEffect(() => {
     if (!openList && !searching && !settingsOpen && !chronicleOpen) return;
@@ -336,6 +334,7 @@ const Screens: FC<{ settings: Settings; address: Address; onShelf: (showing: boo
     <>
       <GestureList
         key="shelf"
+        actions={shelf}
         title="Library"
         readout={`${roman(store.lists.length)} ROTULI`}
         variant="shelf"
@@ -373,6 +372,14 @@ const Screens: FC<{ settings: Settings; address: Address; onShelf: (showing: boo
           store.sealList(id);
         }}
       />
+      <DeskThings
+        scrolls={store.lists.length}
+        onPen={() => {
+          tick();
+          say('penning');
+          shelf.current?.add();
+        }}
+      />
       <View style={[styles.controls, { paddingBottom: insets.bottom + 12 }]}>
         <Pressable onPress={() => setSearching(true)} hitSlop={12} accessibilityRole="button">
           <Text style={styles.deskLabel}>Search</Text>
@@ -396,17 +403,15 @@ export const App: FC = () => {
     EBGaramond_500Medium_Italic,
   });
   const settings = useSettings();
-  // Whether the Library itself is showing, which is when the desk has its inkwell and candle out.
-  const [onShelf, setOnShelf] = useState(false);
   const palette = useMemo(() => paletteOf(settings.theme), [settings.theme]);
   return (
     <GestureHandlerRootView style={{ flex: 1, backgroundColor: palette.desk }}>
       <SafeAreaProvider>
         <ThemeProvider value={palette}>
           <StatusBar style="light" />
-          <Desk furnished={onShelf} />
+          <Desk />
           {!fontsLoaded || !settings.loaded ? null : settings.address ? (
-            <Screens settings={settings} address={settings.address} onShelf={setOnShelf} />
+            <Screens settings={settings} address={settings.address} />
           ) : (
             <ScribeWelcome onChoose={settings.chooseAddress} />
           )}
