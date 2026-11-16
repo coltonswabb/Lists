@@ -1,18 +1,17 @@
-import { type FC, useRef, useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { GestureDetector, ScrollView, usePanGesture } from 'react-native-gesture-handler';
-import Animated, {
-  interpolate,
-  LinearTransition,
-  useAnimatedStyle,
-  useSharedValue,
-  withSpring,
-} from 'react-native-reanimated';
+import { type FC, type ReactNode, useLayoutEffect, useRef, useState } from 'react';
+import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import {
+  GestureDetector,
+  ScrollView,
+  usePanGesture,
+  usePinchGesture,
+  useSimultaneousGestures,
+} from 'react-native-gesture-handler';
+import Animated, { interpolate, useAnimatedStyle, useSharedValue, withSpring, withTiming } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { scheduleOnRN } from 'react-native-worklets';
 
-import { success, tick } from '../haptics';
-import type { AddPosition } from '../store';
+import { success, thud, tick } from '../haptics';
 import { colors, type PaletteName, ROW_HEIGHT, rowColor } from '../theme';
 import { RowInput } from './RowInput';
 import { SwipeRow } from './SwipeRow';
@@ -20,6 +19,8 @@ import { SwipeRow } from './SwipeRow';
 const PULL_RESISTANCE = 0.6;
 const PRESS_GUARD_MS = 150;
 const BACK_DISTANCE = ROW_HEIGHT * 2.3;
+const PINCH_OPEN_AT = ROW_HEIGHT * 0.6;
+const PINCH_CLOSE_SCALE = 0.7;
 const SPRING = { damping: 24, stiffness: 240 } as const;
 
 type PullAction = 'none' | 'create' | 'back';
@@ -43,12 +44,15 @@ type GestureListProps = {
   rows: GestureListRow[];
   placeholder: string;
   emptyHint: string;
-  onAdd: (text: string, at: AddPosition) => void;
+  footer?: ReactNode;
+  onAdd: (texts: string[], index: number) => void;
   onRename: (id: string, text: string) => void;
   onDelete: (id: string) => void;
+  onMove: (from: number, to: number) => void;
   onComplete?: (id: string) => void;
-  /** Tap opens the row; long-press then renames it. Without it, tap renames. */
+  /** Tap opens the row. Without it, tap renames the row. */
   onOpen?: (id: string) => void;
+  onRenameTitle?: (title: string) => void;
   onBack?: () => void;
 };
 
@@ -58,23 +62,42 @@ export const GestureList: FC<GestureListProps> = ({
   rows,
   placeholder,
   emptyHint,
+  footer,
   onAdd,
   onRename,
   onDelete,
+  onMove,
   onComplete,
   onOpen,
+  onRenameTitle,
   onBack,
 }) => {
   const insets = useSafeAreaInsets();
   const [atTop, setAtTop] = useState(true);
-  const [addingAt, setAddingAt] = useState<AddPosition | null>(null);
+  const [addIndex, setAddIndex] = useState<number | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [titleDraft, setTitleDraft] = useState<string | null>(null);
   const [pullAction, setPullAction] = useState<PullAction>('none');
+  const [dragging, setDragging] = useState(false);
 
   const pull = useSharedValue(0);
   const armed = useSharedValue<PullAction>('none');
+  const scrollY = useSharedValue(0);
+  const dragFrom = useSharedValue(-1);
+  const dragTo = useSharedValue(-1);
+  const gapIndex = useSharedValue(-1);
+  const gapSize = useSharedValue(0);
+
   const canGoBack = onBack !== undefined;
-  const busy = addingAt !== null || editingId !== null;
+  const busy = addIndex !== null || editingId !== null || titleDraft !== null;
+  const firstDone = rows.findIndex((row) => row.done);
+  const activeCount = firstDone === -1 ? rows.length : firstDone;
+  const order = rows.map((row) => row.id).join('|');
+
+  // Rows keep their drag offsets until the new order has rendered, so the drop doesn't flicker.
+  useLayoutEffect(() => {
+    dragFrom.value = -1;
+  }, [order, dragFrom]);
 
   // A row under the finger can still report a tap when a pull ends, so presses are ignored while pulling.
   const pulling = useRef(false);
@@ -82,7 +105,7 @@ export const GestureList: FC<GestureListProps> = ({
     pulling.current = true;
   };
   const press = (action: () => void) => {
-    if (!pulling.current) action();
+    if (!pulling.current && !busy) action();
   };
 
   const arm = (action: PullAction) => {
@@ -95,12 +118,13 @@ export const GestureList: FC<GestureListProps> = ({
       pulling.current = false;
     }, PRESS_GUARD_MS);
     setPullAction('none');
-    if (action === 'create') setAddingAt('top');
+    if (action === 'create') setAddIndex(0);
     if (action === 'back') onBack?.();
   };
 
   const pan = usePanGesture({
-    enabled: atTop && !busy,
+    enabled: atTop && !busy && !dragging,
+    maxPointers: 1,
     activeOffsetY: 14,
     failOffsetX: [-14, 14],
     onActivate: () => {
@@ -109,6 +133,7 @@ export const GestureList: FC<GestureListProps> = ({
     },
     onUpdate: (event) => {
       'worklet';
+      if (dragFrom.value >= 0) return;
       const distance = Math.max(0, event.translationY) * PULL_RESISTANCE;
       pull.value = distance;
       const next: PullAction =
@@ -128,6 +153,45 @@ export const GestureList: FC<GestureListProps> = ({
     },
   });
 
+  const openGap = (index: number) => {
+    thud();
+    setAddIndex(index);
+  };
+  const pinchBack = () => {
+    thud();
+    onBack?.();
+  };
+
+  // Pinch apart opens a gap between two rows for a new one; pinch together leaves the list.
+  const pinch = usePinchGesture({
+    enabled: !busy && !dragging,
+    onActivate: (event) => {
+      'worklet';
+      const row = Math.round((event.focalY + scrollY.value) / ROW_HEIGHT);
+      gapIndex.value = Math.max(0, Math.min(activeCount, row));
+    },
+    onUpdate: (event) => {
+      'worklet';
+      gapSize.value = Math.max(0, Math.min(ROW_HEIGHT, (event.scale - 1) * ROW_HEIGHT * 1.4));
+    },
+    onDeactivate: (event) => {
+      'worklet';
+      const index = gapIndex.value;
+      if (!event.canceled && index >= 0 && gapSize.value > PINCH_OPEN_AT) {
+        gapSize.value = 0;
+        gapIndex.value = -1;
+        scheduleOnRN(openGap, index);
+        return;
+      }
+      gapSize.value = withTiming(0, { duration: 150 }, () => {
+        gapIndex.value = -1;
+      });
+      if (!event.canceled && canGoBack && event.scale < PINCH_CLOSE_SCALE) scheduleOnRN(pinchBack);
+    },
+  });
+
+  const gesture = useSimultaneousGestures(pan, pinch);
+
   const pullSpaceStyle = useAnimatedStyle(() => ({ height: pull.value }));
   const pullRowStyle = useAnimatedStyle(() => ({
     opacity: interpolate(pull.value, [0, ROW_HEIGHT], [0.3, 1], 'clamp'),
@@ -137,90 +201,149 @@ export const GestureList: FC<GestureListProps> = ({
     ],
   }));
 
-  const finishAdd = (text: string) => {
-    const at = addingAt ?? 'end';
-    setAddingAt(null);
-    if (!text) return;
+  // Each finished line becomes a row and the input moves below it, ready for the next one.
+  const addLines = (lines: string[]) => {
+    if (addIndex === null) return;
     success();
-    onAdd(text, at);
+    onAdd(lines, addIndex);
+    setAddIndex(addIndex + lines.length);
   };
 
-  const finishEdit = (id: string, text: string) => {
+  const endAdd = (remaining: string) => {
+    if (addIndex !== null && remaining) {
+      success();
+      onAdd([remaining], addIndex);
+    }
+    setAddIndex(null);
+  };
+
+  const endEdit = (id: string, text: string) => {
     setEditingId(null);
     if (text) onRename(id, text);
   };
 
-  const firstDone = rows.findIndex((row) => row.done);
-  const activeCount = firstDone === -1 ? rows.length : firstDone;
-  const totalForColor = activeCount + (addingAt ? 1 : 0);
-  const colorAt = (index: number) =>
-    rowColor(palette, index + (addingAt === 'top' ? 1 : 0), totalForColor);
+  const endTitleEdit = () => {
+    const next = titleDraft?.trim();
+    setTitleDraft(null);
+    if (next && next !== title) onRenameTitle?.(next);
+  };
 
-  const input = (
-    <RowInput
-      color={rowColor(palette, addingAt === 'top' ? 0 : activeCount, totalForColor)}
-      placeholder={placeholder}
-      onDone={finishAdd}
-    />
-  );
+  const startDrag = () => {
+    thud();
+    setDragging(true);
+  };
+
+  const drop = (from: number, to: number) => {
+    if (from === to) dragFrom.value = -1;
+    else onMove(from, to);
+    // Layout animations stay off until the reordered rows have settled.
+    setTimeout(() => setDragging(false), 80);
+  };
+
+  const colorTotal = activeCount + (addIndex === null ? 0 : 1);
+  const colorAt = (index: number) =>
+    rowColor(palette, index + (addIndex !== null && index >= addIndex ? 1 : 0), colorTotal);
+
+  const input =
+    addIndex === null ? null : (
+      <RowInput
+        key="new-row"
+        color={rowColor(palette, addIndex, colorTotal)}
+        placeholder={placeholder}
+        onLines={addLines}
+        onEnd={endAdd}
+      />
+    );
 
   return (
     <View style={[styles.screen, { paddingTop: insets.top }]}>
-      <Pressable onPress={onBack} disabled={!canGoBack} style={styles.header}>
-        <Text style={styles.title} numberOfLines={1}>
-          {canGoBack ? `‹  ${title}` : title}
-        </Text>
-      </Pressable>
-      <GestureDetector gesture={pan}>
+      <View style={styles.header}>
+        {canGoBack ? (
+          <Pressable onPress={onBack} hitSlop={14} accessibilityRole="button" accessibilityLabel="Back to lists">
+            <Text style={styles.back}>‹</Text>
+          </Pressable>
+        ) : null}
+        {titleDraft === null ? (
+          <Pressable style={styles.fill} disabled={!onRenameTitle || busy} onPress={() => setTitleDraft(title)}>
+            <Text style={styles.title} numberOfLines={1}>
+              {title}
+            </Text>
+          </Pressable>
+        ) : (
+          <TextInput
+            autoFocus
+            value={titleDraft}
+            onChangeText={setTitleDraft}
+            onSubmitEditing={endTitleEdit}
+            onBlur={endTitleEdit}
+            returnKeyType="done"
+            selectionColor={colors.text}
+            style={[styles.title, styles.titleInput]}
+          />
+        )}
+      </View>
+      <GestureDetector gesture={gesture}>
         <View style={styles.fill}>
           <ScrollView
             bounces={false}
             overScrollMode="never"
             keyboardShouldPersistTaps="handled"
             automaticallyAdjustKeyboardInsets
+            scrollEnabled={!dragging}
             scrollEventThrottle={16}
-            onScroll={(event) => setAtTop(event.nativeEvent.contentOffset.y <= 0)}
+            onScroll={(event) => {
+              const y = event.nativeEvent.contentOffset.y;
+              scrollY.value = y;
+              setAtTop(y <= 0);
+            }}
             contentContainerStyle={[styles.content, { paddingBottom: insets.bottom }]}
           >
             <Animated.View style={[styles.pullSpace, pullSpaceStyle]}>
               <Animated.View
-                style={[styles.pullRow, { backgroundColor: rowColor(palette, 0, rows.length + 1) }, pullRowStyle]}
+                style={[styles.pullRow, { backgroundColor: rowColor(palette, 0, activeCount + 1) }, pullRowStyle]}
               >
                 <Text style={styles.rowText}>{pullLabels[pullAction]}</Text>
               </Animated.View>
             </Animated.View>
 
-            {addingAt === 'top' ? input : null}
+            {rows.flatMap((row, index) => [
+              addIndex === index ? input : null,
+              editingId === row.id ? (
+                <RowInput
+                  key={row.id}
+                  color={row.done ? colors.doneRow : colorAt(index)}
+                  placeholder={placeholder}
+                  initialText={row.text}
+                  onEnd={(text) => endEdit(row.id, text)}
+                />
+              ) : (
+                <SwipeRow
+                  key={row.id}
+                  color={row.done ? colors.doneRow : colorAt(index)}
+                  index={index}
+                  reorderLimit={activeCount}
+                  reorder={{ from: dragFrom, to: dragTo }}
+                  gap={{ index: gapIndex, size: gapSize }}
+                  animateLayout={!dragging}
+                  onDelete={() => onDelete(row.id)}
+                  onComplete={onComplete ? () => onComplete(row.id) : undefined}
+                  onPress={() => press(() => (onOpen ? onOpen(row.id) : setEditingId(row.id)))}
+                  onDragStart={startDrag}
+                  onDrop={drop}
+                >
+                  <Text style={[styles.rowText, styles.fill, row.done && styles.doneText]} numberOfLines={1}>
+                    {row.text}
+                  </Text>
+                  {row.badge ? <Text style={styles.badge}>{row.badge}</Text> : null}
+                </SwipeRow>
+              ),
+            ])}
 
-            {rows.map((row, index) => (
-              <Animated.View key={row.id} layout={LinearTransition.duration(220)}>
-                {editingId === row.id ? (
-                  <RowInput
-                    color={row.done ? colors.doneRow : colorAt(index)}
-                    placeholder={placeholder}
-                    initialText={row.text}
-                    onDone={(text) => finishEdit(row.id, text)}
-                  />
-                ) : (
-                  <SwipeRow
-                    color={row.done ? colors.doneRow : colorAt(index)}
-                    onDelete={() => onDelete(row.id)}
-                    onComplete={onComplete ? () => onComplete(row.id) : undefined}
-                    onPress={() => press(() => (onOpen ? onOpen(row.id) : setEditingId(row.id)))}
-                    onLongPress={onOpen ? () => press(() => setEditingId(row.id)) : undefined}
-                  >
-                    <Text style={[styles.rowText, styles.fill, row.done && styles.doneText]} numberOfLines={1}>
-                      {row.text}
-                    </Text>
-                    {row.badge ? <Text style={styles.badge}>{row.badge}</Text> : null}
-                  </SwipeRow>
-                )}
-              </Animated.View>
-            ))}
+            {addIndex !== null && addIndex >= rows.length ? input : null}
 
-            {addingAt === 'end' ? input : null}
+            {footer}
 
-            <Pressable style={styles.tapZone} disabled={busy} onPress={() => press(() => setAddingAt('end'))}>
+            <Pressable style={styles.tapZone} disabled={busy} onPress={() => press(() => setAddIndex(activeCount))}>
               {rows.length === 0 && !busy ? <Text style={styles.hint}>{emptyHint}</Text> : null}
             </Pressable>
           </ScrollView>
@@ -233,8 +356,10 @@ export const GestureList: FC<GestureListProps> = ({
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.background },
   fill: { flex: 1 },
-  header: { paddingHorizontal: 20, paddingTop: 10, paddingBottom: 12 },
+  header: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 20, height: 44 },
+  back: { color: colors.textDim, fontSize: 28, fontWeight: '500', lineHeight: 30 },
   title: { color: colors.textDim, fontSize: 13, fontWeight: '700', letterSpacing: 1.4, textTransform: 'uppercase' },
+  titleInput: { flex: 1, color: colors.text, padding: 0 },
   content: { flexGrow: 1 },
   pullSpace: { justifyContent: 'flex-end', overflow: 'hidden' },
   pullRow: { height: ROW_HEIGHT, justifyContent: 'center', paddingHorizontal: 20, transformOrigin: 'bottom' },

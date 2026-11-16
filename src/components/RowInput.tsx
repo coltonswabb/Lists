@@ -7,31 +7,57 @@ type RowInputProps = {
   color: string;
   placeholder: string;
   initialText?: string;
-  /** Called once with the trimmed text; an empty string means the edit was abandoned. */
-  onDone: (text: string) => void;
+  /**
+   * Rapid entry: every finished line (Return, or each line of a pasted block) is reported and the
+   * input stays open for the next one. Without it the first Return ends the edit.
+   */
+  onLines?: (lines: string[]) => void;
+  /** Called once, with whatever trimmed text was left in the input (possibly empty). */
+  onEnd: (remaining: string) => void;
 };
 
-export const RowInput: FC<RowInputProps> = ({ color, placeholder, initialText = '', onDone }) => {
+export const RowInput: FC<RowInputProps> = ({ color, placeholder, initialText = '', onLines, onEnd }) => {
   const [text, setText] = useState(initialText);
-  const finished = useRef(false);
+  const ended = useRef(false);
 
-  const finish = () => {
-    if (finished.current) return;
-    finished.current = true;
-    onDone(text.trim());
+  const end = (remaining: string) => {
+    if (ended.current) return;
+    ended.current = true;
+    onEnd(remaining.trim());
+  };
+
+  // The input is multiline so Return and pasted line breaks both arrive here as "\n".
+  const change = (value: string) => {
+    if (!value.includes('\n')) {
+      setText(value);
+      return;
+    }
+    const parts = value.split('\n');
+    const remainder = parts.pop() ?? '';
+    const lines = parts.map((line) => line.trim()).filter(Boolean);
+    if (!onLines) {
+      end(lines[0] ?? remainder);
+      return;
+    }
+    if (lines.length === 0 && !remainder.trim()) {
+      end('');
+      return;
+    }
+    setText(remainder);
+    if (lines.length > 0) onLines(lines);
   };
 
   return (
     <View style={[styles.row, { backgroundColor: color }]}>
       <TextInput
         autoFocus
+        multiline
+        scrollEnabled={false}
         value={text}
-        onChangeText={setText}
-        onSubmitEditing={finish}
-        onBlur={finish}
+        onChangeText={change}
+        onBlur={() => end(text)}
         placeholder={placeholder}
         placeholderTextColor={colors.textDim}
-        returnKeyType="done"
         selectionColor={colors.text}
         style={styles.input}
       />
@@ -41,5 +67,5 @@ export const RowInput: FC<RowInputProps> = ({ color, placeholder, initialText = 
 
 const styles = StyleSheet.create({
   row: { height: ROW_HEIGHT, justifyContent: 'center', paddingHorizontal: 20 },
-  input: { color: colors.text, fontSize: 19, fontWeight: '600', padding: 0 },
+  input: { color: colors.text, fontSize: 19, fontWeight: '600', padding: 0, height: 26, textAlignVertical: 'center' },
 });
