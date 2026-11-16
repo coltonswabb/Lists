@@ -1,4 +1,4 @@
-import { type FC, type ReactNode, useEffect, useRef } from 'react';
+import { type FC, type ReactNode, useEffect } from 'react';
 import { StyleSheet, Text, useWindowDimensions } from 'react-native';
 import {
   GestureDetector,
@@ -123,24 +123,8 @@ export const SwipeRow: FC<SwipeRowProps> = ({
   const armed = useSharedValue(0);
   const { dragY, scrollStart } = reorder;
   const lastNudge = useSharedValue(0);
-  /** Counts touches, so a hold timer can tell whether the touch it was started for is still the current one. */
-  const holdToken = useSharedValue(0);
   /** The current touch can no longer become a drag: it moved too soon, or it has ended. */
   const holdOver = useSharedValue(true);
-  const holdTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  useEffect(
-    () => () => {
-      if (holdTimer.current) clearTimeout(holdTimer.current);
-    },
-    [],
-  );
-  // The drag begins once the finger has rested on the row for the hold time, whether or not it then moves.
-  const armHold = (handlerTag: number, token: number) => {
-    if (holdTimer.current) clearTimeout(holdTimer.current);
-    holdTimer.current = setTimeout(() => {
-      if (holdToken.value === token && !holdOver.value) GestureStateManager.activate(handlerTag);
-    }, HOLD_TO_DRAG_MS);
-  };
   const holdX = useSharedValue(0);
   const holdY = useSharedValue(0);
   const lift = useSharedValue(0);
@@ -189,9 +173,10 @@ export const SwipeRow: FC<SwipeRowProps> = ({
   const drag = usePanGesture({
     enabled: draggable && rowCount > 1,
     maxPointers: 1,
-    // Activated by hand rather than by the gesture's own hold timer: that timer fires even when the
-    // finger has moved on, which turned a slow pull that began on a row into a drag and cancelled the pull.
-    manualActivation: true,
+    // The hold timer alone would still fire after the finger has moved on, turning a slow pull that
+    // began on a row into a drag, so the touch handlers below fail the drag on any early movement.
+    // (Activating by hand from a JS timer instead does nothing on iOS.)
+    activateAfterLongPress: HOLD_TO_DRAG_MS,
     block: pulls,
     onTouchesDown: (event) => {
       'worklet';
@@ -202,10 +187,8 @@ export const SwipeRow: FC<SwipeRowProps> = ({
         return;
       }
       holdOver.value = false;
-      holdToken.value += 1;
       holdX.value = touch.absoluteX;
       holdY.value = touch.absoluteY;
-      scheduleOnRN(armHold, event.handlerTag, holdToken.value);
     },
     onTouchesMove: (event) => {
       'worklet';

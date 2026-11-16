@@ -26,7 +26,15 @@ type RowInputProps = {
 export const RowInput: FC<RowInputProps> = ({ leadFor, paper, placeholder, initialText = '', rolled = false, onLines, onEnd }) => {
   const { colors, styles } = useTheme(makeStyles);
   const [text, setText] = useState(initialText);
+  // What the input holds right now. On iOS a second Return can arrive before a re-render has cleared
+  // the native field, so the state alone would hand the same line over twice.
+  const latest = useRef(initialText);
   const ended = useRef(false);
+
+  const show = (value: string) => {
+    latest.current = value;
+    setText(value);
+  };
 
   const end = (remaining: string) => {
     if (ended.current) return;
@@ -34,10 +42,21 @@ export const RowInput: FC<RowInputProps> = ({ leadFor, paper, placeholder, initi
     onEnd(remaining.trim());
   };
 
-  // The input is multiline so Return and pasted line breaks both arrive here as "\n".
+  // Return submits rather than inserting a line break; finished lines leave the input at once.
+  const submit = () => {
+    const line = latest.current.trim();
+    if (!onLines || !line) {
+      end(line);
+      return;
+    }
+    show('');
+    onLines([line]);
+  };
+
+  // The input is multiline so a pasted block keeps its line breaks: each line becomes a row.
   const change = (value: string) => {
     if (!value.includes('\n')) {
-      setText(value);
+      show(value);
       return;
     }
     const parts = value.split('\n');
@@ -47,11 +66,7 @@ export const RowInput: FC<RowInputProps> = ({ leadFor, paper, placeholder, initi
       end(lines[0] ?? remainder);
       return;
     }
-    if (lines.length === 0 && !remainder.trim()) {
-      end('');
-      return;
-    }
-    setText(remainder);
+    show(remainder);
     if (lines.length > 0) onLines(lines);
   };
 
@@ -64,8 +79,10 @@ export const RowInput: FC<RowInputProps> = ({ leadFor, paper, placeholder, initi
           multiline
           scrollEnabled={false}
           value={text}
+          submitBehavior="submit"
+          onSubmitEditing={submit}
           onChangeText={change}
-          onBlur={() => end(text)}
+          onBlur={() => end(latest.current)}
           placeholder={placeholder}
           placeholderTextColor={colors.inkFaded}
           selectionColor={colors.accent}

@@ -445,6 +445,9 @@ export const GestureList: FC<GestureListProps> = ({
 
   const gesture = useSimultaneousGestures(pan, pullUp, pinch);
   const pulls = useMemo(() => [pan, pullUp], [pan, pullUp]);
+  // On iOS the native scroll view otherwise claims every vertical drag before a pull can begin. With
+  // bounces off it cannot move past either end, so letting both run never scrolls during a pull.
+  const alongsideScroll = useMemo(() => [pan, pullUp, pinch], [pan, pullUp, pinch]);
 
   // Pulling draws fresh paper out from under the rod.
   const pullSpaceStyle = useAnimatedStyle(() => ({ height: pull.value }));
@@ -589,6 +592,7 @@ export const GestureList: FC<GestureListProps> = ({
           <Animated.View style={[styles.fill, raiseStyle]}>
           <ScrollView
             ref={scrollView}
+            simultaneousWith={alongsideScroll}
             bounces={false}
             overScrollMode="never"
             keyboardShouldPersistTaps="handled"
