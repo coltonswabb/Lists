@@ -10,9 +10,12 @@ A gesture-driven list app built with Expo and React Native.
 - Hold a row, then drag to reorder.
 - Pinch apart to add a row between two others; pinch together to close a scroll.
 - Tap an item to rename it. Tap a scroll's title to rename the scroll.
+- Tap a section's painted initial to fold it away. Dragging a section heading moves its items with it.
+- Holding a dragged row at the top or bottom edge scrolls the list.
+- "Search" on the shelf finds items across every scroll; "Sound" turns the effects on or off.
 - "Unmark all" resets a reusable list; "Clear done" removes finished items.
 
-Data is stored on the device with AsyncStorage.
+Data is stored on the device with AsyncStorage. The sound effects in `assets/sounds` are synthesized, not recordings.
 
 ```bash
 npm install

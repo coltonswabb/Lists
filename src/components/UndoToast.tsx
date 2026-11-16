@@ -12,9 +12,11 @@ type UndoToastProps = {
   undo: Undo | null;
   onUndo: () => void;
   onDismiss: () => void;
+  /** Extra distance from the bottom, to clear anything pinned there. */
+  offset: number;
 };
 
-export const UndoToast: FC<UndoToastProps> = ({ undo, onUndo, onDismiss }) => {
+export const UndoToast: FC<UndoToastProps> = ({ undo, onUndo, onDismiss, offset }) => {
   const insets = useSafeAreaInsets();
 
   useEffect(() => {
@@ -29,7 +31,7 @@ export const UndoToast: FC<UndoToastProps> = ({ undo, onUndo, onDismiss }) => {
     <Animated.View
       entering={FadeInDown.duration(180)}
       exiting={FadeOutDown.duration(180)}
-      style={[styles.toast, { bottom: insets.bottom + 16 }]}
+      style={[styles.toast, { bottom: insets.bottom + 16 + offset }]}
     >
       <Text style={styles.label} numberOfLines={1}>
         {undo.label}

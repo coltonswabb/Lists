@@ -1,5 +1,13 @@
-import { type FC, type ReactNode, useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { type ComponentRef, type FC, type ReactNode, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import {
+  Pressable,
+  ScrollView as NativeScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  useWindowDimensions,
+  View,
+} from 'react-native';
 import {
   GestureDetector,
   ScrollView,
@@ -19,10 +27,11 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { scheduleOnRN } from 'react-native-worklets';
 
 import { success, thud, tick } from '../haptics';
+import { play } from '../sounds';
 import { accentAt, colors, fonts, roman, ROW_HEIGHT } from '../theme';
 import { Roller } from './Roller';
 import { RowInput } from './RowInput';
-import { type Lead, RowLead } from './RowLead';
+import { LEAD_WIDTH, type Lead, RowLead } from './RowLead';
 import { SwipeRow } from './SwipeRow';
 
 const PULL_RESISTANCE = 0.6;
@@ -34,6 +43,8 @@ const SPRING = { damping: 24, stiffness: 240 } as const;
 const UNROLL_MS = 420;
 const ROLL_UP_MS = 240;
 const UNCLIPPED = 100000;
+/** Average advance of the 18pt item text, used to size the strike drawn while swiping. */
+const CHAR_WIDTH = 9.4;
 
 type PullAction = 'none' | 'create' | 'back';
 
@@ -50,6 +61,10 @@ export type GestureListRow = {
   /** A heading inside a scroll. Drawn with a painted initial; cannot be completed. */
   section?: boolean;
   badge?: string;
+  /** Draws the badge in the accent colour: a reward mark rather than a count. */
+  badgeAccent?: boolean;
+  /** Shelf only: stamps the scroll with a wax seal in place of its badge. */
+  sealed?: boolean;
 };
 
 type GestureListProps = {
@@ -70,6 +85,8 @@ type GestureListProps = {
   onDelete: (id: string) => void;
   onMove: (from: number, to: number) => void;
   onComplete?: (id: string) => void;
+  /** Tap on a row's margin mark, for rows where that differs from a tap on its text. */
+  onPressLead?: (id: string) => void;
   /** Tap opens the row. Without it, tap renames the row. */
   onOpen?: (id: string) => void;
   onRenameTitle?: (title: string) => void;
@@ -89,11 +106,15 @@ export const GestureList: FC<GestureListProps> = ({
   onDelete,
   onMove,
   onComplete,
+  onPressLead,
   onOpen,
   onRenameTitle,
   onBack,
 }) => {
   const insets = useSafeAreaInsets();
+  const { width: screenWidth } = useWindowDimensions();
+  const scrollView = useRef<ComponentRef<typeof NativeScrollView>>(null);
+  const scrollOffset = useRef(0);
   const [atTop, setAtTop] = useState(true);
   const [addIndex, setAddIndex] = useState<number | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -119,22 +140,25 @@ export const GestureList: FC<GestureListProps> = ({
   let endIndex = rowCount;
   while (endIndex > 0 && rows[endIndex - 1]?.done) endIndex -= 1;
 
-  // Items are numbered within their section; a section shows how many of its items are still open.
+  // Items are numbered within their section.
   const numbers: number[] = [];
-  const openInSection: number[] = [];
-  let sectionAt = -1;
   let count = 0;
   rows.forEach((row, index) => {
-    if (row.section) {
-      sectionAt = index;
-      count = 0;
-      openInSection[index] = 0;
-      return;
-    }
-    count += 1;
+    count = row.section ? 0 : count + 1;
     numbers[index] = count;
-    if (!row.done && sectionAt >= 0) openInSection[sectionAt] = (openInSection[sectionAt] ?? 0) + 1;
   });
+
+  const itemRows = rows.filter((row) => !row.section);
+  const finished = !isShelf && itemRows.length > 0 && itemRows.every((row) => row.done);
+
+  // Sheet margins, row padding and the margin mark, on both sides of the text.
+  const textRoom = screenWidth - 40 - 32 - LEAD_WIDTH - 12;
+  const strikeFor = (row: GestureListRow) =>
+    isShelf || row.section || row.done ? 0 : Math.min(textRoom, row.text.length * CHAR_WIDTH);
+
+  const nudgeScroll = (direction: -1 | 1) => {
+    scrollView.current?.scrollTo({ y: Math.max(0, scrollOffset.current + direction * ROW_HEIGHT * 1.5), animated: true });
+  };
 
   const leadFor = (row: GestureListRow, index: number): Lead => {
     if (isShelf) return { kind: 'initial', text: row.text, pigment: colors.ink };
@@ -165,6 +189,7 @@ export const GestureList: FC<GestureListProps> = ({
   const initialHeight = useRef(rowCount * ROW_HEIGHT + ROW_HEIGHT * 2).current;
   useEffect(() => {
     if (isShelf) return;
+    play('paper');
     sheetHeight.value = withTiming(initialHeight, { duration: UNROLL_MS, easing: Easing.out(Easing.cubic) }, () => {
       sheetHeight.value = UNCLIPPED;
     });
@@ -175,6 +200,7 @@ export const GestureList: FC<GestureListProps> = ({
   const leave = () => {
     if (!onBack || leaving.current) return;
     leaving.current = true;
+    play('paper');
     sheetHeight.value = measuredHeight.current;
     sheetHeight.value = withTiming(0, { duration: ROLL_UP_MS, easing: Easing.in(Easing.cubic) }, () => {
       scheduleOnRN(onBack);
@@ -284,6 +310,7 @@ export const GestureList: FC<GestureListProps> = ({
   const addLines = (lines: string[]) => {
     if (addIndex === null) return;
     success();
+    play('quill');
     onAdd(lines, addIndex);
     setAddIndex(addIndex + lines.length);
   };
@@ -291,6 +318,7 @@ export const GestureList: FC<GestureListProps> = ({
   const endAdd = (remaining: string) => {
     if (addIndex !== null && remaining) {
       success();
+      play('quill');
       onAdd([remaining], addIndex);
     }
     setAddIndex(null);
@@ -332,8 +360,6 @@ export const GestureList: FC<GestureListProps> = ({
     );
 
   const rowContent = (row: GestureListRow, index: number) => {
-    const sectionOpen = openInSection[index];
-    const badge = row.section ? (sectionOpen ? roman(sectionOpen) : '') : row.badge;
     const content = (
       <>
         <RowLead lead={leadFor(row, index)} />
@@ -343,7 +369,13 @@ export const GestureList: FC<GestureListProps> = ({
         >
           {row.text}
         </Text>
-        {badge ? <Text style={styles.badge}>{badge}</Text> : null}
+        {row.sealed ? (
+          <View style={styles.seal}>
+            <Text style={styles.sealMark}>✓</Text>
+          </View>
+        ) : row.badge ? (
+          <Text style={[styles.badge, row.badgeAccent && styles.badgeAccent]}>{row.badge}</Text>
+        ) : null}
       </>
     );
     return isShelf ? <View style={styles.rolled}>{content}</View> : content;
@@ -385,6 +417,7 @@ export const GestureList: FC<GestureListProps> = ({
       <GestureDetector gesture={gesture}>
         <View style={styles.fill}>
           <ScrollView
+            ref={scrollView}
             bounces={false}
             overScrollMode="never"
             keyboardShouldPersistTaps="handled"
@@ -394,6 +427,7 @@ export const GestureList: FC<GestureListProps> = ({
             onScroll={(event) => {
               const y = event.nativeEvent.contentOffset.y;
               scrollY.value = y;
+              scrollOffset.current = y;
               setAtTop(y <= 0);
             }}
             contentContainerStyle={[styles.content, { paddingBottom: insets.bottom }]}
@@ -434,6 +468,10 @@ export const GestureList: FC<GestureListProps> = ({
                     onDelete={() => onDelete(row.id)}
                     onComplete={onComplete && !row.section ? () => onComplete(row.id) : undefined}
                     onPress={() => press(() => (onOpen ? onOpen(row.id) : setEditingId(row.id)))}
+                    onPressLead={onPressLead && row.section ? () => press(() => onPressLead(row.id)) : undefined}
+                    strikeWidth={strikeFor(row)}
+                    scrollY={scrollY}
+                    onEdge={nudgeScroll}
                     onDragStart={startDrag}
                     onDrop={drop}
                   >
@@ -448,6 +486,7 @@ export const GestureList: FC<GestureListProps> = ({
 
               <Pressable style={styles.tail} disabled={busy} onPress={() => press(() => setAddIndex(endIndex))}>
                 {rowCount === 0 && !busy ? <Text style={styles.hint}>{emptyHint}</Text> : null}
+                {finished && !busy ? <Text style={styles.finis}>❦  FINIS  ❦</Text> : null}
               </Pressable>
             </Animated.View>
             {isShelf ? null : <Roller />}
@@ -490,6 +529,20 @@ const styles = StyleSheet.create({
   sectionText: { fontFamily: fonts.display, fontSize: 26, fontWeight: '400' },
   doneText: { color: colors.inkFaded, textDecorationLine: 'line-through', textDecorationColor: colors.accent },
   badge: { color: colors.inkFaded, fontFamily: fonts.label, fontSize: 11, letterSpacing: 1, marginLeft: 12 },
+  badgeAccent: { color: colors.accent, fontSize: 18 },
+  seal: {
+    width: 30,
+    height: 30,
+    marginLeft: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 15,
+    backgroundColor: colors.remove,
+    borderWidth: 2,
+    borderColor: colors.accent,
+  },
+  sealMark: { color: colors.onAction, fontSize: 14, fontWeight: '700' },
+  finis: { color: colors.accent, fontFamily: fonts.label, fontSize: 12, letterSpacing: 2 },
   tail: { height: ROW_HEIGHT, alignItems: 'center', justifyContent: 'center' },
   tapZone: { flexGrow: 1, minHeight: ROW_HEIGHT },
   hint: { color: colors.inkFaded, fontFamily: fonts.label, fontSize: 11, letterSpacing: 1.2 },

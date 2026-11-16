@@ -25,6 +25,11 @@ const TAP_SLOP = 8;
 const HOLD_TO_DRAG_MS = 320;
 const SPRING = { damping: 22, stiffness: 260 } as const;
 const SHIFT = { duration: 150 } as const;
+/** Width of the margin mark and its padding: a tap here is reported separately from a tap on the text. */
+const LEAD_ZONE = 62;
+/** Holding a dragged row this close to the top or bottom of the screen scrolls the list. */
+const EDGE = 96;
+const NUDGE_EVERY_MS = 220;
 
 /** Shared by every row of one list so rows can make room for the one being dragged. */
 export type ReorderState = {
@@ -55,6 +60,14 @@ type SwipeRowProps = {
   /** Swipe right. Rows without it only rubber-band in that direction. */
   onComplete?: () => void;
   onPress: () => void;
+  /** Tap on the margin mark, when that should do something other than `onPress`. */
+  onPressLead?: () => void;
+  /** Length of the line drawn through the text as the row is swiped towards complete; 0 for none. */
+  strikeWidth?: number;
+  /** The list's scroll offset, so a dragged row stays under the finger while the list scrolls. */
+  scrollY: SharedValue<number>;
+  /** Asked to scroll one step up (-1) or down (1) while a row is held at the edge of the screen. */
+  onEdge: (direction: -1 | 1) => void;
   onDragStart: () => void;
   onDrop: (from: number, to: number) => void;
 };
@@ -71,13 +84,19 @@ export const SwipeRow: FC<SwipeRowProps> = ({
   onDelete,
   onComplete,
   onPress,
+  onPressLead,
+  strikeWidth = 0,
+  scrollY,
+  onEdge,
   onDragStart,
   onDrop,
 }) => {
-  const { width } = useWindowDimensions();
+  const { width, height } = useWindowDimensions();
   const offsetX = useSharedValue(0);
   const armed = useSharedValue(0);
   const dragY = useSharedValue(0);
+  const scrollStart = useSharedValue(0);
+  const lastNudge = useSharedValue(0);
   const lift = useSharedValue(0);
   const canComplete = onComplete !== undefined;
 
@@ -122,6 +141,7 @@ export const SwipeRow: FC<SwipeRowProps> = ({
     onActivate: () => {
       'worklet';
       dragY.value = 0;
+      scrollStart.value = scrollY.value;
       reorder.from.value = index;
       reorder.to.value = index;
       lift.value = withTiming(1, { duration: 120 });
@@ -131,7 +151,14 @@ export const SwipeRow: FC<SwipeRowProps> = ({
       'worklet';
       if (reorder.from.value !== index) return;
       dragY.value = event.translationY;
-      const target = Math.round(index + event.translationY / ROW_HEIGHT);
+      const travelled = event.translationY + scrollY.value - scrollStart.value;
+      const target = Math.round(index + travelled / ROW_HEIGHT);
+      const edge = event.absoluteY > height - EDGE ? 1 : event.absoluteY < EDGE * 1.6 ? -1 : 0;
+      const now = Date.now();
+      if (edge !== 0 && now - lastNudge.value > NUDGE_EVERY_MS) {
+        lastNudge.value = now;
+        scheduleOnRN(onEdge, edge);
+      }
       const to = Math.max(0, Math.min(rowCount - 1, target));
       if (to !== reorder.to.value) {
         reorder.to.value = to;
@@ -143,7 +170,8 @@ export const SwipeRow: FC<SwipeRowProps> = ({
       if (reorder.from.value !== index) return;
       const to = reorder.to.value;
       lift.value = withTiming(0, { duration: 120 });
-      dragY.value = withTiming((to - index) * ROW_HEIGHT, { duration: 120 }, () => {
+      const scrolled = scrollY.value - scrollStart.value;
+      dragY.value = withTiming((to - index) * ROW_HEIGHT - scrolled, { duration: 120 }, () => {
         scheduleOnRN(onDrop, index, to);
       });
     },
@@ -153,9 +181,10 @@ export const SwipeRow: FC<SwipeRowProps> = ({
   const tap = useTapGesture({
     maxDistance: TAP_SLOP,
     maxDuration: HOLD_TO_DRAG_MS,
-    onActivate: () => {
+    onActivate: (event) => {
       'worklet';
-      scheduleOnRN(onPress);
+      if (onPressLead && event.x < LEAD_ZONE) scheduleOnRN(onPressLead);
+      else scheduleOnRN(onPress);
     },
   });
 
@@ -168,7 +197,7 @@ export const SwipeRow: FC<SwipeRowProps> = ({
     const gapShift = gap.index.value >= 0 && index >= gap.index.value ? gap.size.value : 0;
     // While another row is dragged, rows between its origin and its target step aside.
     const aside = from < 0 || isDragged ? 0 : from < index && index <= to ? -1 : to <= index && index < from ? 1 : 0;
-    const dragShift = isDragged ? dragY.value : from < 0 ? 0 : withTiming(aside * ROW_HEIGHT, SHIFT);
+    const dragShift = isDragged ? dragY.value + scrollY.value - scrollStart.value : from < 0 ? 0 : withTiming(aside * ROW_HEIGHT, SHIFT);
     return {
       zIndex: isDragged ? 10 : 0,
       transform: [{ translateY: gapShift }, { translateY: dragShift }, { scale: 1 + lift.value * 0.03 }],
@@ -176,6 +205,10 @@ export const SwipeRow: FC<SwipeRowProps> = ({
     };
   });
   const rowStyle = useAnimatedStyle(() => ({ transform: [{ translateX: offsetX.value }] }));
+  // The strike is drawn left to right as the swipe approaches the point of completing.
+  const strikeStyle = useAnimatedStyle(() => ({
+    transform: [{ scaleX: interpolate(offsetX.value, [0, TRIGGER_DISTANCE], [0, 1], 'clamp') }],
+  }));
   const completeStyle = useAnimatedStyle(() => ({
     opacity: interpolate(offsetX.value, [0, TRIGGER_DISTANCE], [0, 1], 'clamp'),
   }));
@@ -195,7 +228,12 @@ export const SwipeRow: FC<SwipeRowProps> = ({
         <Text style={styles.glyph}>✕</Text>
       </Animated.View>
       <GestureDetector gesture={gesture}>
-        <Animated.View style={[styles.row, { backgroundColor: color }, rowStyle]}>{children}</Animated.View>
+        <Animated.View style={[styles.row, { backgroundColor: color }, rowStyle]}>
+          {children}
+          {strikeWidth > 0 ? (
+            <Animated.View pointerEvents="none" style={[styles.strike, { width: strikeWidth }, strikeStyle]} />
+          ) : null}
+        </Animated.View>
       </GestureDetector>
     </Animated.View>
   );
@@ -219,5 +257,6 @@ const styles = StyleSheet.create({
   action: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, justifyContent: 'center', paddingHorizontal: 24 },
   complete: { backgroundColor: colors.complete, alignItems: 'flex-start' },
   remove: { backgroundColor: colors.remove, alignItems: 'flex-end' },
+  strike: { position: 'absolute', left: LEAD_ZONE, height: 2, backgroundColor: colors.accent, transformOrigin: 'left' },
   glyph: { color: colors.onAction, fontSize: 24, fontWeight: '700' },
 });

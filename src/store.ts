@@ -97,6 +97,38 @@ const move = <T,>(array: T[], from: number, to: number): T[] => {
   return insertAt(rest, to, [moved]);
 };
 
+/** The index of the heading that governs the row at `index`, or -1 above the first heading. */
+const sectionOf = (items: Item[], index: number): number => {
+  for (let i = Math.min(index, items.length - 1); i >= 0; i -= 1) if (items[i]?.section) return i;
+  return -1;
+};
+
+/** Unfolds the section a row sits in, so a row that was just added or moved there stays visible. */
+const reveal = (items: Item[], id: string): Item[] => {
+  const heading = sectionOf(items, items.findIndex((i) => i.id === id));
+  return items.map((item, index) => (index === heading && item.collapsed ? { ...item, collapsed: false } : item));
+};
+
+/**
+ * Moves one row as `move` does, except that a heading takes its items with it and lands on a
+ * section boundary, so it can never split another section.
+ */
+const moveRow = (items: Item[], from: number, to: number): Item[] => {
+  const moved = items[from];
+  const target = items[to];
+  if (!moved || !target || from === to) return items;
+  if (!moved.section) return reveal(move(items, from, to), moved.id);
+  let end = from + 1;
+  while (end < items.length && !items[end]?.section) end += 1;
+  if (to > from && to < end) return items;
+  const group = items.slice(from, end);
+  const rest = [...items.slice(0, from), ...items.slice(end)];
+  let at = rest.indexOf(target) + (to > from ? 1 : 0);
+  if (to > from) while (at < rest.length && !rest[at]?.section) at += 1;
+  else while (at > 0 && !rest[at]?.section) at -= 1;
+  return insertAt(rest, at, group);
+};
+
 export type Undo = { label: string; lists: List[] };
 
 export const useLists = () => {
@@ -173,7 +205,10 @@ export const useLists = () => {
 
   const addItems = useCallback(
     (listId: string, texts: string[], index: number) => {
-      applyToItems(listId, (items) => sinkDone(insertAt(items, index, texts.map(newItem))));
+      const added = texts.map(newItem);
+      const first = added[0];
+      if (!first) return;
+      applyToItems(listId, (items) => sinkDone(reveal(insertAt(items, index, added), first.id)));
     },
     [applyToItems],
   );
@@ -188,7 +223,7 @@ export const useLists = () => {
             i.id !== id
               ? i
               : entry.section
-                ? { id, text: entry.text, done: false, section: true }
+                ? { id, text: entry.text, done: false, section: true, collapsed: i.collapsed }
                 : { id, text: entry.text, done: i.done },
           ),
         ),
@@ -214,7 +249,16 @@ export const useLists = () => {
   );
 
   const moveItem = useCallback(
-    (listId: string, from: number, to: number) => applyToItems(listId, (items) => sinkDone(move(items, from, to))),
+    (listId: string, from: number, to: number) => applyToItems(listId, (items) => sinkDone(moveRow(items, from, to))),
+    [applyToItems],
+  );
+
+  const toggleSection = useCallback(
+    (listId: string, id: string) => {
+      applyToItems(listId, (items) =>
+        items.map((i) => (i.id === id && i.section ? { ...i, collapsed: !i.collapsed } : i)),
+      );
+    },
     [applyToItems],
   );
 
@@ -247,6 +291,7 @@ export const useLists = () => {
     toggleItem,
     deleteItem,
     moveItem,
+    toggleSection,
     uncheckAll,
     clearDone,
   };
