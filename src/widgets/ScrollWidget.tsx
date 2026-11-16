@@ -47,7 +47,7 @@ const ScrollWidget = (props: ScrollWidgetProps, environment: { widgetFamily?: st
           {props.title && props.title.length > 0 ? props.title : 'Library'}
         </Text>
         <Spacer />
-        <Text modifiers={[font({ size: 11, weight: 'medium', design: 'monospaced' }), foregroundStyle(props.faded)]}>
+        <Text modifiers={[font({ size: 11, weight: 'medium', design: 'serif' }), foregroundStyle(props.faded)]}>
           {`${props.remaining ?? 0}`}
         </Text>
       </HStack>
@@ -56,7 +56,7 @@ const ScrollWidget = (props: ScrollWidgetProps, environment: { widgetFamily?: st
       ) : (
         shown.map((text, index) => (
           <HStack key={`${index}-${text}`} spacing={8}>
-            <Text modifiers={[font({ size: 10, weight: 'medium', design: 'monospaced' }), foregroundStyle(props.accent)]}>
+            <Text modifiers={[font({ size: 10, weight: 'medium', design: 'serif' }), foregroundStyle(props.accent)]}>
               {numerals[index] ?? ''}
             </Text>
             <Text modifiers={[font({ size: 14, design: 'serif' }), foregroundStyle(props.ink), lineLimit(1)]}>{text}</Text>

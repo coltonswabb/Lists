@@ -52,6 +52,6 @@ const makeStyles = (colors: Palette) =>
     transform: [{ rotate: '45deg' }],
   },
   block: { alignItems: 'center', borderRadius: 2 },
-  label: { fontFamily: fonts.label, fontSize: 11, letterSpacing: 0.4 },
+  label: { fontFamily: fonts.label, fontSize: 15, letterSpacing: 0.6 },
   letter: { fontFamily: fonts.display, fontSize: 24, lineHeight: 28 },
 });

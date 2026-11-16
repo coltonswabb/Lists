@@ -710,7 +710,7 @@ const makeStyles = (colors: Palette) =>
   back: { color: colors.onDesk, fontSize: 34, lineHeight: 36 },
   title: { color: colors.onDesk, fontFamily: fonts.display, fontSize: 30 },
   titleInput: { flex: 1, padding: 0 },
-  readout: { color: colors.onDeskFaded, fontFamily: fonts.label, fontSize: 11, letterSpacing: 1.2 },
+  readout: { color: colors.onDeskFaded, fontFamily: fonts.label, fontSize: 14, letterSpacing: 1.2 },
   content: { flexGrow: 1 },
   topRoller: { zIndex: 1, marginTop: -6, marginBottom: -ROLLER_HEIGHT / 2 },
   bottomRoller: { zIndex: 1, marginTop: -ROLLER_HEIGHT / 2 },
@@ -734,7 +734,7 @@ const makeStyles = (colors: Palette) =>
   sectionText: { fontFamily: fonts.display, fontSize: 26 },
   rubric: { color: colors.accent },
   doneText: { color: colors.inkFaded, textDecorationLine: 'line-through', textDecorationColor: colors.accent },
-  badge: { color: colors.inkFaded, fontFamily: fonts.label, fontSize: 11, letterSpacing: 1, marginLeft: 12 },
+  badge: { color: colors.inkFaded, fontFamily: fonts.label, fontSize: 14, letterSpacing: 1, marginLeft: 12 },
   badgeAccent: { color: colors.accent, fontSize: 18 },
   seal: {
     width: 30,

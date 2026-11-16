@@ -1,5 +1,4 @@
 import { EBGaramond_500Medium, EBGaramond_500Medium_Italic } from '@expo-google-fonts/eb-garamond';
-import { IBMPlexMono_500Medium } from '@expo-google-fonts/ibm-plex-mono';
 import { PirataOne_400Regular } from '@expo-google-fonts/pirata-one';
 import { useFonts } from 'expo-font';
 import { StatusBar } from 'expo-status-bar';
@@ -258,7 +257,6 @@ const Screens: FC<{ settings: Settings; address: Address }> = ({ settings, addre
 export const App: FC = () => {
   const [fontsLoaded] = useFonts({
     PirataOne_400Regular,
-    IBMPlexMono_500Medium,
     EBGaramond_500Medium,
     EBGaramond_500Medium_Italic,
   });

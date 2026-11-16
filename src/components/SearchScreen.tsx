@@ -69,7 +69,7 @@ const makeStyles = (colors: Palette) =>
   count: {
     color: colors.onDeskFaded,
     fontFamily: fonts.label,
-    fontSize: 11,
+    fontSize: 14,
     letterSpacing: 1.2,
     paddingHorizontal: 20,
     paddingBottom: 8,
@@ -87,5 +87,5 @@ const makeStyles = (colors: Palette) =>
   },
   text: { flex: 1, color: colors.ink, fontFamily: fonts.body, fontSize: 21 },
   done: { color: colors.inkFaded, textDecorationLine: 'line-through', textDecorationColor: colors.accent },
-  source: { maxWidth: 120, color: colors.inkFaded, fontFamily: fonts.label, fontSize: 10, letterSpacing: 1 },
+  source: { maxWidth: 120, color: colors.inkFaded, fontFamily: fonts.label, fontSize: 13, letterSpacing: 1 },
 });

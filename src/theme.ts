@@ -1,13 +1,12 @@
 export const ROW_HEIGHT = 62;
 
 /**
- * Three voices, each with one job: blackletter for names, a monospace for numerals and readouts,
- * and an old-style serif for everything meant to be read: what the user typed, what the scribe says,
- * and anything that can be pressed.
+ * Two hands, as in a manuscript: blackletter for names, and an old-style serif for everything else:
+ * numerals and readouts, what the user typed, what the scribe says, and anything that can be pressed.
  */
 export const fonts = {
   display: 'PirataOne_400Regular',
-  label: 'IBMPlexMono_500Medium',
+  label: 'EBGaramond_500Medium',
   body: 'EBGaramond_500Medium',
   bodyItalic: 'EBGaramond_500Medium_Italic',
 } as const;
