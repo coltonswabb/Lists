@@ -11,6 +11,8 @@ import { pickBackup, shareBackup } from './backup';
 import { ChronicleScreen } from './components/ChronicleScreen';
 import { DayNightVeil } from './components/DayNightVeil';
 import { DeskThings } from './components/DeskThings';
+import { PatternSheet } from './components/PatternSheet';
+import { SealPress } from './components/SealPress';
 import { tick } from './haptics';
 import { Desk } from './components/Desk';
 import { GestureList, type GestureListActions, type GestureListRow, STAMP_DELAY_MS } from './components/GestureList';
@@ -24,6 +26,7 @@ import { SettingsScreen } from './components/SettingsScreen';
 import { UndoToast } from './components/UndoToast';
 import { formatReminder } from './reminder';
 import { syncReminders } from './reminders';
+import { usePatterns } from './patterns';
 import { type Address, say, standing } from './scribe';
 import { useSettings } from './settings';
 import { ThemeProvider, useTheme } from './ThemeContext';
@@ -73,6 +76,12 @@ const Screens: FC<{ settings: Settings; address: Address; onCandle: () => void }
   const { colors, styles } = useTheme(makeStyles);
   const insets = useSafeAreaInsets();
   const store = useLists();
+  const { patterns, keep: keepPattern, forget: forgetPattern } = usePatterns();
+  /** The Library's sheet offering a blank scroll or a kept pattern. */
+  const [choosing, setChoosing] = useState(false);
+  /** Counts the seals pressed, so each press is its own animation; null when none is showing. */
+  const [sealing, setSealing] = useState<number | null>(null);
+  const pressSeal = () => setSealing((last) => (last ?? 0) + 1);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [chronicleOpen, setChronicleOpen] = useState(false);
   /** When this visit began: a scroll counts as dusty by that moment, so the shelf doesn't change as time ticks. */
@@ -254,7 +263,10 @@ const Screens: FC<{ settings: Settings; address: Address; onCandle: () => void }
               else playNote(items.length - remaining);
             }
             if (finishing) say(remaining === 1 ? 'finish' : 'complete');
-            if (finishing && remaining === 1) setFreshSeal(openList.id);
+            if (finishing && remaining === 1) {
+              setFreshSeal(openList.id);
+              pressSeal();
+            }
             store.toggleItem(openList.id, id);
           }}
           onPressLead={(id) => {
@@ -293,6 +305,20 @@ const Screens: FC<{ settings: Settings; address: Address; onCandle: () => void }
                     {openList.daily ? 'Renewed at dawn' : 'Renew at dawn'}
                   </Text>
                 </Pressable>
+                <Pressable
+                  onPress={() => {
+                    say('pattern');
+                    keepPattern(openList);
+                  }}
+                  hitSlop={8}
+                  style={[styles.stamp, patterns.some((pattern) => pattern.name === openList.name) && styles.stampOn]}
+                  accessibilityRole="button"
+                  accessibilityLabel="Keep as a pattern"
+                >
+                  <Text style={[styles.stampText, patterns.some((pattern) => pattern.name === openList.name) && styles.stampTextOn]}>
+                    {patterns.some((pattern) => pattern.name === openList.name) ? 'Pattern kept' : 'Keep as a pattern'}
+                  </Text>
+                </Pressable>
                 {items.some((item) => item.done) ? (
                   <Pressable
                     onPress={() => store.uncheckAll(openList.id)}
@@ -320,6 +346,7 @@ const Screens: FC<{ settings: Settings; address: Address; onCandle: () => void }
           }}
         />
         <UndoToast undo={store.undo} onUndo={undoLast} onDismiss={store.dismissUndo} offset={44} />
+        {sealing !== null ? <SealPress key={sealing} onDone={() => setSealing(null)} /> : null}
       </>
     );
   }
@@ -337,7 +364,8 @@ const Screens: FC<{ settings: Settings; address: Address; onCandle: () => void }
         key="shelf"
         actions={shelf}
         title="Library"
-        readout={`${roman(store.lists.length)} ROTULI`}
+        // Latin for scrolls; one scroll is a rotulus.
+        readout={`${roman(store.lists.length)} ${store.lists.length === 1 ? 'ROTULUS' : 'ROTULI'}`}
         variant="shelf"
         placeholder="New scroll"
         emptyHint="Pull down or tap to add a scroll"
@@ -368,8 +396,8 @@ const Screens: FC<{ settings: Settings; address: Address; onCandle: () => void }
         onMove={store.moveList}
         onOpen={setOpenListId}
         onComplete={(id) => {
-          play('seal');
           say('seal');
+          pressSeal();
           store.sealList(id);
         }}
       />
@@ -379,8 +407,30 @@ const Screens: FC<{ settings: Settings; address: Address; onCandle: () => void }
         night={settings.theme === 'vigil'}
         onPen={() => {
           tick();
+          // With patterns kept, the scribe first asks which sheet to cut.
+          if (patterns.length > 0) {
+            setChoosing(true);
+            return;
+          }
           say('penning');
           shelf.current?.add();
+        }}
+      />
+      <PatternSheet
+        open={choosing}
+        patterns={patterns}
+        onClose={() => setChoosing(false)}
+        onForget={(pattern) => forgetPattern(pattern.id)}
+        onBlank={() => {
+          setChoosing(false);
+          say('penning');
+          shelf.current?.add();
+        }}
+        onPattern={(pattern) => {
+          setChoosing(false);
+          say('fromPattern');
+          play('paper');
+          store.addListFrom(pattern.name, pattern.lines);
         }}
       />
       <View style={[styles.controls, { paddingBottom: insets.bottom + 12 }]}>
@@ -395,6 +445,7 @@ const Screens: FC<{ settings: Settings; address: Address; onCandle: () => void }
         </Pressable>
       </View>
       <UndoToast undo={store.undo} onUndo={undoLast} onDismiss={store.dismissUndo} offset={44} />
+      {sealing !== null ? <SealPress key={sealing} onDone={() => setSealing(null)} /> : null}
     </>
   );
 };

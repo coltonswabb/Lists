@@ -326,6 +326,17 @@ export const useLists = () => {
     [apply],
   );
 
+  /** Lays a new scroll at the end of the shelf, already written with the given lines, none of them done. */
+  const addListFrom = useCallback(
+    (name: string, lines: { text: string; section?: boolean }[]) => {
+      const items: Item[] = lines.map((line) =>
+        line.section ? { id: newId(), text: line.text, done: false, section: true } : { id: newId(), text: line.text, done: false },
+      );
+      apply((all) => [...all, { id: newId(), name, items, touchedAt: Date.now() }]);
+    },
+    [apply],
+  );
+
   const renameList = useCallback(
     (id: string, name: string) => apply((all) => all.map((l) => (l.id === id ? { ...l, name } : l))),
     [apply],
@@ -545,6 +556,7 @@ export const useLists = () => {
     dismissUndo,
     renew,
     addLists,
+    addListFrom,
     renameList,
     deleteList,
     moveList,
