@@ -529,7 +529,7 @@ export const GestureList: FC<GestureListProps> = ({
         </View>
       )}
       <GestureDetector gesture={gesture}>
-        <View style={styles.fill}>
+        <View style={styles.viewport}>
           <Animated.Text style={[styles.clearHint, clearHintStyle]}>
             {clearArmed ? 'Release to clear the finished' : 'Pull to clear the finished'}
           </Animated.Text>
@@ -645,6 +645,8 @@ const makeStyles = (colors: Palette) =>
   StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.desk },
   fill: { flex: 1 },
+  // Clipped, so rows lifted by a pull-up slide under the top roll instead of over the title.
+  viewport: { flex: 1, overflow: 'hidden' },
   header: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 20, height: 56 },
   back: { color: colors.onDesk, fontSize: 34, lineHeight: 36 },
   title: { color: colors.onDesk, fontFamily: fonts.display, fontSize: 30 },
