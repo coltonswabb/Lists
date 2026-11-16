@@ -584,9 +584,9 @@ export const GestureList: FC<GestureListProps> = ({
           </>
         )}
         <View style={[styles.rolled, { backgroundColor: paperFor(index) }]}>
-          {/* Light from above: the roll is brighter along its shoulder and falls into shade beneath. */}
-          <LinearGradient colors={ROLL_LIGHT} locations={ROLL_LIGHT_AT} style={styles.rollLight} pointerEvents="none" />
           {content}
+          {/* Light from above, laid over everything on the roll, so the painted initial curves with the paper it is on. */}
+          <LinearGradient colors={ROLL_LIGHT} locations={ROLL_LIGHT_AT} style={styles.rollLight} pointerEvents="none" />
         </View>
         {hasFinial(colors.name) ? (
           <Finial paper={colors.name} side="right" length={34} tuck={18} />

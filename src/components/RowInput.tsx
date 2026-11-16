@@ -99,7 +99,6 @@ export const RowInput: FC<RowInputProps> = ({ leadFor, paper, placeholder, initi
       {/* A scroll being named lies on the shelf like the others: rounded by the light, with its rod's ends showing. */}
       {rolled && hasFinial(colors.name) ? <Finial paper={colors.name} side="left" length={34} tuck={18} /> : null}
       <View style={[styles.inner, rolled && styles.rolledInner, rolled && { backgroundColor: paper }]}>
-        {rolled ? <LinearGradient colors={ROLL_LIGHT} locations={ROLL_LIGHT_AT} style={styles.rollLight} pointerEvents="none" /> : null}
         <RowLead lead={leadFor(text)} />
         <TextInput
           ref={input}
@@ -117,6 +116,7 @@ export const RowInput: FC<RowInputProps> = ({ leadFor, paper, placeholder, initi
           selectionColor={colors.accent}
           style={styles.input}
         />
+        {rolled ? <LinearGradient colors={ROLL_LIGHT} locations={ROLL_LIGHT_AT} style={styles.rollLight} pointerEvents="none" /> : null}
       </View>
       {rolled && hasFinial(colors.name) ? <Finial paper={colors.name} side="right" length={34} tuck={18} /> : null}
     </View>
