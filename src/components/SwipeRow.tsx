@@ -38,6 +38,12 @@ export type ReorderState = {
   from: SharedValue<number>;
   /** Index it would land on if dropped now. */
   to: SharedValue<number>;
+  /** How many rows travel together: 1, or a heading plus the rows under it. */
+  span: SharedValue<number>;
+  /** Finger travel since the drag began. */
+  dragY: SharedValue<number>;
+  /** Scroll offset when the drag began, so the rows stay under the finger while the list scrolls. */
+  scrollStart: SharedValue<number>;
 };
 
 /** A gap opened by pinching: rows at or after `index` slide down by `size`. */
@@ -54,6 +60,8 @@ type SwipeRowProps = {
   /** Number of rows in the list; a dragged row can land on any of them. */
   rowCount: number;
   draggable: boolean;
+  /** Rows that move when this one is dragged: itself, plus the rows under it if it is a heading. */
+  groupSize: number;
   reorder: ReorderState;
   gap: GapState;
   animateLayout: boolean;
@@ -79,6 +87,7 @@ export const SwipeRow: FC<SwipeRowProps> = ({
   index,
   rowCount,
   draggable,
+  groupSize,
   reorder,
   gap,
   animateLayout,
@@ -96,8 +105,7 @@ export const SwipeRow: FC<SwipeRowProps> = ({
   const { width, height } = useWindowDimensions();
   const offsetX = useSharedValue(0);
   const armed = useSharedValue(0);
-  const dragY = useSharedValue(0);
-  const scrollStart = useSharedValue(0);
+  const { dragY, scrollStart } = reorder;
   const lastNudge = useSharedValue(0);
   const lift = useSharedValue(0);
   const canComplete = onComplete !== undefined;
@@ -146,6 +154,7 @@ export const SwipeRow: FC<SwipeRowProps> = ({
       scrollStart.value = scrollY.value;
       reorder.from.value = index;
       reorder.to.value = index;
+      reorder.span.value = groupSize;
       lift.value = withTiming(1, { duration: 120 });
       scheduleOnRN(onDragStart);
     },
@@ -161,7 +170,7 @@ export const SwipeRow: FC<SwipeRowProps> = ({
         lastNudge.value = now;
         scheduleOnRN(onEdge, edge);
       }
-      const to = Math.max(0, Math.min(rowCount - 1, target));
+      const to = Math.max(0, Math.min(rowCount - groupSize, target));
       if (to !== reorder.to.value) {
         reorder.to.value = to;
         scheduleOnRN(tick);
@@ -174,7 +183,8 @@ export const SwipeRow: FC<SwipeRowProps> = ({
       lift.value = withTiming(0, { duration: 120 });
       const scrolled = scrollY.value - scrollStart.value;
       dragY.value = withTiming((to - index) * ROW_HEIGHT - scrolled, { duration: 120 }, () => {
-        scheduleOnRN(onDrop, index, to);
+        // A group moving down lands after the row its last member has passed.
+        scheduleOnRN(onDrop, index, to > index ? Math.min(rowCount - 1, to + groupSize - 1) : to);
       });
     },
   });
@@ -195,14 +205,16 @@ export const SwipeRow: FC<SwipeRowProps> = ({
   const containerStyle = useAnimatedStyle(() => {
     const from = reorder.from.value;
     const to = reorder.to.value;
-    const isDragged = from === index;
+    const span = reorder.span.value;
+    const isDragged = from >= 0 && index >= from && index < from + span;
     const gapShift = gap.index.value >= 0 && index >= gap.index.value ? gap.size.value : 0;
     // While another row is dragged, rows between its origin and its target step aside.
-    const aside = from < 0 || isDragged ? 0 : from < index && index <= to ? -1 : to <= index && index < from ? 1 : 0;
+    const aside =
+      from < 0 || isDragged ? 0 : index >= from + span && index <= to + span - 1 ? -span : to <= index && index < from ? span : 0;
     const dragShift = isDragged ? dragY.value + scrollY.value - scrollStart.value : from < 0 ? 0 : withTiming(aside * ROW_HEIGHT, SHIFT);
     return {
       zIndex: isDragged ? 10 : 0,
-      transform: [{ translateY: gapShift }, { translateY: dragShift }, { scale: 1 + lift.value * 0.03 }],
+      transform: [{ translateY: gapShift }, { translateY: dragShift }, { scale: 1 + (from === index ? lift.value * 0.03 : 0) }],
       shadowOpacity: lift.value * 0.35,
     };
   });

@@ -8,8 +8,11 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { GestureList, type GestureListRow, STAMP_DELAY_MS } from './components/GestureList';
+import { ScribeLine } from './components/ScribeLine';
+import { ScribeWelcome } from './components/ScribeWelcome';
 import { SearchScreen } from './components/SearchScreen';
 import { UndoToast } from './components/UndoToast';
+import { type Address, say, standing } from './scribe';
 import { useSettings } from './settings';
 import { ThemeProvider, useTheme } from './ThemeContext';
 import { play } from './sounds';
@@ -47,12 +50,22 @@ const scrollRows = (items: Item[]): { rows: GestureListRow[]; visible: Item[] } 
 
 type Settings = ReturnType<typeof useSettings>;
 
-const Screens: FC<{ settings: Settings }> = ({ settings }) => {
+const Screens: FC<{ settings: Settings; address: Address }> = ({ settings, address }) => {
   const { styles } = useTheme(makeStyles);
   const insets = useSafeAreaInsets();
   const store = useLists();
   // The scroll whose last item was just finished: its seal is stamped on when the shelf next appears.
   const [freshSeal, setFreshSeal] = useState<string | null>(null);
+  // The scribe greets once per visit, then waits for instructions.
+  const [greeted, setGreeted] = useState(false);
+  useEffect(() => {
+    const timer = setTimeout(() => setGreeted(true), 4000);
+    return () => clearTimeout(timer);
+  }, []);
+  const undoLast = () => {
+    say('restore');
+    store.undoLast();
+  };
   const [openListId, setOpenListId] = useState<string | null>(null);
   const [searching, setSearching] = useState(false);
   const openList = store.lists.find((list) => list.id === openListId);
@@ -110,16 +123,26 @@ const Screens: FC<{ settings: Settings }> = ({ settings }) => {
           placeholder="New item"
           emptyHint="PULL DOWN OR TAP TO ADD"
           rows={rows}
-          onAdd={(texts, index) => store.addItems(openList.id, texts, positionOf(index))}
+          subheader={
+            <ScribeLine
+              standing={items.length === 0 ? standing.blank(address) : remaining === 0 ? standing.done(address) : ''}
+            />
+          }
+          onAdd={(texts, index) => {
+            say('add');
+            store.addItems(openList.id, texts, positionOf(index));
+          }}
           onRename={(id, text) => store.renameItem(openList.id, id, text)}
           onDelete={(id) => {
             play('seal');
+            say('strike');
             store.deleteItem(openList.id, id);
           }}
           onMove={(from, to) => store.moveItem(openList.id, positionOf(from), positionOf(to))}
           onComplete={(id) => {
             const finishing = !openList.items.find((item) => item.id === id)?.done;
             if (finishing) play('lute');
+            if (finishing) say(remaining === 1 ? 'finish' : 'complete');
             if (finishing && remaining === 1) setFreshSeal(openList.id);
             store.toggleItem(openList.id, id);
           }}
@@ -139,7 +162,7 @@ const Screens: FC<{ settings: Settings }> = ({ settings }) => {
             ) : null
           }
         />
-        <UndoToast undo={store.undo} onUndo={store.undoLast} onDismiss={store.dismissUndo} offset={0} />
+        <UndoToast undo={store.undo} onUndo={undoLast} onDismiss={store.dismissUndo} offset={0} />
       </>
     );
   }
@@ -161,10 +184,20 @@ const Screens: FC<{ settings: Settings }> = ({ settings }) => {
           const sealed = items.length > 0 && open === 0;
           return { id: list.id, text: list.name, badge: roman(open), sealed, stamp: sealed && list.id === freshSeal };
         })}
-        onAdd={store.addLists}
+        subheader={
+          <ScribeLine
+            standing={greeted ? standing.decree(address) : standing.welcome(address)}
+            onPress={() => settings.chooseAddress(null)}
+          />
+        }
+        onAdd={(names, index) => {
+          say('newScroll');
+          store.addLists(names, index);
+        }}
         onRename={store.renameList}
         onDelete={(id) => {
           play('seal');
+          say('strike');
           store.deleteList(id);
         }}
         onMove={store.moveList}
@@ -181,7 +214,7 @@ const Screens: FC<{ settings: Settings }> = ({ settings }) => {
           <Text style={styles.deskLabel}>{settings.sound ? 'SOUND ON' : 'SOUND OFF'}</Text>
         </Pressable>
       </View>
-      <UndoToast undo={store.undo} onUndo={store.undoLast} onDismiss={store.dismissUndo} offset={44} />
+      <UndoToast undo={store.undo} onUndo={undoLast} onDismiss={store.dismissUndo} offset={44} />
     </>
   );
 };
@@ -195,7 +228,11 @@ export const App: FC = () => {
       <SafeAreaProvider>
         <ThemeProvider value={palette}>
           <StatusBar style="light" />
-          {fontsLoaded ? <Screens settings={settings} /> : null}
+          {!fontsLoaded || !settings.loaded ? null : settings.address ? (
+            <Screens settings={settings} address={settings.address} />
+          ) : (
+            <ScribeWelcome onChoose={settings.chooseAddress} />
+          )}
         </ThemeProvider>
       </SafeAreaProvider>
     </GestureHandlerRootView>

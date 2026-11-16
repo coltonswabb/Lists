@@ -19,6 +19,7 @@ import Animated, {
   Easing,
   interpolate,
   useAnimatedStyle,
+  useDerivedValue,
   useSharedValue,
   withSpring,
   withTiming,
@@ -32,7 +33,7 @@ import { play } from '../sounds';
 import { useTheme } from '../ThemeContext';
 import { accentAt, fonts, type Palette, paperAt, roman, ROW_HEIGHT } from '../theme';
 import { PaperOverlay } from './PaperOverlay';
-import { Roller } from './Roller';
+import { Roller, ROLLER_HEIGHT } from './Roller';
 import { RowInput } from './RowInput';
 import { LEAD_WIDTH, type Lead, RowLead } from './RowLead';
 import { SwipeRow } from './SwipeRow';
@@ -87,6 +88,8 @@ type GestureListProps = {
   placeholder: string;
   emptyHint: string;
   footer?: ReactNode;
+  /** Shown under the title, above the rows. */
+  subheader?: ReactNode;
   onAdd: (texts: string[], index: number) => void;
   onRename: (id: string, text: string) => void;
   onDelete: (id: string) => void;
@@ -108,6 +111,7 @@ export const GestureList: FC<GestureListProps> = ({
   placeholder,
   emptyHint,
   footer,
+  subheader,
   onAdd,
   onRename,
   onDelete,
@@ -133,8 +137,18 @@ export const GestureList: FC<GestureListProps> = ({
   const pull = useSharedValue(0);
   const armed = useSharedValue<PullAction>('none');
   const scrollY = useSharedValue(0);
+  const contentHeight = useSharedValue(0);
+  const viewportHeight = useSharedValue(0);
+  // The top roll fattens as the scroll is wound onto it.
+  const wound = useDerivedValue(() => {
+    const range = contentHeight.value - viewportHeight.value;
+    return range > 0 ? Math.max(0, Math.min(1, scrollY.value / range)) : 0;
+  });
   const dragFrom = useSharedValue(-1);
   const dragTo = useSharedValue(-1);
+  const dragSpan = useSharedValue(1);
+  const dragY = useSharedValue(0);
+  const dragScrollStart = useSharedValue(0);
   const gapIndex = useSharedValue(-1);
   const gapSize = useSharedValue(0);
 
@@ -155,6 +169,17 @@ export const GestureList: FC<GestureListProps> = ({
     count = row.section ? 0 : count + 1;
     numbers[index] = count;
   });
+
+  // A heading drags the rows under it along, up to the next heading.
+  const groupSizes = rows.map((row, index) => {
+    if (!row.section) return 1;
+    let end = index + 1;
+    while (end < rowCount && !rows[end]?.section) end += 1;
+    return end - index;
+  });
+
+  // As a scribe marks a new passage, the first open item under each heading begins with a red letter.
+  const rubricated = rows.map((row, index) => !isShelf && !row.section && !row.done && rows[index - 1]?.section === true);
 
   const itemRows = rows.filter((row) => !row.section);
   const finished = !isShelf && itemRows.length > 0 && itemRows.every((row) => row.done);
@@ -381,7 +406,8 @@ export const GestureList: FC<GestureListProps> = ({
           style={[styles.rowText, styles.fill, row.section && styles.sectionText, row.done && styles.doneText]}
           numberOfLines={1}
         >
-          {row.text}
+          {rubricated[index] ? <Text style={styles.rubric}>{row.text.charAt(0)}</Text> : null}
+          {rubricated[index] ? row.text.slice(1) : row.text}
         </Text>
         {row.sealed ? (
           <Animated.View
@@ -395,7 +421,17 @@ export const GestureList: FC<GestureListProps> = ({
         ) : null}
       </>
     );
-    return isShelf ? <View style={[styles.rolled, { backgroundColor: paperFor(index) }]}>{content}</View> : content;
+    if (!isShelf) return content;
+    // A rolled scroll lying on the shelf: the same handles as an open one, seen end to end.
+    return (
+      <View style={styles.rolledScroll}>
+        <View style={styles.knob} />
+        <View style={styles.collar} />
+        <View style={[styles.rolled, { backgroundColor: paperFor(index) }]}>{content}</View>
+        <View style={styles.collar} />
+        <View style={styles.knob} />
+      </View>
+    );
   };
 
   return (
@@ -426,9 +462,10 @@ export const GestureList: FC<GestureListProps> = ({
         )}
         <Text style={styles.readout}>{readout}</Text>
       </View>
+      {subheader}
       {isShelf ? null : (
         <View style={styles.topRoller}>
-          <Roller paper={colors.paperFrom} />
+          <Roller paper={colors.paperFrom} fullness={wound} />
         </View>
       )}
       <GestureDetector gesture={gesture}>
@@ -441,6 +478,12 @@ export const GestureList: FC<GestureListProps> = ({
             automaticallyAdjustKeyboardInsets
             scrollEnabled={!dragging}
             scrollEventThrottle={16}
+            onLayout={(event) => {
+              viewportHeight.value = event.nativeEvent.layout.height;
+            }}
+            onContentSizeChange={(_, height) => {
+              contentHeight.value = height;
+            }}
             onScroll={(event) => {
               const y = event.nativeEvent.contentOffset.y;
               scrollY.value = y;
@@ -480,7 +523,8 @@ export const GestureList: FC<GestureListProps> = ({
                     index={index}
                     rowCount={rowCount}
                     draggable={!row.done}
-                    reorder={{ from: dragFrom, to: dragTo }}
+                    reorder={{ from: dragFrom, to: dragTo, span: dragSpan, dragY, scrollStart: dragScrollStart }}
+                    groupSize={groupSizes[index] ?? 1}
                     gap={{ index: gapIndex, size: gapSize }}
                     animateLayout={!dragging}
                     onDelete={() => onDelete(row.id)}
@@ -531,26 +575,27 @@ const makeStyles = (colors: Palette) =>
   titleInput: { flex: 1, padding: 0 },
   readout: { color: colors.onDeskFaded, fontFamily: fonts.label, fontSize: 11, letterSpacing: 1.2 },
   content: { flexGrow: 1 },
-  topRoller: { zIndex: 1, marginBottom: -12 },
-  bottomRoller: { zIndex: 1, marginTop: -12 },
+  topRoller: { zIndex: 1, marginTop: -6, marginBottom: -ROLLER_HEIGHT / 2 },
+  bottomRoller: { zIndex: 1, marginTop: -ROLLER_HEIGHT / 2 },
   sheet: { marginHorizontal: 20, overflow: 'hidden', backgroundColor: colors.paperTo },
   shelf: { paddingTop: 4 },
   pullSpace: { justifyContent: 'flex-end', overflow: 'hidden' },
   pullRow: { height: ROW_HEIGHT, justifyContent: 'center', paddingHorizontal: 16, backgroundColor: colors.accent },
   pullText: { color: colors.paperFrom, fontFamily: fonts.label, fontSize: 12, letterSpacing: 1.6 },
+  rolledScroll: { flex: 1, flexDirection: 'row', alignItems: 'center', marginHorizontal: -10 },
+  collar: { width: 4, height: 54, borderRadius: 1, backgroundColor: colors.gold },
+  knob: { width: 8, height: 8, borderRadius: 4, backgroundColor: colors.accent },
   rolled: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     height: 48,
     paddingHorizontal: 12,
-    borderRadius: 4,
-    borderLeftWidth: 6,
-    borderRightWidth: 6,
-    borderColor: colors.gold,
+    borderRadius: 3,
   },
   rowText: { color: colors.ink, fontSize: 18, fontWeight: '500' },
   sectionText: { fontFamily: fonts.display, fontSize: 26, fontWeight: '400' },
+  rubric: { color: colors.accent, fontWeight: '700' },
   doneText: { color: colors.inkFaded, textDecorationLine: 'line-through', textDecorationColor: colors.accent },
   badge: { color: colors.inkFaded, fontFamily: fonts.label, fontSize: 11, letterSpacing: 1, marginLeft: 12 },
   badgeAccent: { color: colors.accent, fontSize: 18 },

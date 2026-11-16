@@ -13,6 +13,7 @@ A gesture-driven list app built with Expo and React Native.
 - Tap a section's painted initial to fold it away. Dragging a section heading moves its items with it.
 - Holding a dragged row at the top or bottom edge scrolls the list.
 - "Search" on the shelf finds items across every scroll; "Sound" turns the effects on or off.
+- A scribe greets you and remarks on what you do. It asks how to address you on first launch; tap its line on the shelf to change that.
 - The theme name at the bottom of the shelf cycles through five paper themes.
 - "Unmark all" resets a reusable list; "Clear done" removes finished items.
 
