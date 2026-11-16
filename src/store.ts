@@ -44,23 +44,26 @@ const newItem = (raw: string): Item => {
   return { id: newId(), text: reminder.text, done: false, remindAt: reminder.remindAt };
 };
 
-/** Shown on first launch only: each item teaches the gesture it names. */
+/**
+ * Shown on first launch only: the scribe's own first decree, each line teaching the gesture it names.
+ * Lines stay under about 30 characters so none is cut short on a phone.
+ */
 const starterLists = (): List[] => [
   {
     id: newId(),
-    name: 'Read me first',
+    name: 'Thy first decree',
     items: [
-      'Gestures:',
-      'Swipe me right to complete',
-      'Swipe me left to delete',
-      'Tap me to rename',
-      'Hold and drag me to reorder',
-      'Adding:',
-      'Pull down to add a row',
-      'Pinch apart to add a row',
-      'A colon at the end adds a section',
-      'End with “@ 5pm” to be reminded',
-      'Pull far down to close the scroll',
+      'Striking:',
+      'Swipe right to strike it done',
+      'Swipe left to cast it out',
+      'Tap to amend the wording',
+      'Hold, then drag to reorder',
+      'Writing:',
+      'Pull down to pen a new line',
+      'Pinch apart to write between',
+      'End with a colon for a heading',
+      'Write “@ 5pm” to be reminded',
+      'Pull far down to roll me up',
     ].map(newItem),
   },
 ];
