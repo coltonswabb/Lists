@@ -35,6 +35,20 @@ const ScrollWidget = (props: ScrollWidgetProps, environment: { widgetFamily?: st
   const shown = items.slice(0, family === 'systemLarge' ? 9 : family === 'systemMedium' ? 3 : 4);
   const numerals = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX'];
   const more = (props.remaining ?? 0) - shown.length;
+  // Counted in numerals, as in the app. Defined here because a widget may use nothing from module scope.
+  const roman = (count: number) => {
+    if (count <= 0) return 'NIL';
+    const marks: [number, string][] = [[1000, 'M'], [900, 'CM'], [500, 'D'], [400, 'CD'], [100, 'C'], [90, 'XC'], [50, 'L'], [40, 'XL'], [10, 'X'], [9, 'IX'], [5, 'V'], [4, 'IV'], [1, 'I']];
+    let left = count;
+    let out = '';
+    for (const [value, mark] of marks) {
+      while (left >= value) {
+        out += mark;
+        left -= value;
+      }
+    }
+    return out;
+  };
 
   return (
     <VStack
@@ -48,7 +62,7 @@ const ScrollWidget = (props: ScrollWidgetProps, environment: { widgetFamily?: st
         </Text>
         <Spacer />
         <Text modifiers={[font({ size: 11, weight: 'medium', design: 'serif' }), foregroundStyle(props.faded)]}>
-          {`${props.remaining ?? 0}`}
+          {roman(props.remaining ?? 0)}
         </Text>
       </HStack>
       {shown.length === 0 ? (
@@ -65,7 +79,7 @@ const ScrollWidget = (props: ScrollWidgetProps, environment: { widgetFamily?: st
         ))
       )}
       {more > 0 ? (
-        <Text modifiers={[font({ size: 11, design: 'serif' }), foregroundStyle(props.faded)]}>{`and ${more} more`}</Text>
+        <Text modifiers={[font({ size: 11, design: 'serif' }), foregroundStyle(props.faded)]}>{`and ${roman(more)} more`}</Text>
       ) : null}
       <Spacer />
     </VStack>
