@@ -45,6 +45,8 @@ import { success, thud, tick } from '../haptics';
 import { play } from '../sounds';
 import { useTheme } from '../ThemeContext';
 import { accentAt, fonts, type Palette, paperAt, roman, ROW_HEIGHT } from '../theme';
+import { DeckleEdge } from './DeckleEdge';
+import { Finial, hasFinial } from './Finial';
 import { PaperOverlay } from './PaperOverlay';
 import { Roller, ROLLER_HEIGHT } from './Roller';
 import { RowInput } from './RowInput';
@@ -563,15 +565,27 @@ export const GestureList: FC<GestureListProps> = ({
     // A rolled scroll lying on the shelf: the same handles as an open one, seen end to end.
     return (
       <View style={styles.rolledScroll}>
-        <View style={styles.knob} />
-        <View style={styles.collar} />
+        {hasFinial(colors.name) ? (
+          <Finial paper={colors.name} side="left" length={34} tuck={18} />
+        ) : (
+          <>
+            <View style={styles.knob} />
+            <View style={styles.collar} />
+          </>
+        )}
         <View style={[styles.rolled, { backgroundColor: paperFor(index) }]}>
           {/* Light from above: the roll is brighter along its shoulder and falls into shade beneath. */}
           <LinearGradient colors={ROLL_LIGHT} locations={ROLL_LIGHT_AT} style={styles.rollLight} pointerEvents="none" />
           {content}
         </View>
-        <View style={styles.collar} />
-        <View style={styles.knob} />
+        {hasFinial(colors.name) ? (
+          <Finial paper={colors.name} side="right" length={34} tuck={18} />
+        ) : (
+          <>
+            <View style={styles.collar} />
+            <View style={styles.knob} />
+          </>
+        )}
       </View>
     );
   };
@@ -734,6 +748,8 @@ export const GestureList: FC<GestureListProps> = ({
                 {finished && !busy ? <Text style={styles.finis}>❦  Finis  ❦</Text> : null}
               </Pressable>
               {isShelf ? null : <PaperOverlay />}
+              {isShelf ? null : <DeckleEdge side="left" />}
+              {isShelf ? null : <DeckleEdge side="right" />}
             </Animated.View>
             {isShelf ? null : (
               <View style={styles.bottomRoller}>
@@ -769,7 +785,7 @@ const makeStyles = (colors: Palette) =>
   pullSpace: { justifyContent: 'flex-end', overflow: 'hidden' },
   pullRow: { height: ROW_HEIGHT, justifyContent: 'center', paddingHorizontal: 16, backgroundColor: colors.accent },
   pullText: { color: colors.paperFrom, fontFamily: fonts.bodyItalic, fontSize: 19 },
-  rolledScroll: { flex: 1, flexDirection: 'row', alignItems: 'center', marginHorizontal: -10 },
+  rolledScroll: { flex: 1, flexDirection: 'row', alignItems: 'center', marginHorizontal: -14 },
   collar: { width: 4, height: 54, borderRadius: 1, backgroundColor: colors.gold },
   knob: { width: 8, height: 8, borderRadius: 4, backgroundColor: colors.accent },
   rolled: {
@@ -779,6 +795,7 @@ const makeStyles = (colors: Palette) =>
     height: 48,
     paddingHorizontal: 12,
     borderRadius: 3,
+    zIndex: 1,
   },
   rollLight: { ...StyleSheet.absoluteFill, borderRadius: 3 },
   rowText: { color: colors.ink, fontFamily: fonts.body, fontSize: 21 },

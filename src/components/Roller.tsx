@@ -5,9 +5,13 @@ import Animated, { type SharedValue, useAnimatedStyle } from 'react-native-reani
 
 import { useTheme } from '../ThemeContext';
 import { mixColors, type Palette } from '../theme';
+import { Finial, hasFinial } from './Finial';
 
 const THIN = 22;
 const FULL = 34;
+/** A painted end cap's length, and how much of its collar sits under the roll. Together they leave the roll 4pt proud of the sheet. */
+const FINIAL = 36;
+const FINIAL_TUCK = 20;
 const SHADOW = 'rgba(0,0,0,0.3)';
 const CLEAR = 'rgba(0,0,0,0)';
 
@@ -39,22 +43,29 @@ export const Roller: FC<RollerProps> = ({ paper, fullness }) => {
   const { colors, styles } = useTheme(makeStyles);
   const rollStyle = useAnimatedStyle(() => ({ height: THIN + (FULL - THIN) * (fullness?.value ?? 0) }));
   const collar = cylinderOf(colors.gold, colors.desk);
-  return (
-    <View style={styles.roller}>
+  const painted = hasFinial(colors.name);
+  const plainEnd = (
+    <>
       <View style={styles.knob}>
         <View style={styles.glint} />
       </View>
       <LinearGradient colors={collar} locations={CURVE} style={styles.collar} />
+    </>
+  );
+  return (
+    <View style={[styles.roller, painted && styles.rollerPainted]}>
+      {painted ? <Finial paper={colors.name} side="left" length={FINIAL} tuck={FINIAL_TUCK} /> : plainEnd}
       <Animated.View style={[styles.roll, rollStyle]}>
         <LinearGradient colors={cylinderOf(paper, colors.desk)} locations={CURVE} style={styles.paper} />
         {/* The edge of the wound sheet, seen where it laps over itself. */}
         <View style={styles.lap} />
         <LinearGradient colors={[SHADOW, CLEAR]} style={styles.shadow} pointerEvents="none" />
       </Animated.View>
-      <LinearGradient colors={collar} locations={CURVE} style={styles.collar} />
-      <View style={styles.knob}>
-        <View style={styles.glint} />
-      </View>
+      {painted ? (
+        <Finial paper={colors.name} side="right" length={FINIAL} tuck={FINIAL_TUCK} />
+      ) : (
+        <View style={styles.mirrored}>{plainEnd}</View>
+      )}
     </View>
   );
 };
@@ -65,7 +76,9 @@ export const ROLLER_HEIGHT = FULL + 2;
 const makeStyles = (colors: Palette) =>
   StyleSheet.create({
     roller: { flexDirection: 'row', alignItems: 'center', height: ROLLER_HEIGHT, marginHorizontal: 2 },
-    roll: { flex: 1 },
+    rollerPainted: { marginHorizontal: 0 },
+    mirrored: { flexDirection: 'row-reverse', alignItems: 'center' },
+    roll: { flex: 1, zIndex: 1 },
     paper: { ...StyleSheet.absoluteFill, borderRadius: 3 },
     lap: {
       position: 'absolute',

@@ -22,11 +22,15 @@ export const marginalia: Drawing[] = [
 ];
 
 /** Single line drawings by name, when they have been made. */
-export const drawings: Partial<Record<'quill' | 'flourish' | 'divider' | 'empty-shelf', Drawing>> = {
+export const drawings: Partial<Record<'quill' | 'flourish' | 'divider' | 'empty-shelf' | 'initial-frame' | 'tick' | 'strike' | 'nil-found', Drawing>> = {
   'divider': { source: require('../assets/art/divider.png'), width: 900, height: 66 },
   'empty-shelf': { source: require('../assets/art/empty-shelf.png'), width: 900, height: 883 },
   'flourish': { source: require('../assets/art/flourish.png'), width: 900, height: 898 },
+  'initial-frame': { source: require('../assets/art/initial-frame.png'), width: 900, height: 900 },
+  'nil-found': { source: require('../assets/art/nil-found.png'), width: 900, height: 677 },
   'quill': { source: require('../assets/art/quill.png'), width: 900, height: 811 },
+  'strike': { source: require('../assets/art/strike.png'), width: 900, height: 35 },
+  'tick': { source: require('../assets/art/tick.png'), width: 900, height: 690 },
 };
 
 /** The wax seal pressed on a finished scroll, in its own colours. */
@@ -43,3 +47,18 @@ export const desks: Partial<Record<ThemeName, Drawing>> = {
   verdant: { source: require('../assets/art/desk-verdant.png'), width: 512, height: 512 },
   vigil: { source: require('../assets/art/desk-vigil.png'), width: 512, height: 512 },
 };
+
+/** Turned end caps for a scroll's rod, pointing left, in their own colours. */
+export const finials: Partial<Record<'brass' | 'iron', Drawing>> = {
+  brass: { source: require('../assets/art/finial-brass.png'), width: 200, height: 105 },
+  iron: { source: require('../assets/art/finial-iron.png'), width: 200, height: 105 },
+};
+
+/** Things lying on the desk, in their own colours. */
+export const deskProps: Partial<Record<'inkwell' | 'candle', Drawing>> = {
+  inkwell: { source: require('../assets/art/desk-inkwell.png'), width: 423, height: 480 },
+  candle: { source: require('../assets/art/desk-candle.png'), width: 251, height: 420 },
+};
+
+/** A vertical, tileable strip of torn edge: opaque where the paper is missing. Tinted as the desk. */
+export const deckle: Drawing | undefined = { source: require('../assets/art/deckle-edge.png'), width: 16, height: 1086 };

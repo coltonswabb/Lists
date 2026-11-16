@@ -11,6 +11,11 @@ Turns art dropped in assets/incoming/ into files the app can use, named as in do
 - parchment: a greyscale texture becomes a soft darkening layer (black, with the darker mottling as
   alpha), so it marks every paper colour without greying it. Kept tileable, at full size.
 - desk-<paper>: tileable desk textures, kept in colour, 512px.
+- finial-<metal>, desk-inkwell, desk-candle: painted objects on white, cut out like the seal.
+- deckle-edge: a black-and-white mask of a torn paper edge becomes a narrow strip of "air" (opaque
+  where there is no paper), which the app tints as the desk and lays over the sheet's sides.
+- icon-<paper>: full-bleed app icons, copied to assets/icons/<paper>.png at 1024px. These replace
+  what scripts/draw-icons.py drew, and only show after the next native build.
 
 Everything is written to assets/art/, and src/art.ts is rewritten to list what exists, so the app
 picks new art up by itself.
@@ -33,9 +38,15 @@ PAD = 12  # transparent pixels kept around the trimmed drawing
 # Lightness at or above PAPER is background; at or below INK is full-strength line. Between, partly
 # transparent, which keeps the anti-aliased edges of the pen strokes smooth.
 PAPER, INK = 235, 70
-LINE_ART = re.compile(r"^(margin-\d+|quill|flourish|divider|empty-shelf)$")
+SINGLES = ("quill", "flourish", "divider", "empty-shelf", "initial-frame", "tick", "strike", "nil-found")
+LINE_ART = re.compile(r"^(margin-\d+|" + "|".join(SINGLES) + r")$")
+# Painted objects cut out of a white ground, and the longest side each is scaled to.
+OBJECTS = {"wax-seal": 192, "finial-brass": 200, "finial-iron": 200, "desk-inkwell": 480, "desk-candle": 420}
+ICON = re.compile(r"^icon-(scriptorium|vigil|lapis|verdant|codex)$")
+ICONS = ROOT / "assets" / "icons"
+DECKLE_HEIGHT = 1086
 DESK = re.compile(r"^desk-(scriptorium|vigil|lapis|verdant|codex)$")
-SEAL_SIZE, TILE_SIZE, PARCHMENT_SIZE = 192, 512, 1254
+TILE_SIZE, PARCHMENT_SIZE = 512, 1254
 PARCHMENT_STRENGTH = 70  # the alpha of the darkest mottling, out of 255
 
 
@@ -127,8 +138,8 @@ def rgba(row, x, channels):
     return tuple(row[x * 4 : x * 4 + 4])
 
 
-def key_seal(source, target):
-    """Cuts the white background away from the edges inward, leaving the wax and its highlights."""
+def key_object(source, target, size):
+    """Cuts the white background away from the edges inward, leaving the object and its highlights."""
     width, height, channels, rows = load(source)
     pixels = [bytearray(b"".join(bytes(rgba(row, x, channels)) for x in range(width))) for row in rows]
 
@@ -147,9 +158,51 @@ def key_seal(source, target):
         for nx, ny in ((x + 1, y), (x - 1, y), (x, y + 1), (x, y - 1)):
             if 0 <= nx < width and 0 <= ny < height and not cleared[ny * width + nx]:
                 stack.append((nx, ny))
+    # The object's anti-aliased rim is still nearly white; take it off so no pale halo shows on a dark desk.
+    for _ in range(2):
+        rim = []
+        for y in range(1, height - 1):
+            for x in range(1, width - 1):
+                if cleared[y * width + x]:
+                    continue
+                if not (cleared[y * width + x - 1] or cleared[y * width + x + 1] or cleared[(y - 1) * width + x] or cleared[(y + 1) * width + x]):
+                    continue
+                if min(pixels[y][x * 4 : x * 4 + 3]) > 170:
+                    rim.append((x, y))
+        for x, y in rim:
+            cleared[y * width + x] = 1
+            pixels[y][x * 4 + 3] = 0
     w, h, cropped = trim(width, height, pixels)
     write_png(target, w, h, cropped)
-    subprocess.run(["sips", "-Z", str(SEAL_SIZE), str(target)], check=True, capture_output=True)
+    subprocess.run(["sips", "-Z", str(size), str(target)], check=True, capture_output=True)
+
+
+def deckle_strip(source, target):
+    """The band of a torn-edge mask where paper gives way to air, as black whose alpha is the air."""
+    width, height, channels, rows = load(source)
+    air = [[lightness(row, x, channels) for x in range(width)] for row in rows]
+    # Per row, where the paper begins (the first dark pixel from the left).
+    # A stray fleck of ink out in the air is not the edge: the paper starts where it stays dark.
+    run = 12
+    starts = [next((x for x in range(width - run) if all(v < 128 for v in line[x : x + run])), width) for line in air]
+    left, right = max(0, min(starts) - 2), min(width, max(starts) + 3)
+    out = []
+    for line, start in zip(air, starts):
+        row = bytearray()
+        for x in range(left, right):
+            # Air up to the edge, whatever flecks lie in it; past the edge, the mask's own soft boundary.
+            row += bytes((0, 0, 0, 255 if x < start - 2 else line[x]))
+        out.append(row)
+    write_png(target, right - left, height, out)
+    scaled = max(1, round((right - left) * DECKLE_HEIGHT / height))
+    subprocess.run(["sips", "-z", str(DECKLE_HEIGHT), str(scaled), str(target)], check=True, capture_output=True)
+
+
+def app_icon(source, name):
+    ICONS.mkdir(parents=True, exist_ok=True)
+    target = ICONS / f"{name}.png"
+    subprocess.run(["sips", "-s", "format", "png", "-z", "1024", "1024", str(source), "--out", str(target)], check=True, capture_output=True)
+    return target
 
 
 def parchment_layer(source, target):
@@ -225,7 +278,7 @@ def write_module(drawings):
             lines.append(f"  {entry(name, w, h)},")
     lines.append("];")
     singles = {n: s for n, s in drawings.items() if LINE_ART.match(n) and not n.startswith("margin-")}
-    lines += ["", "/** Single line drawings by name, when they have been made. */", "export const drawings: Partial<Record<'quill' | 'flourish' | 'divider' | 'empty-shelf', Drawing>> = {"]
+    lines += ["", "/** Single line drawings by name, when they have been made. */", "export const drawings: Partial<Record<" + " | ".join(f"'{n}'" for n in SINGLES) + ", Drawing>> = {"]
     for name, (w, h) in sorted(singles.items()):
         lines.append(f"  '{name}': {entry(name, w, h)},")
     lines.append("};")
@@ -240,6 +293,19 @@ def write_module(drawings):
         if DESK.match(name):
             lines.append(f"  {name[5:]}: {entry(name, w, h)},")
     lines.append("};")
+    lines += ["", "/** Turned end caps for a scroll's rod, pointing left, in their own colours. */", "export const finials: Partial<Record<'brass' | 'iron', Drawing>> = {"]
+    for name, (w, h) in sorted(drawings.items()):
+        if name.startswith("finial-"):
+            lines.append(f"  {name[7:]}: {entry(name, w, h)},")
+    lines.append("};")
+    lines += ["", "/** Things lying on the desk, in their own colours. */", "export const deskProps: Partial<Record<'inkwell' | 'candle', Drawing>> = {"]
+    for name in ("desk-inkwell", "desk-candle"):
+        if name in drawings:
+            lines.append(f"  {name[5:]}: {entry(name, *drawings[name])},")
+    lines.append("};")
+    lines += ["", "/** A vertical, tileable strip of torn edge: opaque where the paper is missing. Tinted as the desk. */"]
+    deckle = drawings.get("deckle-edge")
+    lines.append(f"export const deckle: Drawing | undefined = {entry('deckle-edge', *deckle) if deckle else 'undefined'};")
     MODULE.write_text("\n".join(lines) + "\n")
 
 
@@ -254,8 +320,16 @@ def main():
             continue  # already imported, and the source hasn't changed since
         if LINE_ART.match(name):
             key_line_art(source, target)
-        elif name == "wax-seal":
-            key_seal(source, target)
+        elif ICON.match(name):
+            icon = ICONS / f"{name[5:]}.png"
+            if not icon.exists() or icon.stat().st_mtime < source.stat().st_mtime:
+                app_icon(source, name[5:])
+                print(f"imported {source.name} -> assets/icons/{name[5:]}.png")
+            continue
+        elif name in OBJECTS:
+            key_object(source, target, OBJECTS[name])
+        elif name == "deckle-edge":
+            deckle_strip(source, target)
         elif name == "parchment":
             parchment_layer(source, target)
         elif DESK.match(name):

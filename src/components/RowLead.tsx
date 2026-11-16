@@ -17,13 +17,19 @@ export type Lead =
 export const LEAD_WIDTH = 34;
 /** The flourish is drawn round an empty square about half its width, so it is twice the block's size. */
 const FLOURISH = LEAD_WIDTH * 1.9;
+/** The vinework frame's opening is about three fifths of its width, so the painted block just fills it. */
+const FRAME = LEAD_WIDTH * 1.62;
 
 export const RowLead: FC<{ lead: Lead }> = ({ lead }) => {
   const { styles } = useTheme(makeStyles);
   if (lead.kind === 'done') {
     return (
       <View style={styles.cell}>
-        <View style={[styles.tick, { borderColor: lead.color }]} />
+        {drawings.tick ? (
+          <LineArt drawing={drawings.tick} width={22} color={lead.color} />
+        ) : (
+          <View style={[styles.tick, { borderColor: lead.color }]} />
+        )}
       </View>
     );
   }
@@ -36,9 +42,14 @@ export const RowLead: FC<{ lead: Lead }> = ({ lead }) => {
       </View>
     );
   }
-  const frame = lead.flourish ? drawings.flourish : undefined;
+  // A vinework frame when it has been drawn; otherwise the looser pen-flourish.
+  const border = lead.flourish ? drawings['initial-frame'] : undefined;
+  const frame = lead.flourish && !border ? drawings.flourish : undefined;
   return (
     <View style={[styles.cell, styles.block, { backgroundColor: lead.pigment }]}>
+      {border && lead.flourish ? (
+        <LineArt drawing={border} width={FRAME} color={lead.flourish} style={styles.frame} />
+      ) : null}
       {frame && lead.flourish ? (
         // Pen-flourishing round a painted initial, as a scribe would add to mark a new section.
         <LineArt drawing={frame} width={FLOURISH} color={lead.flourish} style={styles.flourish} />
@@ -63,5 +74,6 @@ const makeStyles = (colors: Palette) =>
   block: { alignItems: 'center', borderRadius: 2 },
   label: { fontFamily: fonts.label, fontSize: 15, letterSpacing: 0.6 },
   letter: { fontFamily: fonts.display, fontSize: 24, lineHeight: 28 },
+  frame: { position: 'absolute', left: (LEAD_WIDTH - FRAME) / 2, top: (LEAD_WIDTH - FRAME) / 2, opacity: 0.85 },
   flourish: { position: 'absolute', left: (LEAD_WIDTH - FLOURISH) / 2, top: (LEAD_WIDTH - FLOURISH) / 2, opacity: 0.55 },
 });

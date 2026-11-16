@@ -3,9 +3,11 @@ import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-
 import Animated, { FadeIn } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { drawings } from '../art';
 import { useTheme } from '../ThemeContext';
 import { type Palette, fonts, roman, ROW_HEIGHT } from '../theme';
 import type { List } from '../types';
+import { LineArt } from './LineArt';
 
 type SearchScreenProps = {
   lists: List[];
@@ -56,7 +58,12 @@ export const SearchScreen: FC<SearchScreenProps> = ({ lists, onOpen, onClose }) 
             </Text>
           </Pressable>
         ))}
-        {needle && matches.length === 0 ? <Text style={styles.none}>No line on any scroll reads so.</Text> : null}
+        {needle && matches.length === 0 ? (
+          <View style={styles.nothing}>
+            {drawings['nil-found'] ? <LineArt drawing={drawings['nil-found']} width={210} color={colors.onDeskFaded} /> : null}
+            <Text style={styles.none}>No line on any scroll reads so.</Text>
+          </View>
+        ) : null}
       </ScrollView>
     </Animated.View>
   );
@@ -90,5 +97,6 @@ const makeStyles = (colors: Palette) =>
   text: { color: colors.ink, fontFamily: fonts.body, fontSize: 21 },
   done: { color: colors.inkFaded, textDecorationLine: 'line-through', textDecorationColor: colors.accent },
   source: { color: colors.inkFaded, fontFamily: fonts.bodyItalic, fontSize: 15 },
-  none: { marginTop: 28, textAlign: 'center', color: colors.onDeskFaded, fontFamily: fonts.bodyItalic, fontSize: 18 },
+  nothing: { marginTop: 36, alignItems: 'center', gap: 14 },
+  none: { textAlign: 'center', color: colors.onDeskFaded, fontFamily: fonts.bodyItalic, fontSize: 18 },
 });

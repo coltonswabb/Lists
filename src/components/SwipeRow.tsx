@@ -20,6 +20,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { scheduleOnRN } from 'react-native-worklets';
 
+import { drawings } from '../art';
 import { thud, tick } from '../haptics';
 import { useTheme } from '../ThemeContext';
 import { type Palette, ROW_HEIGHT } from '../theme';
@@ -126,7 +127,7 @@ export const SwipeRow: FC<SwipeRowProps> = ({
   leadActionLabel,
   completeActionLabel = 'Strike done',
 }) => {
-  const { styles } = useTheme(makeStyles);
+  const { colors, styles } = useTheme(makeStyles);
   const { width, height } = useWindowDimensions();
   const offsetX = useSharedValue(0);
   const armed = useSharedValue(0);
@@ -342,7 +343,16 @@ export const SwipeRow: FC<SwipeRowProps> = ({
         >
           {children}
           {strikeWidth > 0 ? (
-            <Animated.View pointerEvents="none" style={[styles.strike, { width: strikeWidth }, strikeStyle]} />
+            drawings.strike ? (
+              // A quill's stroke, uneven and tapering, drawn across the words.
+              <Animated.Image
+                source={drawings.strike.source}
+                resizeMode="stretch"
+                style={[styles.strike, styles.strikeDrawn, { width: strikeWidth, tintColor: colors.accent }, strikeStyle]}
+              />
+            ) : (
+              <Animated.View pointerEvents="none" style={[styles.strike, { width: strikeWidth }, strikeStyle]} />
+            )
           ) : null}
         </Animated.View>
       </GestureDetector>
@@ -370,6 +380,7 @@ const makeStyles = (colors: Palette) =>
   action: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, justifyContent: 'center', paddingHorizontal: 24 },
   complete: { backgroundColor: colors.complete, alignItems: 'flex-start' },
   remove: { backgroundColor: colors.remove, alignItems: 'flex-end' },
+  strikeDrawn: { height: 7, backgroundColor: 'transparent' },
   strike: { position: 'absolute', left: LEAD_ZONE, height: 2, backgroundColor: colors.accent, transformOrigin: 'left' },
   glyph: { color: colors.onAction, fontSize: 24, fontWeight: '700' },
 });
