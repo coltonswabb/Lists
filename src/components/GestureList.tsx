@@ -49,15 +49,15 @@ const ROLL_UP_MS = 240;
 const UNCLIPPED = 100000;
 /** A fresh wax seal lands this long after the shelf appears, once the eye has found the scroll. */
 export const STAMP_DELAY_MS = 350;
-/** Average advance of the 18pt item text, used to size the strike drawn while swiping. */
-const CHAR_WIDTH = 9.4;
+/** Average advance of the 21pt item text, used to size the strike drawn while swiping. */
+const CHAR_WIDTH = 9.2;
 
 type PullAction = 'none' | 'create' | 'back';
 
 const pullLabels = {
-  none: 'PULL TO ADD',
-  create: 'RELEASE TO ADD',
-  back: 'RELEASE TO CLOSE',
+  none: 'Pull to add',
+  create: 'Release to add',
+  back: 'Release to close',
 } as const satisfies Record<PullAction, string>;
 
 export type GestureListRow = {
@@ -101,6 +101,10 @@ type GestureListProps = {
   onOpen?: (id: string) => void;
   onRenameTitle?: (title: string) => void;
   onBack?: () => void;
+  /** Name of the place `onBack` returns to, for the button at the foot of the screen. */
+  backLabel?: string;
+  /** Pulling up past the end of the rows clears the finished ones. Absent when there are none. */
+  onPullUp?: () => void;
 };
 
 export const GestureList: FC<GestureListProps> = ({
@@ -121,6 +125,8 @@ export const GestureList: FC<GestureListProps> = ({
   onOpen,
   onRenameTitle,
   onBack,
+  backLabel,
+  onPullUp,
 }) => {
   const { colors, styles } = useTheme(makeStyles);
   const insets = useSafeAreaInsets();
@@ -128,6 +134,13 @@ export const GestureList: FC<GestureListProps> = ({
   const scrollView = useRef<ComponentRef<typeof NativeScrollView>>(null);
   const scrollOffset = useRef(0);
   const [atTop, setAtTop] = useState(true);
+  const [atBottom, setAtBottom] = useState(true);
+  const [clearArmed, setClearArmed] = useState(false);
+  const extent = useRef({ content: 0, viewport: 0 });
+  const updateEdges = (y: number) => {
+    setAtTop(y <= 0);
+    setAtBottom(y >= extent.current.content - extent.current.viewport - 2);
+  };
   const [addIndex, setAddIndex] = useState<number | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [titleDraft, setTitleDraft] = useState<string | null>(null);
@@ -263,6 +276,14 @@ export const GestureList: FC<GestureListProps> = ({
     if (action === 'back') leave();
   };
 
+  const endPullUp = (clear: boolean) => {
+    setTimeout(() => {
+      pulling.current = false;
+    }, PRESS_GUARD_MS);
+    setClearArmed(false);
+    if (clear) onPullUp?.();
+  };
+
   const pan = usePanGesture({
     enabled: atTop && !busy && !dragging,
     maxPointers: 1,
@@ -331,7 +352,46 @@ export const GestureList: FC<GestureListProps> = ({
     },
   });
 
-  const gesture = useSimultaneousGestures(pan, pinch);
+  // Pulling up past the last row lifts the scroll and, far enough, clears what is finished.
+  const raise = useSharedValue(0);
+  const raiseArmed = useSharedValue(false);
+  const armClear = (armedNow: boolean) => {
+    setClearArmed(armedNow);
+    if (armedNow) tick();
+  };
+  const pullUp = usePanGesture({
+    enabled: onPullUp !== undefined && atBottom && !busy && !dragging,
+    maxPointers: 1,
+    activeOffsetY: -14,
+    failOffsetX: [-14, 14],
+    onActivate: () => {
+      'worklet';
+      scheduleOnRN(beginPull);
+    },
+    onUpdate: (event) => {
+      'worklet';
+      const distance = Math.max(0, -event.translationY) * PULL_RESISTANCE;
+      raise.value = distance;
+      const next = distance > ROW_HEIGHT;
+      if (next !== raiseArmed.value) {
+        raiseArmed.value = next;
+        scheduleOnRN(armClear, next);
+      }
+    },
+    onDeactivate: (event) => {
+      'worklet';
+      const clear = !event.canceled && raiseArmed.value;
+      raiseArmed.value = false;
+      raise.value = withSpring(0, SPRING);
+      scheduleOnRN(endPullUp, clear);
+    },
+  });
+  const raiseStyle = useAnimatedStyle(() => ({ transform: [{ translateY: -raise.value }] }));
+  const clearHintStyle = useAnimatedStyle(() => ({
+    opacity: interpolate(raise.value, [0, ROW_HEIGHT * 0.6], [0, 1], 'clamp'),
+  }));
+
+  const gesture = useSimultaneousGestures(pan, pullUp, pinch);
 
   // Pulling draws fresh paper out from under the rod.
   const pullSpaceStyle = useAnimatedStyle(() => ({ height: pull.value }));
@@ -470,6 +530,10 @@ export const GestureList: FC<GestureListProps> = ({
       )}
       <GestureDetector gesture={gesture}>
         <View style={styles.fill}>
+          <Animated.Text style={[styles.clearHint, clearHintStyle]}>
+            {clearArmed ? 'Release to clear the finished' : 'Pull to clear the finished'}
+          </Animated.Text>
+          <Animated.View style={[styles.fill, raiseStyle]}>
           <ScrollView
             ref={scrollView}
             bounces={false}
@@ -480,15 +544,19 @@ export const GestureList: FC<GestureListProps> = ({
             scrollEventThrottle={16}
             onLayout={(event) => {
               viewportHeight.value = event.nativeEvent.layout.height;
+              extent.current.viewport = event.nativeEvent.layout.height;
+              updateEdges(scrollOffset.current);
             }}
             onContentSizeChange={(_, height) => {
               contentHeight.value = height;
+              extent.current.content = height;
+              updateEdges(scrollOffset.current);
             }}
             onScroll={(event) => {
               const y = event.nativeEvent.contentOffset.y;
               scrollY.value = y;
               scrollOffset.current = y;
-              setAtTop(y <= 0);
+              updateEdges(y);
             }}
             contentContainerStyle={[styles.content, { paddingBottom: insets.bottom }]}
           >
@@ -548,7 +616,7 @@ export const GestureList: FC<GestureListProps> = ({
 
               <Pressable style={styles.tail} disabled={busy} onPress={() => press(() => setAddIndex(endIndex))}>
                 {rowCount === 0 && !busy ? <Text style={styles.hint}>{emptyHint}</Text> : null}
-                {finished && !busy ? <Text style={styles.finis}>❦  FINIS  ❦</Text> : null}
+                {finished && !busy ? <Text style={styles.finis}>❦  Finis  ❦</Text> : null}
               </Pressable>
               {isShelf ? null : <PaperOverlay />}
             </Animated.View>
@@ -559,8 +627,16 @@ export const GestureList: FC<GestureListProps> = ({
             )}
             <Pressable style={styles.tapZone} disabled={busy} onPress={() => press(() => setAddIndex(endIndex))} />
           </ScrollView>
+          </Animated.View>
         </View>
       </GestureDetector>
+      {canGoBack && backLabel ? (
+        <View style={[styles.foot, { paddingBottom: insets.bottom + 12 }]}>
+          <Pressable onPress={leave} hitSlop={12} accessibilityRole="button">
+            <Text style={styles.footLabel}>{`‹  ${backLabel}`}</Text>
+          </Pressable>
+        </View>
+      ) : null}
     </View>
   );
 };
@@ -581,7 +657,7 @@ const makeStyles = (colors: Palette) =>
   shelf: { paddingTop: 4 },
   pullSpace: { justifyContent: 'flex-end', overflow: 'hidden' },
   pullRow: { height: ROW_HEIGHT, justifyContent: 'center', paddingHorizontal: 16, backgroundColor: colors.accent },
-  pullText: { color: colors.paperFrom, fontFamily: fonts.label, fontSize: 12, letterSpacing: 1.6 },
+  pullText: { color: colors.paperFrom, fontFamily: fonts.bodyItalic, fontSize: 19 },
   rolledScroll: { flex: 1, flexDirection: 'row', alignItems: 'center', marginHorizontal: -10 },
   collar: { width: 4, height: 54, borderRadius: 1, backgroundColor: colors.gold },
   knob: { width: 8, height: 8, borderRadius: 4, backgroundColor: colors.accent },
@@ -593,9 +669,9 @@ const makeStyles = (colors: Palette) =>
     paddingHorizontal: 12,
     borderRadius: 3,
   },
-  rowText: { color: colors.ink, fontSize: 18, fontWeight: '500' },
-  sectionText: { fontFamily: fonts.display, fontSize: 26, fontWeight: '400' },
-  rubric: { color: colors.accent, fontWeight: '700' },
+  rowText: { color: colors.ink, fontFamily: fonts.body, fontSize: 21 },
+  sectionText: { fontFamily: fonts.display, fontSize: 26 },
+  rubric: { color: colors.accent },
   doneText: { color: colors.inkFaded, textDecorationLine: 'line-through', textDecorationColor: colors.accent },
   badge: { color: colors.inkFaded, fontFamily: fonts.label, fontSize: 11, letterSpacing: 1, marginLeft: 12 },
   badgeAccent: { color: colors.accent, fontSize: 18 },
@@ -611,8 +687,20 @@ const makeStyles = (colors: Palette) =>
     borderColor: colors.accent,
   },
   sealMark: { color: colors.onAction, fontSize: 14, fontWeight: '700' },
-  finis: { color: colors.accent, fontFamily: fonts.label, fontSize: 12, letterSpacing: 2 },
+  finis: { color: colors.accent, fontFamily: fonts.bodyItalic, fontSize: 19 },
   tail: { height: ROW_HEIGHT, alignItems: 'center', justifyContent: 'center' },
   tapZone: { flexGrow: 1, minHeight: ROW_HEIGHT },
-  hint: { color: colors.inkFaded, fontFamily: fonts.label, fontSize: 11, letterSpacing: 1.2 },
+  hint: { color: colors.inkFaded, fontFamily: fonts.bodyItalic, fontSize: 18 },
+  clearHint: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 14,
+    textAlign: 'center',
+    color: colors.onDesk,
+    fontFamily: fonts.bodyItalic,
+    fontSize: 18,
+  },
+  foot: { flexDirection: 'row', paddingHorizontal: 20, paddingTop: 12 },
+  footLabel: { color: colors.onDesk, fontFamily: fonts.bodyItalic, fontSize: 18, opacity: 0.85 },
 });

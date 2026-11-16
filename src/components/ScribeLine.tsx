@@ -4,7 +4,7 @@ import Animated, { FadeIn } from 'react-native-reanimated';
 
 import { listen } from '../scribe';
 import { useTheme } from '../ThemeContext';
-import type { Palette } from '../theme';
+import { fonts, type Palette } from '../theme';
 
 const REMARK_MS = 2600;
 
@@ -43,5 +43,5 @@ export const ScribeLine: FC<ScribeLineProps> = ({ standing, onPress }) => {
 const makeStyles = (colors: Palette) =>
   StyleSheet.create({
     box: { height: 26, paddingHorizontal: 20, justifyContent: 'flex-start' },
-    line: { color: colors.onDeskFaded, fontSize: 14, fontStyle: 'italic' },
+    line: { color: colors.onDeskFaded, fontFamily: fonts.bodyItalic, fontSize: 17 },
   });

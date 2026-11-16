@@ -1,12 +1,15 @@
 export const ROW_HEIGHT = 62;
 
 /**
- * Three voices, each with one job: blackletter for names, a monospace for small technical labels,
- * and the system sans for anything the user typed.
+ * Three voices, each with one job: blackletter for names, a monospace for numerals and readouts,
+ * and an old-style serif for everything meant to be read: what the user typed, what the scribe says,
+ * and anything that can be pressed.
  */
 export const fonts = {
   display: 'PirataOne_400Regular',
   label: 'IBMPlexMono_500Medium',
+  body: 'EBGaramond_500Medium',
+  bodyItalic: 'EBGaramond_500Medium_Italic',
 } as const;
 
 /**
@@ -28,7 +31,7 @@ type ThemeSpec = {
 
 export const themes = {
   scriptorium: {
-    label: 'SCRIPTORIUM',
+    label: 'Scriptorium',
     desk: '#181614',
     paperFrom: '#f5e9c9',
     paperTo: '#e6ad5c',
@@ -38,7 +41,7 @@ export const themes = {
     onDesk: '#ebe3d0',
   },
   vigil: {
-    label: 'NIGHT VIGIL',
+    label: 'Night Vigil',
     desk: '#0c0b0a',
     paperFrom: '#2c2824',
     paperTo: '#5c3c1d',
@@ -48,7 +51,7 @@ export const themes = {
     onDesk: '#e6dcc6',
   },
   lapis: {
-    label: 'LAPIS',
+    label: 'Lapis',
     desk: '#10141d',
     paperFrom: '#eef1f6',
     paperTo: '#86a8dd',
@@ -58,7 +61,7 @@ export const themes = {
     onDesk: '#e3e8f2',
   },
   verdant: {
-    label: 'VERDANT',
+    label: 'Verdant',
     desk: '#121610',
     paperFrom: '#f3eed8',
     paperTo: '#a3bd84',
@@ -68,7 +71,7 @@ export const themes = {
     onDesk: '#e6e6d2',
   },
   codex: {
-    label: 'PURPLE CODEX',
+    label: 'Purple Codex',
     desk: '#120c16',
     paperFrom: '#45285a',
     paperTo: '#84407f',

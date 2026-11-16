@@ -15,7 +15,8 @@ A gesture-driven list app built with Expo and React Native.
 - "Search" on the shelf finds items across every scroll; "Sound" turns the effects on or off.
 - A scribe greets you and remarks on what you do. It asks how to address you on first launch; tap its line on the shelf to change that.
 - The theme name at the bottom of the shelf cycles through five paper themes.
-- "Unmark all" resets a reusable list; "Clear done" removes finished items.
+- At the end of a scroll, keep pulling up to clear the finished items. "Unmark all" resets a reusable list.
+- "Library" at the foot of a scroll rolls it up and returns to the shelf of scrolls.
 
 Data is stored on the device with AsyncStorage. The sound effects in `assets/sounds` are synthesized, not recordings.
 

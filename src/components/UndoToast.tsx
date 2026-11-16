@@ -39,7 +39,7 @@ export const UndoToast: FC<UndoToastProps> = ({ undo, onUndo, onDismiss, offset 
         {undo.label}
       </Text>
       <Pressable onPress={onUndo} hitSlop={12}>
-        <Text style={styles.action}>RESTORE</Text>
+        <Text style={styles.action}>Restore</Text>
       </Pressable>
     </Animated.View>
   );
@@ -59,6 +59,6 @@ const makeStyles = (colors: Palette) =>
     borderRadius: 4,
     backgroundColor: colors.parchment,
   },
-  label: { flex: 1, color: colors.ink, fontSize: 15, fontWeight: '500' },
-  action: { color: colors.accent, fontFamily: fonts.label, fontSize: 13, letterSpacing: 1 },
+  label: { flex: 1, color: colors.ink, fontFamily: fonts.body, fontSize: 18 },
+  action: { color: colors.accent, fontFamily: fonts.bodyItalic, fontSize: 18 },
 });

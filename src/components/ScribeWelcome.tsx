@@ -27,7 +27,7 @@ export const ScribeWelcome: FC<ScribeWelcomeProps> = ({ onChoose }) => {
       </View>
       <Text style={styles.greeting}>Well met.</Text>
       <Text style={styles.body}>I am thy scribe. I shall keep thy scrolls in good order and strike what is done.</Text>
-      <Text style={styles.question}>HOW SHALL I ADDRESS THEE?</Text>
+      <Text style={styles.question}>How shall I address thee?</Text>
       {choices.map(({ address, label }) => (
         <Pressable key={address} style={styles.choice} onPress={() => onChoose(address)}>
           <Text style={styles.choiceText}>{label}</Text>
@@ -50,14 +50,13 @@ const makeStyles = (colors: Palette) =>
     },
     markLetter: { color: colors.paperFrom, fontFamily: fonts.display, fontSize: 40, lineHeight: 46 },
     greeting: { marginTop: 28, color: colors.onDesk, fontFamily: fonts.display, fontSize: 44 },
-    body: { marginTop: 10, color: colors.onDesk, fontSize: 18, lineHeight: 26, opacity: 0.85 },
+    body: { marginTop: 10, color: colors.onDesk, fontFamily: fonts.body, fontSize: 21, lineHeight: 28, opacity: 0.85 },
     question: {
       marginTop: 44,
       marginBottom: 14,
       color: colors.onDeskFaded,
-      fontFamily: fonts.label,
-      fontSize: 11,
-      letterSpacing: 1.4,
+      fontFamily: fonts.bodyItalic,
+      fontSize: 18,
     },
     choice: {
       height: 56,
@@ -67,5 +66,5 @@ const makeStyles = (colors: Palette) =>
       borderRadius: 3,
       backgroundColor: colors.paperFrom,
     },
-    choiceText: { color: colors.ink, fontSize: 19, fontWeight: '600' },
+    choiceText: { color: colors.ink, fontFamily: fonts.body, fontSize: 22 },
   });

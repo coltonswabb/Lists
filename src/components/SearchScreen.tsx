@@ -40,7 +40,7 @@ export const SearchScreen: FC<SearchScreenProps> = ({ lists, onOpen, onClose }) 
           style={styles.input}
         />
         <Pressable onPress={onClose} hitSlop={14}>
-          <Text style={styles.action}>CLOSE</Text>
+          <Text style={styles.action}>Close</Text>
         </Pressable>
       </View>
       <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingBottom: insets.bottom + 24 }}>
@@ -64,8 +64,8 @@ const makeStyles = (colors: Palette) =>
   StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.desk },
   header: { flexDirection: 'row', alignItems: 'center', gap: 16, paddingHorizontal: 20, height: 56 },
-  input: { flex: 1, color: colors.onDesk, fontSize: 18, fontWeight: '500', padding: 0 },
-  action: { color: colors.onDesk, fontFamily: fonts.label, fontSize: 11, letterSpacing: 1.2 },
+  input: { flex: 1, color: colors.onDesk, fontFamily: fonts.body, fontSize: 21, padding: 0 },
+  action: { color: colors.onDesk, fontFamily: fonts.bodyItalic, fontSize: 18 },
   count: {
     color: colors.onDeskFaded,
     fontFamily: fonts.label,
@@ -85,7 +85,7 @@ const makeStyles = (colors: Palette) =>
     borderRadius: 4,
     backgroundColor: colors.parchment,
   },
-  text: { flex: 1, color: colors.ink, fontSize: 18, fontWeight: '500' },
+  text: { flex: 1, color: colors.ink, fontFamily: fonts.body, fontSize: 21 },
   done: { color: colors.inkFaded, textDecorationLine: 'line-through', textDecorationColor: colors.accent },
   source: { maxWidth: 120, color: colors.inkFaded, fontFamily: fonts.label, fontSize: 10, letterSpacing: 1 },
 });

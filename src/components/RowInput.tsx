@@ -2,7 +2,7 @@ import { type FC, useRef, useState } from 'react';
 import { StyleSheet, TextInput, View } from 'react-native';
 
 import { useTheme } from '../ThemeContext';
-import { type Palette, ROW_HEIGHT } from '../theme';
+import { fonts, type Palette, ROW_HEIGHT } from '../theme';
 import { type Lead, RowLead } from './RowLead';
 
 type RowInputProps = {
@@ -91,10 +91,10 @@ const makeStyles = (colors: Palette) =>
   input: {
     flex: 1,
     color: colors.ink,
-    fontSize: 18,
-    fontWeight: '500',
+    fontFamily: fonts.body,
+    fontSize: 21,
     padding: 0,
-    height: 24,
+    height: 28,
     textAlignVertical: 'center',
   },
 });

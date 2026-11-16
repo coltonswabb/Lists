@@ -1,3 +1,4 @@
+import { EBGaramond_500Medium, EBGaramond_500Medium_Italic } from '@expo-google-fonts/eb-garamond';
 import { IBMPlexMono_500Medium } from '@expo-google-fonts/ibm-plex-mono';
 import { PirataOne_400Regular } from '@expo-google-fonts/pirata-one';
 import { useFonts } from 'expo-font';
@@ -121,7 +122,7 @@ const Screens: FC<{ settings: Settings; address: Address }> = ({ settings, addre
           readout={items.length > 0 && remaining === 0 ? 'FINIS' : `${roman(remaining)} RES`}
           variant="scroll"
           placeholder="New item"
-          emptyHint="PULL DOWN OR TAP TO ADD"
+          emptyHint="Pull down or tap to add"
           rows={rows}
           subheader={
             <ScribeLine
@@ -149,14 +150,24 @@ const Screens: FC<{ settings: Settings; address: Address }> = ({ settings, addre
           onPressLead={(id) => store.toggleSection(openList.id, id)}
           onRenameTitle={(name) => store.renameList(openList.id, name)}
           onBack={() => setOpenListId(null)}
+          backLabel="Library"
+          onPullUp={
+            items.some((item) => item.done)
+              ? () => {
+                  play('seal');
+                  say('strike');
+                  store.clearDone(openList.id);
+                }
+              : undefined
+          }
           footer={
             items.some((item) => item.done) ? (
               <View style={styles.footer}>
                 <Pressable onPress={() => store.uncheckAll(openList.id)} hitSlop={10}>
-                  <Text style={styles.label}>UNMARK ALL</Text>
+                  <Text style={styles.label}>Unmark all</Text>
                 </Pressable>
                 <Pressable onPress={() => store.clearDone(openList.id)} hitSlop={10}>
-                  <Text style={styles.label}>CLEAR DONE</Text>
+                  <Text style={styles.label}>Clear the finished</Text>
                 </Pressable>
               </View>
             ) : null
@@ -173,11 +184,11 @@ const Screens: FC<{ settings: Settings; address: Address }> = ({ settings, addre
     <>
       <GestureList
         key="shelf"
-        title="Scrolls"
+        title="Library"
         readout={`${roman(store.lists.length)} ROTULI`}
         variant="shelf"
         placeholder="New scroll"
-        emptyHint="PULL DOWN OR TAP TO ADD A SCROLL"
+        emptyHint="Pull down or tap to add a scroll"
         rows={store.lists.map((list) => {
           const items = itemsOf(list);
           const open = openCount(items);
@@ -205,13 +216,13 @@ const Screens: FC<{ settings: Settings; address: Address }> = ({ settings, addre
       />
       <View style={[styles.controls, { paddingBottom: insets.bottom + 12 }]}>
         <Pressable onPress={() => setSearching(true)} hitSlop={12}>
-          <Text style={styles.deskLabel}>SEARCH</Text>
+          <Text style={styles.deskLabel}>Search</Text>
         </Pressable>
         <Pressable onPress={settings.nextTheme} hitSlop={12}>
           <Text style={styles.deskLabel}>{themes[settings.theme].label}</Text>
         </Pressable>
         <Pressable onPress={settings.toggleSound} hitSlop={12}>
-          <Text style={styles.deskLabel}>{settings.sound ? 'SOUND ON' : 'SOUND OFF'}</Text>
+          <Text style={styles.deskLabel}>{settings.sound ? 'Sound on' : 'Sound off'}</Text>
         </Pressable>
       </View>
       <UndoToast undo={store.undo} onUndo={undoLast} onDismiss={store.dismissUndo} offset={44} />
@@ -220,7 +231,12 @@ const Screens: FC<{ settings: Settings; address: Address }> = ({ settings, addre
 };
 
 export const App: FC = () => {
-  const [fontsLoaded] = useFonts({ PirataOne_400Regular, IBMPlexMono_500Medium });
+  const [fontsLoaded] = useFonts({
+    PirataOne_400Regular,
+    IBMPlexMono_500Medium,
+    EBGaramond_500Medium,
+    EBGaramond_500Medium_Italic,
+  });
   const settings = useSettings();
   const palette = useMemo(() => paletteOf(settings.theme), [settings.theme]);
   return (
@@ -243,7 +259,7 @@ const makeStyles = (colors: Palette) =>
   StyleSheet.create({
   footer: { flexDirection: 'row', justifyContent: 'center', gap: 28, paddingTop: 20 },
   controls: { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 20, paddingTop: 12 },
-  label: { color: colors.accent, fontFamily: fonts.label, fontSize: 11, letterSpacing: 1.2 },
+  label: { color: colors.accent, fontFamily: fonts.bodyItalic, fontSize: 18 },
     // Labels that sit on the desk rather than on paper: the accent is tuned for paper and can be too dark here.
-    deskLabel: { color: colors.onDesk, fontFamily: fonts.label, fontSize: 11, letterSpacing: 1.2, opacity: 0.8 },
+    deskLabel: { color: colors.onDesk, fontFamily: fonts.bodyItalic, fontSize: 18, opacity: 0.85 },
 });
