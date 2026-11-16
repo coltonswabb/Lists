@@ -5,8 +5,8 @@
 // async work and nothing from module scope: everything it needs arrives in `props`, pushed from the
 // app by src/widgetSync.ts.
 
-import { HStack, Spacer, Text, VStack } from '@expo/ui/swift-ui';
-import { containerBackground, font, foregroundStyle, lineLimit, padding, widgetURL } from '@expo/ui/swift-ui/modifiers';
+import { Button, HStack, Spacer, Text, VStack } from '@expo/ui/swift-ui';
+import { buttonStyle, containerBackground, font, foregroundStyle, lineLimit, padding, widgetURL } from '@expo/ui/swift-ui/modifiers';
 import { createWidget } from 'expo-widgets';
 
 export type ScrollWidgetProps = {
@@ -14,6 +14,10 @@ export type ScrollWidgetProps = {
   title: string;
   /** Unfinished items on that scroll, in order, capped by the sender. */
   items: string[];
+  /** The id of each item in `items`, in the same order, so one struck on the widget can be struck in the app. */
+  ids?: string[];
+  /** Ids struck on the widget itself since the app last looked. The app strikes them and empties this. */
+  struck?: string[];
   /** How many are unfinished in total, which may be more than `items` holds. */
   remaining: number;
   /** What the scribe says when the scroll is finished or absent. */
@@ -32,6 +36,9 @@ const ScrollWidget = (props: ScrollWidgetProps, environment: { widgetFamily?: st
   const family = environment.widgetFamily ?? 'systemSmall';
   const link = 'decree://scroll';
   const items = props.items ?? [];
+  const ids = props.ids ?? [];
+  // The small widget is one tap target that opens the app; the larger ones have room for a button per line.
+  const canStrike = family !== 'systemSmall' && ids.length === items.length;
   const shown = items.slice(0, family === 'systemLarge' ? 9 : family === 'systemMedium' ? 3 : 4);
   const numerals = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX'];
   const more = (props.remaining ?? 0) - shown.length;
@@ -70,9 +77,29 @@ const ScrollWidget = (props: ScrollWidgetProps, environment: { widgetFamily?: st
       ) : (
         shown.map((text, index) => (
           <HStack key={`${index}-${text}`} spacing={8}>
-            <Text modifiers={[font({ size: 10, weight: 'medium', design: 'serif' }), foregroundStyle(props.accent)]}>
-              {numerals[index] ?? ''}
-            </Text>
+            {canStrike && ids[index] ? (
+              // Pressing the numeral strikes the item here and now, without opening the app. What it
+              // returns becomes the widget's new props; the app finds the id in `struck` when it next looks.
+              <Button
+                target={`strike-${index}`}
+                modifiers={[buttonStyle('plain')]}
+                onPress={() => ({
+                  ...props,
+                  items: items.filter((_, at) => at !== index),
+                  ids: ids.filter((_, at) => at !== index),
+                  remaining: Math.max(0, (props.remaining ?? 0) - 1),
+                  struck: [...(props.struck ?? []), ids[index]],
+                })}
+              >
+                <Text modifiers={[font({ size: 10, weight: 'medium', design: 'serif' }), foregroundStyle(props.accent)]}>
+                  {numerals[index] ?? ''}
+                </Text>
+              </Button>
+            ) : (
+              <Text modifiers={[font({ size: 10, weight: 'medium', design: 'serif' }), foregroundStyle(props.accent)]}>
+                {numerals[index] ?? ''}
+              </Text>
+            )}
             <Text modifiers={[font({ size: 14, design: 'serif' }), foregroundStyle(props.ink), lineLimit(1)]}>{text}</Text>
             <Spacer />
           </HStack>

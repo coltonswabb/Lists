@@ -47,6 +47,19 @@
                 ],
                 "initialLayout": "./src/widgets/ScrollWidget.tsx"
               }
+            },
+            {
+              "name": "ScrollLock",
+              "displayName": "Scroll (Lock Screen)",
+              "description": "What is left on your scroll, on the Lock Screen.",
+              "ios": {
+                "supportedFamilies": [
+                  "accessoryCircular",
+                  "accessoryRectangular",
+                  "accessoryInline"
+                ],
+                "initialLayout": "./src/widgets/LockWidget.tsx"
+              }
             }
           ],
           "frequentUpdates": false

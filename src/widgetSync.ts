@@ -14,9 +14,12 @@ export const widgetProps = (lists: List[], palette: Palette, address: Address): 
   const open = (list: List) => list.items.filter((item) => !item.section && !item.done);
   const list = lists.find((candidate) => open(candidate).length > 0) ?? lists[0];
   const items = list ? open(list) : [];
+  const shown = items.slice(0, MAX_ITEMS);
   return {
     title: list?.name ?? '',
-    items: items.slice(0, MAX_ITEMS).map((item) => item.text),
+    items: shown.map((item) => item.text),
+    ids: shown.map((item) => item.id),
+    struck: [],
     remaining: items.length,
     note: list ? standing.done(address) : standing.blank(address),
     paper: palette.paperFrom,
@@ -26,19 +29,65 @@ export const widgetProps = (lists: List[], palette: Palette, address: Address): 
   };
 };
 
-/** Pushes the current lists to the home screen widget. Safe to call often: it skips unchanged data. */
+/**
+ * Pushes the current lists to the home screen widget and the Lock Screen one. Safe to call often:
+ * it skips unchanged data.
+ */
 export const syncWidget = async (lists: List[], palette: Palette, address: Address): Promise<void> => {
   if (Platform.OS !== 'ios') return;
   try {
     const props = widgetProps(lists, palette, address);
     const payload = JSON.stringify(props);
     if (payload === lastPayload) return;
-    // Lazy import keeps the native module out of the web bundle.
+    // Lazy imports keep the native module out of the web bundle.
     const { default: ScrollWidget } = await import('./widgets/ScrollWidget');
     ScrollWidget.updateTimeline([{ date: new Date(), props }]);
     lastPayload = payload;
+    // The Lock Screen widget is newer than the home screen one; if it is missing from this build, the other still updates.
+    try {
+      const { default: LockWidget } = await import('./widgets/LockWidget');
+      LockWidget.updateTimeline([{ date: new Date(), props: { title: props.title, items: props.items.slice(0, 2), remaining: props.remaining } }]);
+    } catch (error) {
+      console.warn('Lock Screen widget sync failed:', error);
+    }
   } catch (error) {
     // The widget is a convenience; it must never take the app down.
     console.warn('Widget sync failed:', error);
   }
+};
+
+/**
+ * The ids of items struck on the widget since the app last looked. Reading them also makes the next
+ * sync write the widget afresh, which empties its list of struck ids.
+ */
+export const takeWidgetStrikes = async (): Promise<string[]> => {
+  if (Platform.OS !== 'ios') return [];
+  try {
+    const { default: ScrollWidget } = await import('./widgets/ScrollWidget');
+    const timeline = await ScrollWidget.getTimeline();
+    const struck = timeline[timeline.length - 1]?.props.struck ?? [];
+    if (struck.length > 0) lastPayload = null;
+    return struck.filter((id): id is string => typeof id === 'string');
+  } catch (error) {
+    console.warn('Reading the widget failed:', error);
+    return [];
+  }
+};
+
+/** Calls back when a button on the widget is pressed while the app is running. Returns a function that stops listening. */
+export const listenForWidgetStrikes = (onPress: () => void): (() => void) => {
+  if (Platform.OS !== 'ios') return () => undefined;
+  let stop: (() => void) | undefined;
+  let stopped = false;
+  void import('expo-widgets')
+    .then(({ addUserInteractionListener }) => {
+      if (stopped) return;
+      const subscription = addUserInteractionListener(() => onPress());
+      stop = () => subscription.remove();
+    })
+    .catch(() => undefined);
+  return () => {
+    stopped = true;
+    stop?.();
+  };
 };

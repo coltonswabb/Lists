@@ -2,7 +2,7 @@ import { EBGaramond_500Medium, EBGaramond_500Medium_Italic } from '@expo-google-
 import { PirataOne_400Regular } from '@expo-google-fonts/pirata-one';
 import { useFonts } from 'expo-font';
 import { StatusBar } from 'expo-status-bar';
-import { type FC, useEffect, useMemo, useRef, useState } from 'react';
+import { type FC, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, AppState, BackHandler, Pressable, StyleSheet, Text, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -33,7 +33,7 @@ import { play, playNote } from './sounds';
 import { useLists } from './store';
 import { fonts, type Palette, paletteOf, roman } from './theme';
 import type { Item, List } from './types';
-import { syncWidget } from './widgetSync';
+import { listenForWidgetStrikes, syncWidget, takeWidgetStrikes } from './widgetSync';
 
 const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
 /** Clearing at least this many items at once earns a word from the scribe. */
@@ -88,21 +88,39 @@ const Screens: FC<{ settings: Settings; address: Address; onCandle: () => void }
   /** The item whose margin was tapped, to be carried to another scroll. */
   const [sending, setSending] = useState<{ listId: string; itemId: string; text: string } | null>(null);
   const { renew } = store;
-
-  // Daily scrolls renew at dawn, so a day can turn while the app sits in the background.
-  useEffect(() => {
-    const subscription = AppState.addEventListener('change', (state) => {
-      if (state === 'active' && renew()) say('renewed');
-    });
-    return () => subscription.remove();
-  }, [renew]);
-  // The buttons on a reminder: strike the item, or be reminded again in an hour. The lists are read
-  // through a ref so that the listener is set up once, not again on every change.
+  // The lists as they are now, for listeners that are set up once and must not go stale.
   const { toggleItem, remindLater } = store;
   const listsNow = useRef(store.lists);
   useEffect(() => {
     listsNow.current = store.lists;
   }, [store.lists]);
+
+  // Items struck on the home screen widget are struck here as soon as the app can look: when the
+  // lists have loaded, when the app comes forward, and at once if it is running when the button is pressed.
+  const strikeFromWidget = useCallback(() => {
+    void takeWidgetStrikes().then((ids) => {
+      for (const id of ids) {
+        const list = listsNow.current.find((candidate) => candidate.items.some((item) => item.id === id && !item.done));
+        if (list) toggleItem(list.id, id);
+      }
+    });
+  }, [toggleItem]);
+  useEffect(() => {
+    if (!store.loaded) return;
+    strikeFromWidget();
+    return listenForWidgetStrikes(strikeFromWidget);
+  }, [store.loaded, strikeFromWidget]);
+
+  // Daily scrolls renew at dawn, so a day can turn while the app sits in the background.
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (state) => {
+      if (state === 'active' && renew()) say('renewed');
+      if (state === 'active') strikeFromWidget();
+    });
+    return () => subscription.remove();
+  }, [renew, strikeFromWidget]);
+  // The buttons on a reminder: strike the item, or be reminded again in an hour. The lists are read
+  // through a ref so that the listener is set up once, not again on every change.
   useEffect(
     () =>
       listenForReminderActions((action, listId, itemId) => {
