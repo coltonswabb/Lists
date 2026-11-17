@@ -37,7 +37,7 @@ import { type Address, say, sayOneOf, standing } from './scribe';
 import { useSettings } from './settings';
 import { ThemeProvider, useTheme } from './ThemeContext';
 import { play, playNote } from './sounds';
-import { DAWN_HOUR, dawnDay, isTutorial, plannedDay, useLists } from './store';
+import { dawnDay, isTutorial, plannedDay, useLists } from './store';
 import { onVellum, fonts, type Palette, paletteOf, roman } from './theme';
 import type { Item, List } from './types';
 import { listenForWidgetStrikes, syncWidget, takeWidgetStrikes } from './widgetSync';
@@ -895,9 +895,11 @@ const Screens: FC<{ settings: Settings; address: Address; night: boolean; onCand
   );
 };
 
-/** The hour the candle is lit when it follows the clock. It is snuffed at dawn, the hour the day's scrolls are laid out. */
+/** The hour the candle is lit when it follows the clock. */
 const DUSK_HOUR = 19;
-const nightByClock = (now: Date) => now.getHours() >= DUSK_HOUR || now.getHours() < DAWN_HOUR;
+/** The hour it goes out again. The day itself turns at midnight; the candle burns on past it for those still at the desk. */
+const CANDLE_OUT_HOUR = 5;
+const nightByClock = (now: Date) => now.getHours() >= DUSK_HOUR || now.getHours() < CANDLE_OUT_HOUR;
 
 const columnStyle = { flex: 1, width: '100%', maxWidth: PAGE_WIDTH, alignSelf: 'center' } as const;
 /** With the shelf beside it, the desk is as wide as the two together. */
