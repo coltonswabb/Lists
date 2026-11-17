@@ -1,4 +1,4 @@
-import { type FC, useEffect } from 'react';
+import { type FC, useEffect, useRef } from 'react';
 import { Image, Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
 import Animated, {
   Easing,
@@ -6,6 +6,7 @@ import Animated, {
   useReducedMotion,
   useSharedValue,
   withRepeat,
+  withDelay,
   withSequence,
   withTiming,
 } from 'react-native-reanimated';
@@ -26,6 +27,7 @@ const FOOT = 58;
 const WICK = { x: 0.575, y: 0.11 };
 const FLAME = { width: 15, height: 30 };
 const GLOW = 120;
+const SMOKE = { width: 14, height: 42 };
 
 /** On the inkwell's painting: the line above which there is only feather, and where the quill meets the ink. */
 const FEATHER_ABOVE = 0.545;
@@ -40,14 +42,15 @@ type DeskThingsProps = {
   onPen: () => void;
   /** The candle is touched: turn day to night, or night to day. */
   onCandle: () => void;
-  /** Whether it is night, for VoiceOver. */
+  /** Whether it is night. The candle burns only by night; by day it stands snuffed. */
   night: boolean;
 };
 
 /**
- * The scribe's things, low on the Library's desk: a lit candle, and an inkwell whose quill is the
+ * The scribe's things, low on the Library's desk: a candle, and an inkwell whose quill is the
  * visible way to start a scroll. Tapping it dips the quill, and the candle gutters in the draught.
- * Touching the candle turns day to night and back.
+ * The candle stands snuffed by day; touching it lights it and night falls, and touching it again
+ * snuffs it, with a thread of smoke, and the day comes back.
  */
 export const DeskThings: FC<DeskThingsProps> = ({ scrolls, onPen, onCandle, night }) => {
   const insets = useSafeAreaInsets();
@@ -60,6 +63,25 @@ export const DeskThings: FC<DeskThingsProps> = ({ scrolls, onPen, onCandle, nigh
   const flutter = useSharedValue(0);
   const flare = useSharedValue(0);
   const dip = useSharedValue(0);
+  // How far the flame is alight, 0 to 1, and how far a thread of smoke has risen after snuffing.
+  const lit = useSharedValue(night ? 1 : 0);
+  const smoke = useSharedValue(1);
+  const wasNight = useRef(night);
+  useEffect(() => {
+    if (wasNight.current === night) return;
+    wasNight.current = night;
+    if (night) {
+      // Caught from the wick: small and low, then standing up to its height.
+      lit.value = still ? 1 : withTiming(1, { duration: 520, easing: Easing.out(Easing.back(2)) });
+    } else {
+      lit.value = still ? 0 : withTiming(0, { duration: 160, easing: Easing.in(Easing.quad) });
+      if (!still) {
+        smoke.value = 0;
+        // The candle is snuffed while the sky covers the desk, so the smoke waits to rise until the sky lifts off it.
+        smoke.value = withDelay(950, withTiming(1, { duration: 2400, easing: Easing.out(Easing.quad) }));
+      }
+    }
+  }, [night, still, lit, smoke]);
 
   useEffect(() => {
     if (still) return;
@@ -68,13 +90,22 @@ export const DeskThings: FC<DeskThingsProps> = ({ scrolls, onPen, onCandle, nigh
   }, [still, waver, flutter]);
 
   const flameStyle = useAnimatedStyle(() => ({
+    opacity: Math.min(1, lit.value * 1.6),
     transform: [
+      { scale: lit.value },
       { rotate: `${(waver.value - 0.5) * 9 + (flutter.value - 0.5) * 4 + flare.value * 14}deg` },
       { scaleY: 0.94 + flutter.value * 0.1 + waver.value * 0.06 - flare.value * 0.25 },
       { scaleX: 1 - flutter.value * 0.06 + flare.value * 0.12 },
     ],
   }));
-  const glowStyle = useAnimatedStyle(() => ({ opacity: 0.75 + flutter.value * 0.15 + waver.value * 0.1 - flare.value * 0.3 }));
+  const glowStyle = useAnimatedStyle(() => ({ opacity: lit.value * (0.75 + flutter.value * 0.15 + waver.value * 0.1 - flare.value * 0.3) }));
+  // The smoke curls up from the wick, widening and thinning out as it goes.
+  const smokeStyle = useAnimatedStyle(() => ({
+    opacity: smoke.value >= 1 ? 0 : Math.sin(smoke.value * Math.PI) * 0.7,
+    // Held at its foot on the wick, so it rises and spreads from there rather than drifting off it.
+    transformOrigin: '50% 100%',
+    transform: [{ translateY: -smoke.value * 12 }, { translateX: smoke.value * 3 }, { scale: 0.8 + smoke.value * 0.45 }],
+  }));
   const featherStyle = useAnimatedStyle(() => ({
     transform: [{ translateY: dip.value * 3 }, { rotate: `${dip.value * -9}deg` }],
   }));
@@ -110,7 +141,8 @@ export const DeskThings: FC<DeskThingsProps> = ({ scrolls, onPen, onCandle, nigh
           }}
           hitSlop={10}
           accessibilityRole="switch"
-          accessibilityLabel="Night Vigil"
+          accessibilityLabel="Candle"
+          accessibilityHint={night ? "Snuffs it, and the day returns" : "Lights it for night, to plan the morrow"}
           accessibilityState={{ checked: night }}
           style={{ width: CANDLE, height: candleHeight }}
         >
@@ -148,6 +180,16 @@ export const DeskThings: FC<DeskThingsProps> = ({ scrolls, onPen, onCandle, nigh
               {/* A teardrop leaning a little, as a flame does: full at the foot, drawn to a point. */}
               <Path d="M15 1 C 17 15, 28 26, 27 41 C 26 52, 21 59, 15 59 C 9 59, 4 52, 3 41 C 2 28, 12 17, 15 1 Z" fill="url(#flame)" />
               <Path d="M15 34 C 17 40, 21 44, 20 50 C 19 55, 17 57, 15 57 C 13 57, 11 55, 10 50 C 9 45, 13 40, 15 34 Z" fill="#5a78c8" opacity={0.35} />
+            </Svg>
+          </Animated.View>
+          <Animated.View
+            pointerEvents="none"
+            style={[styles.smoke, { left: CANDLE * WICK.x - SMOKE.width / 2 - 2, top: candleHeight * WICK.y - SMOKE.height + 3 }, smokeStyle]}
+          >
+            <Svg width={SMOKE.width} height={SMOKE.height} viewBox="0 0 20 60">
+              {/* A broad faint haze about a thin bright thread, so it reads as smoke and not a drawn line. */}
+              <Path d="M10 60 C 4 50, 16 44, 10 34 C 4 24, 15 18, 9 8 C 7 4, 10 1, 12 0" stroke="#e4ded2" strokeWidth={7} strokeLinecap="round" fill="none" opacity={0.18} />
+              <Path d="M10 60 C 4 50, 16 44, 10 34 C 4 24, 15 18, 9 8 C 7 4, 10 1, 12 0" stroke="#e4ded2" strokeWidth={1.8} strokeLinecap="round" fill="none" opacity={0.7} />
             </Svg>
           </Animated.View>
         </Pressable>
@@ -191,6 +233,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   glow: { position: 'absolute', width: GLOW, height: GLOW },
+  smoke: { position: 'absolute', width: SMOKE.width, height: SMOKE.height },
   flame: { position: 'absolute', width: FLAME.width, height: FLAME.height },
   clip: { position: 'absolute', overflow: 'hidden' },
 });
