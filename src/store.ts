@@ -72,6 +72,7 @@ const starterLists = (): List[] => [
       'Tap to amend the wording',
       'Hold, then drag to reorder',
       'Tap its numeral to move it',
+      'Clear struck sweeps the done',
       'Writing:',
       'Pull down to pen a new line',
       'Pinch apart to write between',
@@ -80,8 +81,10 @@ const starterLists = (): List[] => [
       'Swipe up to roll me up',
       // Back in the Library, where the scribe's things stand.
       'On the desk:',
-      'Tap the inkwell for a scroll',
+      'Tap the quill for a new scroll',
+      'Tap More to choose its kind',
       'Touch the candle for night',
+      'By night, plan the morrow',
     ].map(newItem),
   },
 ];

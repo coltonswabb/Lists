@@ -66,8 +66,11 @@ const PULL_RESISTANCE = 0.6;
 const ROLL_UP_AT = ROW_HEIGHT * 0.9;
 /** A push released faster than this, in points a second, rolls the scroll up however short it was. */
 const FLICK_UP = 900;
-/** How far into shadow the last scroll on the shelf lies, as a share of black: the first lies in none. */
-const SHELF_SHADE = 0.38;
+/**
+ * How far into shadow the last scroll on the shelf lies, as a share of black: the first lies in none. Pale paper
+ * goes muddy long before dark paper stops showing it, so it is shaded less.
+ */
+const SHELF_SHADE = { pale: 0.22, dark: 0.38 };
 /** A finger that has travelled further than this was dragging, not tapping. */
 const TAP_SLOP = 10;
 const PRESS_GUARD_MS = 150;
@@ -673,7 +676,7 @@ export const GestureList: FC<GestureListProps> = ({
     const place = rowCount > 1 ? index / (rowCount - 1) : 0;
     // And each lies a little further into shadow than the one above it, whatever it is made of, so the shelf
     // plainly darkens toward its foot.
-    const shaded = (color: string) => mixColors(color, '#000000', place * SHELF_SHADE);
+    const shaded = (color: string) => mixColors(color, '#000000', place * (colors.darkPaper ? SHELF_SHADE.dark : SHELF_SHADE.pale));
     if (row.vellum) return shaded(mixColors(row.vellum.from, row.vellum.to, rowCount > 1 ? place : 0.5));
     const paper = mixColors(colors.paperFrom, colors.paperTo, place);
     return shaded(row.ribbon ? mixColors(paper, row.ribbon, 0.14) : paper);

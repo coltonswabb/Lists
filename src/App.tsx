@@ -748,7 +748,8 @@ const Screens: FC<{ settings: Settings; address: Address; night: boolean; onCand
             vellum: kinds[kindOf(list)].vellum,
             emblem: kinds[kindOf(list)].emblem ?? undefined,
             progress: shareDone(list, kindOf(list)),
-            badge: mark ? `${mark} · ${roman(open)}` : roman(open),
+            // A marked scroll with nothing on it yet wears its mark alone: "MORROW", not "MORROW · NIL".
+            badge: mark ? (open > 0 ? `${mark} · ${roman(open)}` : mark) : roman(open),
             badgeMarked: mark !== null,
             sealed: sealed && !morrow,
             stamp: sealed && list.id === freshSeal,

@@ -214,7 +214,8 @@ const makeStyles = (colors: Palette) =>
     fade: { position: 'absolute', top: 0, left: 0, right: 0, height: 18 },
     title: { color: colors.onDesk, fontFamily: fonts.display, fontSize: 30 },
     action: { color: colors.onDesk, fontFamily: fonts.bodyItalic, fontSize: 18 },
-    papers: { paddingBottom: 10, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.rule },
+    // Raised above the sheet's margin rule, which would otherwise run across the papers' own little desks.
+    papers: { zIndex: 1, paddingBottom: 10, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.rule },
     topRoller: { zIndex: 1, marginBottom: -ROLLER_HEIGHT / 2 },
     bottomRoller: { zIndex: 1, marginTop: -ROLLER_HEIGHT / 2 },
     sheet: { marginHorizontal: 20, paddingTop: ROLLER_HEIGHT / 2, overflow: 'hidden' },
