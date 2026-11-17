@@ -744,6 +744,8 @@ const Screens: FC<{ settings: Settings; address: Address; night: boolean; onCand
             id: list.id,
             text: list.name,
             note: isTutorial(list) ? 'Tutorial' : undefined,
+            // Tomorrow is the scribe's own and cannot be cast out or sealed: a swipe on it springs back.
+            fixed: list.tomorrow === true,
             ribbon: kinds[kindOf(list)].ribbon ?? undefined,
             vellum: kinds[kindOf(list)].vellum,
             emblem: kinds[kindOf(list)].emblem ?? undefined,

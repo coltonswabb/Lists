@@ -121,6 +121,8 @@ export type GestureListRow = {
   planned?: boolean;
   /** Shelf only: a dark kind's own vellum, which its roll is made of, with its name in bright ink. */
   vellum?: Vellum;
+  /** Cannot be cast out or struck: the scribe's own, which a swipe only nudges. */
+  fixed?: boolean;
   /** Shelf only: the kind's small sign, set beside the count. */
   emblem?: string;
   /** Shelf only: the colour of the ribbon tied round the roll, which is also the ground of its painted initial. */
@@ -918,8 +920,8 @@ export const GestureList: FC<GestureListProps> = ({
                     gap={{ index: gapIndex, size: gapSize }}
                     animateLayout={!dragging}
                     sweepAfter={sweeping && row.done ? (sweepOrder.get(row.id) ?? 0) * SWEEP_STAGGER_MS : undefined}
-                    onDelete={() => onDelete(row.id)}
-                    onComplete={onComplete && !row.section ? () => onComplete(row.id) : undefined}
+                    onDelete={row.fixed ? undefined : () => onDelete(row.id)}
+                    onComplete={row.fixed ? undefined : onComplete && !row.section ? () => onComplete(row.id) : undefined}
                     onPress={() => press(() => (onOpen ? onOpen(row.id) : setEditingId(row.id)))}
                     onPressLead={onPressLead ? () => press(() => onPressLead(row.id)) : undefined}
                     strikeWidth={strikeFor(row)}

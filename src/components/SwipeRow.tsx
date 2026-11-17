@@ -79,7 +79,8 @@ type SwipeRowProps = {
   animateLayout: boolean;
   /** Set while finished rows are being cleared: the row starts sweeping off the sheet after this many milliseconds. */
   sweepAfter?: number;
-  onDelete: () => void;
+  /** Casts the row out. Without it the row cannot be cast out: a swipe left meets resistance and springs back. */
+  onDelete?: () => void;
   /** Swipe right. Rows without it only rubber-band in that direction. */
   onComplete?: () => void;
   onPress: () => void;
@@ -139,6 +140,7 @@ export const SwipeRow: FC<SwipeRowProps> = ({
   const holdY = useSharedValue(0);
   const lift = useSharedValue(0);
   const canComplete = onComplete !== undefined;
+  const canDelete = onDelete !== undefined;
 
   // Being cleared: the whole row sweeps off the sheet. Its owner removes it once the sweep has finished.
   const sweep = useSharedValue(0);
@@ -158,8 +160,9 @@ export const SwipeRow: FC<SwipeRowProps> = ({
     onUpdate: (event) => {
       'worklet';
       const x = event.translationX;
-      offsetX.value = x > 0 && !canComplete ? x * 0.2 : x;
-      const next = x < -TRIGGER_DISTANCE ? -1 : x > TRIGGER_DISTANCE && canComplete ? 1 : 0;
+      // A swipe the row cannot answer is felt as resistance, and never arms.
+      offsetX.value = (x > 0 && !canComplete) || (x < 0 && !canDelete) ? x * 0.2 : x;
+      const next = x < -TRIGGER_DISTANCE && canDelete ? -1 : x > TRIGGER_DISTANCE && canComplete ? 1 : 0;
       if (next !== armed.value) {
         armed.value = next;
         if (next !== 0) scheduleOnRN(tick);
@@ -169,7 +172,7 @@ export const SwipeRow: FC<SwipeRowProps> = ({
       'worklet';
       const direction = event.canceled ? 0 : armed.value;
       armed.value = 0;
-      if (direction === -1) {
+      if (direction === -1 && onDelete) {
         offsetX.value = withTiming(-width, { duration: 160 }, (finished) => {
           if (finished) scheduleOnRN(onDelete);
         });
@@ -344,14 +347,14 @@ export const SwipeRow: FC<SwipeRowProps> = ({
           accessibilityActions={[
             { name: 'activate' },
             ...(canComplete ? [{ name: 'complete', label: completeActionLabel }] : []),
-            { name: 'delete', label: 'Cast out' },
+            ...(canDelete ? [{ name: 'delete', label: 'Cast out' }] : []),
             ...(onPressLead && leadActionLabel ? [{ name: 'lead', label: leadActionLabel }] : []),
           ]}
           onAccessibilityAction={(event) => {
             const action = event.nativeEvent.actionName;
             if (action === 'activate') onPress();
             else if (action === 'complete') complete();
-            else if (action === 'delete') onDelete();
+            else if (action === 'delete') onDelete?.();
             else if (action === 'lead') onPressLead?.();
           }}
         >
