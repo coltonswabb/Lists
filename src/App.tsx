@@ -12,6 +12,7 @@ import { ChestScreen } from './components/ChestScreen';
 import { ChronicleScreen } from './components/ChronicleScreen';
 import { DayNightVeil } from './components/DayNightVeil';
 import { DeskThings } from './components/DeskThings';
+import { NightLight } from './components/NightLight';
 import { PatternSheet } from './components/PatternSheet';
 import { SealPress } from './components/SealPress';
 import { tick } from './haptics';
@@ -659,6 +660,7 @@ export const App: FC = () => {
               <ScribeWelcome onChoose={settings.chooseAddress} />
             )}
           </View>
+          {night ? <NightLight /> : null}
           {turning ? (
             <DayNightVeil
               to={turning}
