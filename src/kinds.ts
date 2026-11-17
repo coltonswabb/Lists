@@ -3,7 +3,7 @@ import type { Vellum } from './theme';
 import type { List } from './types';
 
 /** What a scroll is for. It changes the scroll's trim and what the scribe calls the things on it, not how it works. */
-export const kindNames = ['decree', 'ledger', 'market', 'quest', 'spell', 'revel', 'missive'] as const;
+export const kindNames = ['decree', 'ledger', 'market', 'quest', 'spell', 'revel', 'missive', 'rite'] as const;
 export type Kind = (typeof kindNames)[number];
 
 /** How an open scroll of a kind is dressed, over whatever paper is chosen. */
@@ -97,6 +97,16 @@ export const kinds: Record<Kind, KindSpec> = {
     left: ['EPISTULA', 'EPISTULAE'],
     line: (to) => `Who must hear of it, ${addresses[to]}?`,
     hints: ['missive', 'letter', 'call', 'write to', 'reply', 'message', 'people', 'thank'],
+  },
+  rite: {
+    label: 'Rite',
+    purpose: 'habits and daily routines',
+    ribbon: '#2f7f7a',
+    // Kept like a book of hours: calm, sea-green paper, turned to every day.
+    trim: { wash: 'rgba(40,120,115,0.10)', pigment: '#256660' },
+    left: ['RITUS', 'RITUS'],
+    line: (to) => `As every day, ${addresses[to]}.`,
+    hints: ['rite', 'routine', 'habit', 'ritual', 'morning', 'evening', 'daily', 'workout', 'gym'],
   },
 };
 

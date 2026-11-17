@@ -549,7 +549,14 @@ const Screens: FC<{ settings: Settings; address: Address; night: boolean; onCand
           open={menuOpen}
           title={openList.name}
           kind={kind}
-          onKind={(chosen) => store.setKind(openList.id, chosen)}
+          onKind={(chosen) => {
+            store.setKind(openList.id, chosen);
+            // A rite is done afresh each day, so choosing it sets the scroll to renew at dawn; that can be turned off below.
+            if (chosen === 'rite' && !openList.daily) {
+              say('renew');
+              store.setDaily(openList.id, true);
+            }
+          }}
           onClose={() => setMenuOpen(false)}
           choices={[
             {
