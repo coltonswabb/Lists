@@ -107,6 +107,8 @@ export type GestureListRow = {
   /** A heading inside a scroll. Drawn with a painted initial; cannot be completed. */
   section?: boolean;
   badge?: string;
+  /** Shelf only: a few small words written under the scroll's name, saying what kind of scroll it is. */
+  note?: string;
   /** What the row's text becomes when opened for editing, if that differs from what is shown. */
   editText?: string;
   /** Draws the badge in the accent colour at its usual size: a word that marks the row out, such as NEW. */
@@ -570,6 +572,10 @@ export const GestureList: FC<GestureListProps> = ({
   const paperFor = (index: number, done = false) =>
     paperAt(colors, index + (addIndex !== null && index >= addIndex ? 1 : 0), paperTotal, done);
 
+  // On a shelf with scrolls on it the bare desk does nothing when touched: a scroll is added with the quill or by
+  // pulling down. An empty shelf still takes a touch, and so does the paper below a scroll's last line.
+  const deskIsQuiet = isShelf && rowCount > 0;
+
   const input =
     addIndex === null ? null : (
       <RowInput
@@ -588,15 +594,26 @@ export const GestureList: FC<GestureListProps> = ({
     const content = (
       <>
         <RowLead lead={leadFor(row, index)} />
-        <Text
-          style={[styles.rowText, styles.fill, row.section ? styles.sectionText : !isShelf && styles.itemText, row.done && styles.doneText]}
-          // A long item runs onto a second line before it is cut short.
-          numberOfLines={isShelf || row.section ? 1 : 2}
-          maxFontSizeMultiplier={MAX_TEXT_SCALE}
-        >
-          {rubricated[index] ? <Text style={styles.rubric}>{row.text.charAt(0)}</Text> : null}
-          {rubricated[index] ? row.text.slice(1) : headingAfterInitial(row, isShelf)}
-        </Text>
+        {isShelf && row.note ? (
+          <View style={styles.fill}>
+            <Text style={[styles.rowText, styles.notedText]} numberOfLines={1} maxFontSizeMultiplier={MAX_TEXT_SCALE}>
+              {row.text}
+            </Text>
+            <Text style={styles.note} numberOfLines={1} maxFontSizeMultiplier={MAX_TEXT_SCALE}>
+              {row.note}
+            </Text>
+          </View>
+        ) : (
+          <Text
+            style={[styles.rowText, styles.fill, row.section ? styles.sectionText : !isShelf && styles.itemText, row.done && styles.doneText]}
+            // A long item runs onto a second line before it is cut short.
+            numberOfLines={isShelf || row.section ? 1 : 2}
+            maxFontSizeMultiplier={MAX_TEXT_SCALE}
+          >
+            {rubricated[index] ? <Text style={styles.rubric}>{row.text.charAt(0)}</Text> : null}
+            {rubricated[index] ? row.text.slice(1) : headingAfterInitial(row, isShelf)}
+          </Text>
+        )}
         {row.sealed ? (
           <Animated.View
             style={waxSeal ? styles.waxSeal : styles.seal}
@@ -767,6 +784,7 @@ export const GestureList: FC<GestureListProps> = ({
                     strikeWidth={strikeFor(row)}
                     label={[
                       row.text,
+                      row.note ?? '',
                       row.section ? 'heading' : row.done ? 'done' : '',
                       row.sealed ? 'sealed' : row.badge && !row.section && !isShelf ? row.badge.toLowerCase() : '',
                     ]
@@ -794,9 +812,10 @@ export const GestureList: FC<GestureListProps> = ({
                   finished && finisArt ? styles.tailWithArt : null,
                   rowCount === 0 && drawings['empty-shelf'] ? styles.tailEmpty : null,
                 ]}
-                accessibilityRole="button"
-                accessibilityLabel={isShelf ? 'Add a scroll' : 'Add a row'}
-                disabled={busy}
+                accessibilityRole={deskIsQuiet ? undefined : 'button'}
+                accessibilityLabel={deskIsQuiet ? undefined : isShelf ? 'Add a scroll' : 'Add a row'}
+                accessible={!deskIsQuiet}
+                disabled={busy || deskIsQuiet}
                 onPress={() => press(() => setAddIndex(endIndex))}
               >
                 {rowCount === 0 && !busy && drawings['empty-shelf'] ? (
@@ -821,7 +840,7 @@ export const GestureList: FC<GestureListProps> = ({
                 <Roller paper={colors.paperTo} />
               </View>
             )}
-            <Pressable style={styles.tapZone} disabled={busy} onPress={() => press(() => setAddIndex(endIndex))} />
+            <Pressable style={styles.tapZone} accessible={false} disabled={busy || deskIsQuiet} onPress={() => press(() => setAddIndex(endIndex))} />
           </ScrollView>
           </Animated.View>
         </View>
@@ -882,6 +901,9 @@ const makeStyles = (colors: Palette) =>
   },
   rollLight: { ...StyleSheet.absoluteFill, borderRadius: 3 },
   rowText: { color: colors.ink, fontFamily: fonts.body, fontSize: 21 },
+  // A noted scroll's name sits a little higher and tighter, to leave room for the note beneath it.
+  notedText: { lineHeight: 24 },
+  note: { color: colors.inkFaded, fontFamily: fonts.bodyItalic, fontSize: 13, lineHeight: 15, marginTop: -1 },
   // Close against its framed initial, which is the word's own first letter.
   sectionText: { fontFamily: fonts.display, fontSize: 26, marginLeft: 3 },
   // Close enough set that two lines sit inside one row with air above and below.

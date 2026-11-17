@@ -32,7 +32,7 @@ import { type Address, say, standing } from './scribe';
 import { useSettings } from './settings';
 import { ThemeProvider, useTheme } from './ThemeContext';
 import { play, playNote } from './sounds';
-import { dawnDay, plannedDay, useLists } from './store';
+import { dawnDay, isTutorial, plannedDay, useLists } from './store';
 import { fonts, type Palette, paletteOf, roman } from './theme';
 import type { Item, List } from './types';
 import { listenForWidgetStrikes, syncWidget, takeWidgetStrikes } from './widgetSync';
@@ -528,6 +528,7 @@ const Screens: FC<{ settings: Settings; address: Address; night: boolean; onCand
           return {
             id: list.id,
             text: list.name,
+            note: isTutorial(list) ? 'Tutorial' : undefined,
             badge: mark ? `${mark} · ${roman(open)}` : roman(open),
             badgeMarked: mark !== null,
             sealed: sealed && !morrow,

@@ -25,6 +25,8 @@ export type List = {
   touchedAt?: number;
   /** A reusable scroll: every item is unmarked again each dawn. */
   daily?: boolean;
+  /** The scribe's own first scroll, which teaches the gestures: marked as a tutorial on the shelf. */
+  tutorial?: boolean;
   /** The day (YYYY-MM-DD, local) a daily scroll was last renewed. */
   renewedOn?: string;
   /** Put away in the chest: kept whole, off the shelf, until it is wanted again. */

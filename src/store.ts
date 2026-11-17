@@ -54,10 +54,16 @@ const newItem = (raw: string): Item => {
  * Shown on first launch only: the scribe's own first decree, each line teaching the gesture it names.
  * Lines stay under about 30 characters so none is cut short on a phone.
  */
+const STARTER_NAME = 'Thy first decree';
+
+/** The scribe's teaching scroll: marked so when made, or known by its name where it was made before the mark existed. */
+export const isTutorial = (list: List) => list.tutorial === true || list.name === STARTER_NAME;
+
 const starterLists = (): List[] => [
   {
     id: newId(),
-    name: 'Thy first decree',
+    name: STARTER_NAME,
+    tutorial: true,
     items: [
       'Striking:',
       'Swipe right to strike it done',
