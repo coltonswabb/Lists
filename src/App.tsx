@@ -665,6 +665,19 @@ const Screens: FC<{ settings: Settings; address: Address; night: boolean; onCand
                 }
               },
             },
+            ...(items.some((item) => item.done) && !night
+              ? [
+                  {
+                    // Always here, because the foot of a finished scroll offers sealing in its place.
+                    label: 'Clear struck',
+                    note: 'The struck lines are swept off the scroll. The chronicle keeps them.',
+                    onPress: () => {
+                      setMenuOpen(false);
+                      scrollActions.current?.clear();
+                    },
+                  },
+                ]
+              : []),
             ...(items.some((item) => item.done)
               ? [
                   {

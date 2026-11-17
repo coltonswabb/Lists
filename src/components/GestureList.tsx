@@ -411,8 +411,20 @@ export const GestureList: FC<GestureListProps> = ({
   const beginPull = () => {
     pulling.current = true;
   };
+  const inputHandle = useRef<RowInputHandle | null>(null);
+  /** Finishes whatever is being written, a new row or one being amended, and puts the keyboard away. */
+  const doneWriting = () => {
+    inputHandle.current?.finish();
+    Keyboard.dismiss();
+  };
   const press = (action: () => void) => {
-    if (!pulling.current && !busy) action();
+    if (pulling.current) return;
+    // With something being written, a touch on anything else finishes it and puts the keyboard away, and does no more.
+    if (busy) {
+      doneWriting();
+      return;
+    }
+    action();
   };
 
   const arm = (action: PullAction) => {
@@ -635,7 +647,6 @@ export const GestureList: FC<GestureListProps> = ({
   const paperFor = (index: number, done = false) =>
     paperAt(colors, index + (addIndex !== null && index >= addIndex ? 1 : 0), paperTotal, done);
 
-  const inputHandle = useRef<RowInputHandle | null>(null);
   // A touch on bare desk or paper while a row is being written finishes it: what was written is kept, a blank is put away.
   // Where a touch on bare desk or paper began, so that a drag across it is not taken for a tap.
   const touchedAt = useRef({ x: 0, y: 0 });
@@ -647,12 +658,7 @@ export const GestureList: FC<GestureListProps> = ({
     if (Math.abs(pageX - touchedAt.current.x) > TAP_SLOP || Math.abs(pageY - touchedAt.current.y) > TAP_SLOP) return;
     if (addIndex !== null) {
       const open = inputHandle.current;
-      // On a scroll, a blank row stays where it is and takes the caret back: closing it here and opening another on
-      // the next touch would make it come and go. On the shelf a blank scroll is put away.
-      if (!isShelf && open?.isBlank()) {
-        open.focus();
-        return;
-      }
+      // Done writing: a touch on bare desk or paper finishes the row and puts the keyboard away, blank or not.
       open?.finish();
       Keyboard.dismiss();
       return;
@@ -872,7 +878,9 @@ export const GestureList: FC<GestureListProps> = ({
             simultaneousWith={alongsideScroll}
             bounces={false}
             overScrollMode="never"
-            keyboardShouldPersistTaps="handled"
+            // While something is being written, a touch anywhere else on the list only puts the keyboard away,
+            // which finishes the row: what was written is kept, a blank is dropped. Otherwise touches go where they land.
+            keyboardShouldPersistTaps={busy ? 'never' : 'handled'}
             automaticallyAdjustKeyboardInsets
             scrollEnabled={!dragging}
             scrollEventThrottle={16}
@@ -926,6 +934,7 @@ export const GestureList: FC<GestureListProps> = ({
                     rolled={isShelf}
                     // A scroll being renamed keeps the dress it has.
                     dressFor={() => ({ ribbon: row.ribbon, vellum: row.vellum })}
+                    handleRef={inputHandle}
                     onEnd={(text) => endEdit(row.id, text)}
                   />
                 ) : (
