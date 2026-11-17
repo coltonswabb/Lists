@@ -18,7 +18,7 @@ import { SealPress } from './components/SealPress';
 import { tick } from './haptics';
 import { Desk } from './components/Desk';
 import { GestureList, type GestureListActions, type GestureListRow, STAMP_DELAY_MS } from './components/GestureList';
-import { Marginalia } from './components/Marginalia';
+import { Marginalia, nextDrawing } from './components/Marginalia';
 import { ScribeLine } from './components/ScribeLine';
 import { ScribeWelcome } from './components/ScribeWelcome';
 import { SearchScreen } from './components/SearchScreen';
@@ -106,6 +106,8 @@ const Screens: FC<{ settings: Settings; address: Address; night: boolean; onCand
   /** Counts the seals pressed, so each press is its own animation; null when none is showing. */
   const [sealing, setSealing] = useState<number | null>(null);
   const pressSeal = () => setSealing((last) => (last ?? 0) + 1);
+  /** Which margin drawing a finished scroll is given: begun at random, and moved on each time a scroll is finished. */
+  const [finisTurn, setFinisTurn] = useState(() => Math.floor(Math.random() * 1000));
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [chronicleOpen, setChronicleOpen] = useState(false);
   const [chestOpen, setChestOpen] = useState(false);
@@ -401,6 +403,8 @@ const Screens: FC<{ settings: Settings; address: Address; night: boolean; onCand
             if (finishing && remaining === 1) {
               setFreshSeal(openList.id);
               pressSeal();
+              // Each finishing is rewarded with a different drawing from the last.
+              setFinisTurn((turn) => turn + nextDrawing());
               // The teaching scroll has done its work once every line on it is struck: offer to put it away.
               if (isTutorial(openList)) {
                 const tutorialId = openList.id;
@@ -440,7 +444,7 @@ const Screens: FC<{ settings: Settings; address: Address; night: boolean; onCand
               : undefined
           }
           leadActionLabel={store.lists.length > 1 ? 'Carry to another scroll' : undefined}
-          finisArt={<Marginalia seed={openList.id} ink={colors.ink} accent={colors.accent} />}
+          finisArt={<Marginalia seed={openList.id} turn={finisTurn} ink={colors.ink} accent={colors.accent} />}
         />
         {/* What can be done to the whole scroll stands at the foot of the desk, as the Library's own labels do. */}
         <View style={[styles.controls, isTomorrow && styles.controlsCentred, { paddingBottom: insets.bottom + 12 }]}>

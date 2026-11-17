@@ -76,9 +76,17 @@ const drawings: Drawing[] = [snail, fish, bird, vine];
 /** A stable number for a string, so a scroll keeps the same drawing. */
 const hash = (text: string) => [...text].reduce((sum, char) => (sum * 31 + char.charCodeAt(0)) | 0, 7);
 
+/** A step to a different drawing than the one now shown, whichever that is. */
+export const nextDrawing = () => {
+  const count = marginalia.length || drawings.length;
+  return count > 1 ? 1 + Math.floor(Math.random() * (count - 1)) : 0;
+};
+
 type MarginaliaProps = {
-  /** Chooses the drawing: the same seed always draws the same creature. */
+  /** Where the choice of drawing starts from. */
   seed: string;
+  /** Moves the choice on from there: a different turn draws a different creature. */
+  turn?: number;
   ink: string;
   accent: string;
 };
@@ -95,12 +103,12 @@ const INK_AFTER_MS = 420;
 /**
  * A drawing for the margin of a finished scroll, after the creatures and vines medieval scribes drew
  * beside their text. Imported pen drawings are tinted with the paper's ink, so they read on every
- * paper; each scroll keeps the same one.
+ * paper. Which one is drawn changes each time a scroll is finished.
  */
-export const Marginalia: FC<MarginaliaProps> = ({ seed, ink, accent }) => {
+export const Marginalia: FC<MarginaliaProps> = ({ seed, turn = 0, ink, accent }) => {
   const { width: windowWidth } = useWindowDimensions();
   const screenWidth = Math.min(windowWidth, 640);
-  const pick = Math.abs(hash(seed));
+  const pick = Math.abs(hash(seed)) + turn;
   const drawing = marginalia[pick % Math.max(1, marginalia.length)];
   if (drawing) {
     // Wide drawings fill the column; tall ones are held to the same height, so none crowds the page.
