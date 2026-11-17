@@ -57,6 +57,18 @@ const dayView = (lists: List[], today: string): List[] =>
     .filter((list) => !list.tomorrow && !list.stored && isDue(list.plannedFor, today))
     .map((list) => (list.items.every((item) => isDue(item.plannedFor, today)) ? list : { ...list, items: list.items.filter((item) => isDue(item.plannedFor, today)) }));
 
+/**
+ * The scrolls as the night sees them. Night is for the day to come and starts each evening with nothing on it:
+ * the Tomorrow scroll, scrolls begun by candlelight, and of the day's own scrolls only the lines written on them
+ * for tomorrow. The day's lines rest out of sight until the candle is snuffed.
+ */
+const nightView = (lists: List[], today: string): List[] =>
+  lists
+    .filter((list) => !list.stored)
+    .map((list) =>
+      list.tomorrow || !isDue(list.plannedFor, today) ? list : { ...list, items: list.items.filter((item) => !item.section && !isDue(item.plannedFor, today)) },
+    );
+
 const itemsOf = (list: List) => list.items.filter((item) => !item.section);
 const openCount = (items: Item[]) => items.filter((item) => !item.done).length;
 
@@ -74,9 +86,9 @@ const scrollRows = (items: Item[], today: string): { rows: GestureListRow[]; vis
       const mark = item.done || item.plannedFor === undefined ? null : item.plannedFor > today ? 'MORROW' : item.plannedFor === today ? 'NEW' : null;
       rows.push(
         reminder
-          ? { ...item, badge: mark ? `${mark} · ${reminder.toUpperCase()}` : reminder.toUpperCase(), badgeMarked: mark !== null, editText: `${item.text} @ ${reminder}` }
+          ? { ...item, badge: mark ? `${mark} · ${reminder.toUpperCase()}` : reminder.toUpperCase(), badgeMarked: mark !== null, planned: mark !== null, editText: `${item.text} @ ${reminder}` }
           : mark
-            ? { ...item, badge: mark, badgeMarked: true }
+            ? { ...item, badge: mark, badgeMarked: true, planned: true }
             : item,
       );
       visible.push(item);
@@ -207,7 +219,7 @@ const Screens: FC<{ settings: Settings; address: Address; night: boolean; onCand
   const today = dawnDay(new Date());
   const dayLists = useMemo(() => dayView(store.lists, today), [store.lists, today]);
   /** The scrolls on the shelf. By day, the day's. By night, all of them, with Tomorrow last. */
-  const shelfLists = useMemo(() => (night ? store.lists.filter((list) => !list.stored) : dayLists), [night, store.lists, dayLists]);
+  const shelfLists = useMemo(() => (night ? nightView(store.lists, today) : dayLists), [night, store.lists, dayLists, today]);
   /** What lies in the chest, most recently put away first. */
   const storedLists = useMemo(
     () => store.lists.filter((list) => list.stored).sort((a, b) => (b.storedAt ?? 0) - (a.storedAt ?? 0)),
@@ -425,7 +437,8 @@ const Screens: FC<{ settings: Settings; address: Address; night: boolean; onCand
               else playNote(items.length - remaining);
             }
             if (finishing) say(remaining === 1 ? 'finish' : 'complete');
-            if (finishing && remaining === 1) {
+            // By night only tomorrow's lines are in view, so striking the last of them does not finish the scroll.
+            if (finishing && remaining === 1 && !night) {
               setFreshSeal(openList.id);
               pressSeal();
               // Each finishing is rewarded with a different drawing from the last.
@@ -488,10 +501,13 @@ const Screens: FC<{ settings: Settings; address: Address; night: boolean; onCand
                 </Pressable>
               ) : null}
             </>
-          ) : items.length > 0 ? (
+          ) : items.length > 0 || night ? (
             <>
               {/* Only what is wanted often stands here: clearing what is struck, when something is. The rest is behind More. */}
-              {remaining === 0 ? (
+              {night ? (
+                // By candlelight the scroll shows only what is written for tomorrow; sealing and clearing are the day's work.
+                <Text style={styles.deskNote}>Lines written by candlelight join this scroll at dawn.</Text>
+              ) : remaining === 0 ? (
                 // Every line struck: the scroll is finished, and the next thing to do with it is seal it into the chronicle.
                 <Pressable
                   onPress={() => {
@@ -623,7 +639,8 @@ const Screens: FC<{ settings: Settings; address: Address; night: boolean; onCand
           const lines = items.filter((item) => !item.section);
           const sealed = items.length > 0 && open === 0;
           // A scroll made by candlelight for a day to come is marked so on the night's shelf.
-          const morrow = !list.tomorrow && list.plannedFor !== undefined && list.plannedFor > today;
+          // So is one of the day's own scrolls that has had lines written on it for tomorrow.
+          const morrow = !list.tomorrow && ((list.plannedFor !== undefined && list.plannedFor > today) || (night && items.length > 0));
           // And one that arrived this morning, or that holds lines which did, is marked NEW for the day.
           const fresh = !list.tomorrow && (list.plannedFor === today || items.some((item) => !item.done && item.plannedFor === today));
           const mark = morrow ? 'MORROW' : fresh ? 'NEW' : null;

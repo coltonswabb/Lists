@@ -112,6 +112,8 @@ export type GestureListRow = {
   badge?: string;
   /** Shelf only: a few small words written under the scroll's name, saying what kind of scroll it is. */
   note?: string;
+  /** Scroll only: written by candlelight for a day to come, or newly arrived from one: marked with a bar of gold at its edge. */
+  planned?: boolean;
   /** Shelf only: the colour of the ribbon tied round the roll, which is also the ground of its painted initial. */
   ribbon?: string;
   /** Shelf only: the share of the scroll's lines already struck, 0 to 1, shown as a line of gold along the roll. */
@@ -637,6 +639,8 @@ export const GestureList: FC<GestureListProps> = ({
   const rowContent = (row: GestureListRow, index: number) => {
     const content = (
       <>
+        {/* A line planned by candlelight carries gold at its edge, tomorrow's by night and the new arrival's by day. */}
+        {!isShelf && row.planned && !row.done ? <View pointerEvents="none" style={styles.planned} /> : null}
         <RowLead lead={leadFor(row, index)} />
         {isShelf && row.note ? (
           <View style={styles.fill}>
@@ -955,6 +959,7 @@ const makeStyles = (colors: Palette) =>
     zIndex: 1,
   },
   rollLight: { ...StyleSheet.absoluteFill, borderRadius: 3 },
+  planned: { position: 'absolute', left: 7, top: 10, bottom: 10, width: 4, borderTopRightRadius: 2, borderBottomRightRadius: 2, backgroundColor: colors.complete },
   column: { position: 'absolute', top: 0, bottom: 0, right: 58, width: StyleSheet.hairlineWidth * 2, backgroundColor: colors.accent, opacity: 0.35 },
   // Room at the roll's end for the ribbon, so the count is not written under it.
   ribboned: { paddingRight: 34 },
