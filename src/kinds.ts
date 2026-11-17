@@ -16,6 +16,12 @@ export type ScrollTrim = {
   glow?: string;
   /** A second rule is drawn down the right of the sheet, as in an account book. */
   columns?: boolean;
+  /** The lines are numbered in runes, not numerals. */
+  runes?: boolean;
+  /** One mark stands in the margin of every line in place of its number, for a list with no order to it. */
+  mark?: string;
+  /** A dotted trail runs down the margin, as a route does on a map. */
+  trail?: boolean;
   /** A line that opens with a name and a colon has the name written in the pigment: who the line is for. */
   names?: boolean;
 };
@@ -65,7 +71,7 @@ export const kinds: Record<Kind, KindSpec> = {
     purpose: 'things to buy',
     ribbon: '#5f7d3c',
     // Carried to the stalls and back: paper gone a little green and brown with handling.
-    trim: { wash: 'rgba(96,110,40,0.12)', pigment: '#4f6a2f' },
+    trim: { wash: 'rgba(96,110,40,0.12)', pigment: '#4f6a2f', mark: '❧' },
     left: ['EMENDUM', 'EMENDA'],
     line: (to) => `What shall we fetch, ${addresses[to]}?`,
     hints: ['market', 'grocer', 'shop', 'store', 'buy', 'food', 'pantry', 'errand'],
@@ -78,20 +84,21 @@ export const kinds: Record<Kind, KindSpec> = {
     purpose: 'goals and ventures',
     ribbon: '#b5782c',
     // A map's paper: sun-browned, with its marks in ochre.
-    trim: { wash: 'rgba(150,96,30,0.14)', pigment: '#9a601c' },
+    trim: { wash: 'rgba(150,96,30,0.14)', pigment: '#9a601c', trail: true },
     left: ['LABOR', 'LABORES'],
     line: (to) => `Onward, ${addresses[to]}.`,
     hints: ['quest', 'goal', 'project', 'plan', 'trip', 'travel', 'journey', 'build', 'learn'],
     struck: ['A league nearer, {t}.', 'Well fought, {t}.', 'Onward, {t}.', 'The road shortens, {t}.'],
     finished: 'The venture is won, {t}. I shall fetch the wax.',
     tally: ['quest won', 'quests won'],
+    flare: '#d9912f',
   },
   spell: {
     label: 'Spell',
     purpose: 'what must not be forgotten',
     ribbon: '#6b4192',
     // Vellum dyed deep violet, written in silver, its numerals and initials in gold foil that gives off its own light.
-    trim: { pigment: '#e6c56a', glow: '#e2c064' },
+    trim: { pigment: '#e6c56a', glow: '#e2c064', runes: true },
     vellum: { from: '#2c1845', to: '#42245f', ink: '#edebf6', foil: '#e6c56a' },
     left: ['VERBUM', 'VERBA'],
     line: (to) => `These must not fail, ${addresses[to]}.`,
@@ -106,20 +113,21 @@ export const kinds: Record<Kind, KindSpec> = {
     purpose: 'play and leisure',
     ribbon: '#ae3d5e',
     // Dressed for a feast: a blush on the paper and rose-red marks.
-    trim: { wash: 'rgba(200,90,120,0.10)', pigment: '#a23355' },
+    trim: { wash: 'rgba(200,90,120,0.10)', pigment: '#a23355', mark: '✦', glow: '#ffb3c8' },
     left: ['LUDUS', 'LUDI'],
     line: (to) => `At thy leisure, ${addresses[to]}.`,
     hints: ['revel', 'play', 'fun', 'weekend', 'party', 'game', 'movie', 'watch', 'holiday', 'feast'],
     struck: ['Huzzah, {t}!', 'Merrily done, {t}.', 'A fine sport, {t}.', 'More wine, {t}?'],
     finished: 'A revel well kept, {t}. I shall fetch the wax.',
     tally: ['revel kept', 'revels kept'],
+    flare: '#e0557f',
   },
   missive: {
     label: 'Missive',
     purpose: 'people to write or speak to',
     ribbon: '#8f2a2a',
     // A letter: clean paper, marked in the red of sealing wax.
-    trim: { wash: 'rgba(255,255,255,0.08)', pigment: '#8f2a2a', names: true },
+    trim: { wash: 'rgba(255,255,255,0.08)', pigment: '#8f2a2a', names: true, mark: '☙' },
     left: ['EPISTULA', 'EPISTULAE'],
     line: (to) => `Who must hear of it, ${addresses[to]}?`,
     hints: ['missive', 'letter', 'call', 'write to', 'reply', 'message', 'people', 'thank'],
@@ -132,14 +140,26 @@ export const kinds: Record<Kind, KindSpec> = {
     purpose: 'habits and daily routines',
     ribbon: '#2f7f7a',
     // Kept like a book of hours: calm, sea-green paper, turned to every day.
-    trim: { wash: 'rgba(40,120,115,0.10)', pigment: '#256660' },
+    trim: { wash: 'rgba(40,120,115,0.10)', pigment: '#256660', mark: '☩' },
     left: ['RITUS', 'RITUS'],
     line: (to) => `As every day, ${addresses[to]}.`,
     hints: ['rite', 'routine', 'habit', 'ritual', 'morning', 'evening', 'daily', 'workout', 'gym'],
     struck: ['As ever, {t}.', 'Observed, {t}.', 'Faithfully done, {t}.', 'The day is kept, {t}.'],
     finished: 'The day’s rite is kept, {t}.',
     tally: ['rite kept', 'rites kept'],
+    flare: '#3aa59e',
   },
+};
+
+/** The elder runes in their order, which stand for a spell's line numbers: the first line ᚠ, the second ᚢ, and so on. */
+const RUNES = [...'ᚠᚢᚦᚨᚱᚲᚷᚹᚺᚾᛁᛃᛇᛈᛉᛊᛏᛒᛖᛗᛚᛜᛞᛟ'];
+
+/** A number in runes: one rune up to twenty-four, then two. */
+export const runeOf = (value: number): string => {
+  if (value <= 0) return '';
+  const at = value - 1;
+  const last = RUNES[at % RUNES.length] ?? '';
+  return at < RUNES.length ? last : `${RUNES[Math.floor(at / RUNES.length) - 1] ?? ''}${last}`;
 };
 
 export const isKind = (value: unknown): value is Kind => typeof value === 'string' && (kindNames as readonly string[]).includes(value);

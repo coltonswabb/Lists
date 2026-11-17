@@ -8,7 +8,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { pickBackup, shareBackup } from './backup';
-import { type Kind, kindNames, kindOf, kinds } from './kinds';
+import { guessKind, type Kind, kindNames, kindOf, kinds } from './kinds';
 import { PaneWidth } from './PaneWidth';
 import { ChestScreen } from './components/ChestScreen';
 import { ChronicleScreen } from './components/ChronicleScreen';
@@ -173,6 +173,14 @@ const Screens: FC<{ settings: Settings; address: Address; night: boolean; onCand
   const [choosing, setChoosing] = useState(false);
   /** The kind picked in that sheet for the scroll about to be named, and when: it holds only while the name is being written. */
   const pendingKind = useRef<{ kind: Kind | null; at: number }>({ kind: null, at: 0 });
+  /** The same kind, held where the shelf can see it, so the scroll being named already wears it. */
+  const [namingAs, setNamingAs] = useState<Kind | null>(null);
+  // A kind picked and then not used is forgotten after a while, so a later scroll is not dressed in it by mistake.
+  useEffect(() => {
+    if (namingAs === null) return;
+    const timer = setTimeout(() => setNamingAs(null), PENDING_KIND_MS);
+    return () => clearTimeout(timer);
+  }, [namingAs]);
   /** The sheet over an open scroll holding what can be done to the whole of it. */
   const [menuOpen, setMenuOpen] = useState(false);
   /** Counts the seals pressed, so each press is its own animation; null when none is showing. */
@@ -737,6 +745,7 @@ const Screens: FC<{ settings: Settings; address: Address; night: boolean; onCand
             text: list.name,
             note: isTutorial(list) ? 'Tutorial' : undefined,
             ribbon: kinds[kindOf(list)].ribbon ?? undefined,
+            vellum: kinds[kindOf(list)].vellum,
             progress: shareDone(list, kindOf(list)),
             badge: mark ? `${mark} · ${roman(open)}` : roman(open),
             badgeMarked: mark !== null,
@@ -767,6 +776,7 @@ const Screens: FC<{ settings: Settings; address: Address; night: boolean; onCand
           // The kind chosen from the quill's sheet a moment ago, if one was; otherwise the name will suggest one.
           const chosen = Date.now() - pendingKind.current.at < PENDING_KIND_MS ? pendingKind.current.kind : null;
           pendingKind.current = { kind: null, at: 0 };
+          setNamingAs(null);
           store.addLists(names, shelfPosition(index), night ? plannedDay(new Date()) : undefined, chosen ?? undefined);
         }}
         // Tomorrow is the scribe's own: it cannot be renamed, cast out or sealed.
@@ -778,6 +788,11 @@ const Screens: FC<{ settings: Settings; address: Address; night: boolean; onCand
           play('seal');
           say('strike');
           store.deleteList(id);
+        }}
+        // A scroll being named wears the kind chosen for it, or failing that the kind its name so far suggests.
+        dressFor={(name) => {
+          const kind = kinds[namingAs ?? guessKind(name)];
+          return { ribbon: kind.ribbon ?? undefined, vellum: kind.vellum };
         }}
         onMove={(from, to) => store.moveList(shelfPosition(from), shelfPosition(to))}
         onOpen={setOpenListId}
@@ -807,12 +822,14 @@ const Screens: FC<{ settings: Settings; address: Address; night: boolean; onCand
         onBlank={() => {
           setChoosing(false);
           pendingKind.current = { kind: null, at: 0 };
+          setNamingAs(null);
           say('penning');
           shelf.current?.add();
         }}
         onKind={(kind) => {
           setChoosing(false);
           pendingKind.current = { kind, at: Date.now() };
+          setNamingAs(kind);
           say('penning');
           shelf.current?.add();
         }}

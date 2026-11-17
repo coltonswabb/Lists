@@ -10,7 +10,7 @@ export type Lead =
   /** A painted first letter, for things that have a name: scrolls and sections. */
   | { kind: 'initial'; text: string; pigment: string; letter: string; flourish?: string }
   /** A small margin label, for ordinary items: their number, or a mark once finished. */
-  | { kind: 'label'; label: string; color: string; glow?: string }
+  | { kind: 'label'; label: string; color: string; glow?: string; large?: boolean }
   /** A drawn tick, for a finished item. */
   | { kind: 'done'; color: string };
 
@@ -37,7 +37,7 @@ export const RowLead: FC<{ lead: Lead }> = ({ lead }) => {
     return (
       <View style={styles.cell}>
         <Text
-          style={[styles.label, { color: lead.color }, lead.glow ? { textShadowColor: lead.glow, textShadowRadius: 6, textShadowOffset: { width: 0, height: 0 } } : null]} numberOfLines={1} maxFontSizeMultiplier={MAX_TEXT_SCALE}>
+          style={[styles.label, lead.large && styles.sign, { color: lead.color }, lead.glow ? { textShadowColor: lead.glow, textShadowRadius: 6, textShadowOffset: { width: 0, height: 0 } } : null]} numberOfLines={1} maxFontSizeMultiplier={MAX_TEXT_SCALE}>
           {lead.label}
         </Text>
       </View>
@@ -74,6 +74,8 @@ const makeStyles = (colors: Palette) =>
   },
   block: { alignItems: 'center', borderRadius: 2 },
   label: { fontFamily: fonts.label, fontSize: 15, letterSpacing: 0.6 },
+  // A rune or a kind's mark is a sign, not small capitals: drawn larger, in whatever face has it.
+  sign: { fontFamily: undefined, fontSize: 21, letterSpacing: 0 },
   letter: { fontFamily: fonts.display, fontSize: 24, lineHeight: 28 },
   frame: { position: 'absolute', left: (LEAD_WIDTH - FRAME) / 2, top: (LEAD_WIDTH - FRAME) / 2, opacity: 0.85 },
   flourish: { position: 'absolute', left: (LEAD_WIDTH - FLOURISH) / 2, top: (LEAD_WIDTH - FLOURISH) / 2, opacity: 0.55 },

@@ -46,10 +46,10 @@ import { scheduleOnRN } from 'react-native-worklets';
 import { drawings, waxSeal } from '../art';
 import { success, thud, tick } from '../haptics';
 import { play } from '../sounds';
-import type { ScrollTrim } from '../kinds';
+import { runeOf, type ScrollTrim } from '../kinds';
 import { usePaneWidth } from '../PaneWidth';
 import { useTheme } from '../ThemeContext';
-import { accentAt, fonts, mixColors, MAX_TEXT_SCALE, type Palette, paperAt, roman, ROW_HEIGHT, TEXT_SCALE } from '../theme';
+import { accentAt, fonts, mixColors, MAX_TEXT_SCALE, type Palette, type Vellum, paperAt, roman, ROW_HEIGHT, TEXT_SCALE } from '../theme';
 import { DeckleEdge } from './DeckleEdge';
 import { Finial, hasFinial } from './Finial';
 import { PaperOverlay } from './PaperOverlay';
@@ -114,6 +114,8 @@ export type GestureListRow = {
   note?: string;
   /** Scroll only: written by candlelight for a day to come, or newly arrived from one: marked with a bar of gold at its edge. */
   planned?: boolean;
+  /** Shelf only: a dark kind's own vellum, which its roll is made of, with its name in bright ink. */
+  vellum?: Vellum;
   /** Shelf only: the colour of the ribbon tied round the roll, which is also the ground of its painted initial. */
   ribbon?: string;
   /** Shelf only: the share of the scroll's lines already struck, 0 to 1, shown as a line of gold along the roll. */
@@ -162,6 +164,8 @@ type GestureListProps = {
   onClear?: () => void;
   /** Filled with the things a parent may ask of the list. */
   actions?: RefObject<GestureListActions | null>;
+  /** Shelf only: how a scroll being named is dressed, given its name so far: its ribbon's colour, and its vellum if it is a dark kind. */
+  dressFor?: (name: string) => { ribbon?: string; vellum?: Vellum };
   /** Scroll only: how the sheet is dressed for the kind of scroll it is. */
   trim?: ScrollTrim;
   /** Drawn in the margin beside "Finis" once every item is done. */
@@ -188,6 +192,7 @@ export const GestureList: FC<GestureListProps> = ({
   onBack,
   onClear,
   trim,
+  dressFor,
   finisArt,
   leadActionLabel,
   actions,
@@ -301,18 +306,32 @@ export const GestureList: FC<GestureListProps> = ({
   };
 
   const leadFor = (row: GestureListRow, index: number): Lead => {
-    if (isShelf) return { kind: 'initial', text: row.text, pigment: row.ribbon ?? colors.ink, letter: colors.paperFrom };
+    // On the shelf a dark kind's initial is foil on its own dark vellum; any other is the paper's colour on its ribbon's.
+    if (isShelf) {
+      return row.vellum
+        ? { kind: 'initial', text: row.text, pigment: row.vellum.foil, letter: row.vellum.from }
+        : { kind: 'initial', text: row.text, pigment: row.ribbon ?? colors.ink, letter: colors.paperFrom };
+    }
     // A kind's pigment is mixed for pale paper; on a dark one it is lightened so it can still be read.
     const pigment = trim?.pigment && colors.darkPaper ? mixColors(trim.pigment, '#ffffff', 0.5) : trim?.pigment;
     if (row.section) return { kind: 'initial', text: row.text, pigment: pigment ?? colors.accent, letter: colors.paperFrom, flourish: pigment ?? colors.accent };
     if (row.done) return { kind: 'done', color: colors.inkFaded };
-    return { kind: 'label', label: roman(numbers[index] ?? 0), color: pigment ?? accentAt(colors, index, rowCount), glow: trim?.glow };
+    // A spell is numbered in runes; a list with no order to it carries its kind's mark in place of a number.
+    const number = numbers[index] ?? 0;
+    const label = trim?.runes ? runeOf(number) : (trim?.mark ?? roman(number));
+    return { kind: 'label', label, color: pigment ?? accentAt(colors, index, rowCount), glow: trim?.glow, large: trim?.runes === true || trim?.mark !== undefined };
   };
 
   // While typing, a trailing colon previews the row as a section.
   const draftLead = (text: string): Lead => {
     const trimmed = text.trim();
-    if (isShelf) return { kind: 'initial', text: trimmed, pigment: colors.ink, letter: colors.paperFrom };
+    // A scroll being named already wears its kind: the one chosen for it, or the one its name so far suggests.
+    if (isShelf) {
+      const dress = dressFor?.(trimmed);
+      return dress?.vellum
+        ? { kind: 'initial', text: trimmed, pigment: dress.vellum.foil, letter: dress.vellum.from }
+        : { kind: 'initial', text: trimmed, pigment: dress?.ribbon ?? colors.ink, letter: colors.paperFrom };
+    }
     if (trimmed.length > 1 && (trimmed.endsWith(':') || trimmed.startsWith('#'))) {
       return { kind: 'initial', text: trimmed.replace(/^#+\s*/, ''), pigment: colors.accent, letter: colors.paperFrom };
     }
@@ -663,7 +682,7 @@ export const GestureList: FC<GestureListProps> = ({
         <RowLead lead={leadFor(row, index)} />
         {isShelf && row.note ? (
           <View style={styles.fill}>
-            <Text style={[styles.rowText, styles.notedText]} numberOfLines={1} maxFontSizeMultiplier={MAX_TEXT_SCALE}>
+            <Text style={[styles.rowText, styles.notedText, row.vellum && isShelf ? { color: row.vellum.ink } : null]} numberOfLines={1} maxFontSizeMultiplier={MAX_TEXT_SCALE}>
               {row.text}
             </Text>
             <Text style={styles.note} numberOfLines={1} maxFontSizeMultiplier={MAX_TEXT_SCALE}>
@@ -672,7 +691,7 @@ export const GestureList: FC<GestureListProps> = ({
           </View>
         ) : (
           <Text
-            style={[styles.rowText, styles.fill, row.section ? styles.sectionText : !isShelf && styles.itemText, row.done && styles.doneText]}
+            style={[styles.rowText, styles.fill, row.section ? styles.sectionText : !isShelf && styles.itemText, row.done && styles.doneText, row.vellum && isShelf ? { color: row.vellum.ink } : null]}
             // A long item runs onto a second line before it is cut short.
             numberOfLines={isShelf || row.section ? 1 : 2}
             maxFontSizeMultiplier={MAX_TEXT_SCALE}
@@ -692,7 +711,7 @@ export const GestureList: FC<GestureListProps> = ({
             )}
           </Animated.View>
         ) : row.badge ? (
-          <Text style={[styles.badge, row.badgeMarked && styles.badgeMarked, row.badgeAccent && styles.badgeAccent]}>{row.badge}</Text>
+          <Text style={[styles.badge, row.badgeMarked && styles.badgeMarked, row.badgeAccent && styles.badgeAccent, row.vellum && isShelf ? { color: row.vellum.foil } : null]}>{row.badge}</Text>
         ) : null}
       </>
     );
@@ -708,7 +727,7 @@ export const GestureList: FC<GestureListProps> = ({
             <View style={styles.collar} />
           </>
         )}
-        <View style={[styles.rolled, row.ribbon !== undefined && styles.ribboned, { backgroundColor: paperFor(index) }]}>
+        <View style={[styles.rolled, row.ribbon !== undefined && styles.ribboned, { backgroundColor: row.vellum ? mixColors(row.vellum.from, row.vellum.to, 0.5) : paperFor(index) }]}>
           {content}
           {/* The ribbon that marks what the scroll is for, tied round the roll near its end, under the light. */}
           {row.ribbon ? <View style={[styles.ribbon, { backgroundColor: row.ribbon }]} /> : null}
@@ -908,6 +927,7 @@ export const GestureList: FC<GestureListProps> = ({
               {/* What kind of scroll it is, laid over its paper: a wash of colour, and an account book's second rule. */}
               {trim?.wash ? <View pointerEvents="none" style={[StyleSheet.absoluteFill, { backgroundColor: trim.wash }]} /> : null}
               {trim?.columns ? <View pointerEvents="none" style={styles.column} /> : null}
+              {trim?.trail ? <View pointerEvents="none" style={[styles.trail, { borderLeftColor: trim.pigment ?? colors.accent }]} /> : null}
               {isShelf ? null : <PaperOverlay />}
               {isShelf ? null : <DeckleEdge side="left" />}
               {isShelf ? null : <DeckleEdge side="right" />}
@@ -978,6 +998,7 @@ const makeStyles = (colors: Palette) =>
   },
   rollLight: { ...StyleSheet.absoluteFill, borderRadius: 3 },
   planned: { position: 'absolute', left: 7, top: 10, bottom: 10, width: 4, borderTopRightRadius: 2, borderBottomRightRadius: 2, backgroundColor: colors.complete },
+  trail: { position: 'absolute', top: 0, bottom: 0, left: 9, width: 0, borderLeftWidth: 2, borderStyle: 'dotted', opacity: 0.55 },
   column: { position: 'absolute', top: 0, bottom: 0, right: 58, width: StyleSheet.hairlineWidth * 2, backgroundColor: colors.accent, opacity: 0.35 },
   // Room at the roll's end for the ribbon, so the count is not written under it.
   ribboned: { paddingRight: 34 },
