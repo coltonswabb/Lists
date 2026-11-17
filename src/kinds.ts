@@ -14,8 +14,8 @@ export type ScrollTrim = {
   pigment?: string;
   /** The numerals give off light of this colour, as written words of power do. */
   glow?: string;
-  /** A second rule is drawn down the right of the sheet, as in an account book. */
-  columns?: boolean;
+  /** The lines are numbered in plain figures with a stop, as entries in an account book are. */
+  figures?: boolean;
   /** The lines are numbered in runes, not numerals. */
   runes?: boolean;
   /** One mark stands in the margin of every line in place of its number, for a list with no order to it. */
@@ -60,8 +60,8 @@ export const kinds: Record<Kind, KindSpec> = {
     purpose: 'work and business',
     emblem: '§',
     ribbon: '#3f5576',
-    // An account book: cool, sober paper, a column ruled off at the right, and plain dark numerals.
-    trim: { wash: 'rgba(60,80,110,0.10)', pigment: '#2f3f5a', columns: true },
+    // An account book: cool, sober paper, its entries numbered in plain figures.
+    trim: { wash: 'rgba(60,80,110,0.10)', pigment: '#2f3f5a', figures: true },
     left: ['NEGOTIUM', 'NEGOTIA'],
     line: (to) => `To business, ${addresses[to]}.`,
     hints: ['work', 'office', 'job', 'client', 'invoice', 'business', 'meeting', 'email', 'ledger'],

@@ -342,7 +342,7 @@ export const GestureList: FC<GestureListProps> = ({
     if (row.done) return { kind: 'done', color: colors.inkFaded };
     // A spell is numbered in runes; a list with no order to it carries its kind's mark in place of a number.
     const number = numbers[index] ?? 0;
-    const label = trim?.runes ? runeOf(number) : (trim?.mark ?? roman(number));
+    const label = trim?.runes ? runeOf(number) : trim?.figures ? `${number}.` : (trim?.mark ?? roman(number));
     return { kind: 'label', label, color: pigment ?? accentAt(colors, index, rowCount), glow: trim?.glow, large: trim?.runes === true || trim?.mark !== undefined };
   };
 
@@ -1008,7 +1008,6 @@ export const GestureList: FC<GestureListProps> = ({
               </Pressable>
               {/* What kind of scroll it is, laid over its paper: a wash of colour, and an account book's second rule. */}
               {trim?.wash ? <View pointerEvents="none" style={[StyleSheet.absoluteFill, { backgroundColor: trim.wash }]} /> : null}
-              {trim?.columns ? <View pointerEvents="none" style={styles.column} /> : null}
               {trim?.trail ? <View pointerEvents="none" style={[styles.trail, { borderLeftColor: trim.pigment ?? colors.accent }]} /> : null}
               {isShelf || busy ? null : <MarginVine height={sheetTall} share={shareDone} stem={colors.ink} leaf={trim?.pigment ?? colors.accent2} berry={colors.complete} />}
               {isShelf ? null : <PaperOverlay />}
@@ -1082,7 +1081,6 @@ const makeStyles = (colors: Palette) =>
   rollLight: { ...StyleSheet.absoluteFill, borderRadius: 3 },
   planned: { position: 'absolute', left: 7, top: 10, bottom: 10, width: 4, borderTopRightRadius: 2, borderBottomRightRadius: 2, backgroundColor: colors.complete },
   trail: { position: 'absolute', top: 0, bottom: 0, left: 9, width: 0, borderLeftWidth: 2, borderStyle: 'dotted', opacity: 0.55 },
-  column: { position: 'absolute', top: 0, bottom: 0, right: 58, width: StyleSheet.hairlineWidth * 2, backgroundColor: colors.accent, opacity: 0.35 },
   // Room at the roll's end for the ribbon, so the count is not written under it.
   ribboned: { paddingRight: 34 },
   emblem: { marginLeft: 10, fontSize: 17 },

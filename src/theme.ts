@@ -106,6 +106,52 @@ export const themes = {
 } as const satisfies Record<string, ThemeSpec>;
 
 export type ThemeName = keyof typeof themes;
+
+/**
+ * Each paper by candlelight. Night is for planning the day to come, and every book keeps its own character
+ * through it: the same book, read after dark, its paper gone deep and its ink pale. The psalter by night is
+ * the book of hours, which is also a paper in its own right.
+ */
+const nights: Record<ThemeName, ThemeSpec> = {
+  scriptorium: themes.vigil,
+  vigil: themes.vigil,
+  lapis: {
+    label: 'Lapis',
+    desk: '#070a12',
+    paperFrom: '#18233c',
+    paperTo: '#2c4a80',
+    ink: '#e6ecf7',
+    accent: '#e9b54a',
+    accent2: '#9bbcec',
+    book: themes.lapis.book,
+    rod: '#7d7448',
+    onDesk: '#dfe6f2',
+  },
+  verdant: {
+    label: 'Verdant',
+    desk: '#070a06',
+    paperFrom: '#1c281c',
+    paperTo: '#3c5830',
+    ink: '#e9ecd9',
+    accent: '#e3a04c',
+    accent2: '#a9cc88',
+    book: themes.verdant.book,
+    rod: '#6f6838',
+    onDesk: '#e2e6d2',
+  },
+  codex: {
+    label: 'Purple Codex',
+    desk: '#08050b',
+    paperFrom: '#20122b',
+    paperTo: '#4c2459',
+    ink: '#ece7f2',
+    accent: '#e4b651',
+    accent2: '#dcd7ea',
+    book: themes.codex.book,
+    rod: '#84692f',
+    onDesk: '#e3dcea',
+  },
+};
 export const themeNames = Object.keys(themes) as ThemeName[];
 export const isThemeName = (value: unknown): value is ThemeName =>
   typeof value === 'string' && value in themes;
@@ -141,14 +187,16 @@ export const mixColors = (from: string, to: string, t: number): string => {
   return `rgb(${channel(0)},${channel(1)},${channel(2)})`;
 };
 
-export const paletteOf = (name: ThemeName) => {
-  const spec: ThemeSpec = themes[name];
+export const paletteOf = (name: ThemeName, night = false) => {
+  // By night the paper is the same book's, gone dark; it keeps the paper's name, so its own desk and art go with it.
+  const spec: ThemeSpec = night ? nights[name] : themes[name];
   // Pale ink on a dark paper loses more when faded than dark ink on a pale one, so it is faded less.
   const [r, g, b] = toRgb(spec.paperFrom);
   const darkPaper = r * 0.299 + g * 0.587 + b * 0.114 < 110;
   return {
     ...spec,
-    name,
+    // The psalter by night is the book of hours outright, with that book's own desk, rods and art.
+    name: night && name === 'scriptorium' ? ('vigil' as ThemeName) : name,
     /** The paper is dark and written on in pale ink, so colours meant for pale paper must be lightened to be read. */
     darkPaper,
     parchment: spec.paperFrom,

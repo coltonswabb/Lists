@@ -913,11 +913,11 @@ export const App: FC = () => {
   });
   const settings = useSettings();
   const { width: windowWidth } = useWindowDimensions();
-  // Night is not a paper: it is the candle's side of the desk, drawn in Night Vigil whatever the day's paper.
+  // Night is not a paper: it is the candle's side of the desk, where each paper is the same book gone dark.
   const [night, setNight] = useState(false);
   // The hour of the day, which the daylight is drawn by.
   const [hour, setHour] = useState(() => new Date().getHours());
-  const palette = useMemo(() => paletteOf(night ? 'vigil' : settings.theme), [night, settings.theme]);
+  const palette = useMemo(() => paletteOf(settings.theme, night), [night, settings.theme]);
   // The sky being drawn over the desk while the candle turns day to night or back.
   const [turning, setTurning] = useState<'night' | 'day' | null>(null);
   const turnSky = () => {
