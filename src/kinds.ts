@@ -105,7 +105,7 @@ export const kinds: Record<Kind, KindSpec> = {
     ribbon: '#6b4192',
     // Vellum dyed deep violet, written in silver, its numerals and initials in gold foil that gives off its own light.
     trim: { pigment: '#e6c56a', glow: '#e2c064', runes: true },
-    vellum: { from: '#2c1845', to: '#42245f', ink: '#edebf6', foil: '#e6c56a' },
+    vellum: { from: '#482a6c', to: '#2a1643', ink: '#edebf6', foil: '#e6c56a' },
     left: ['VERBUM', 'VERBA'],
     line: (to) => `These must not fail, ${addresses[to]}.`,
     hints: ['spell', 'important', 'urgent', 'must', 'deadline', 'due', 'priority', 'critical'],

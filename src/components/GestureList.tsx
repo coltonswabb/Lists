@@ -658,6 +658,16 @@ export const GestureList: FC<GestureListProps> = ({
       />
     );
 
+  /**
+   * What a rolled scroll on the shelf is made of. Whatever its kind, it deepens with its place on the shelf, as the
+   * plain ones do: a dark kind runs from one tone of its vellum to the other, a pale one is the paper at that place
+   * leaning toward its ribbon's colour.
+   */
+  const rollOf = (row: GestureListRow, index: number) => {
+    if (row.vellum) return mixColors(row.vellum.from, row.vellum.to, rowCount > 1 ? index / (rowCount - 1) : 0.5);
+    return row.ribbon ? mixColors(paperFor(index), row.ribbon, 0.17) : paperFor(index);
+  };
+
   /** A row's words as they are written: a rubric on the first letter under a heading, or on a missive the name of whoever it is for. */
   const written = (row: GestureListRow, index: number): ReactNode => {
     if (rubricated[index]) {
@@ -736,12 +746,13 @@ export const GestureList: FC<GestureListProps> = ({
             <View style={styles.collar} />
           </>
         )}
-        <View style={[styles.rolled, row.ribbon !== undefined && styles.ribboned, { backgroundColor: row.vellum ? mixColors(row.vellum.from, row.vellum.to, 0.5) : row.ribbon ? mixColors(paperFor(index), row.ribbon, 0.17) : paperFor(index) }]}>
+        <View style={[styles.rolled, row.ribbon !== undefined && styles.ribboned, { backgroundColor: rollOf(row, index) }]}>
           {content}
           {/* The ribbon that marks what the scroll is for, tied round the roll near its end, under the light. */}
           {row.ribbon ? <View style={[styles.ribbon, { backgroundColor: row.ribbon }]} /> : null}
           {/* How far along the scroll is: a line of gold leaf along the foot of the roll, as long as the share struck. */}
-          {row.progress !== undefined && row.progress > 0 && !row.sealed ? (
+          {/* Its track is there on every scroll with lines on it, empty until something is struck, so the gold is read as progress. */}
+          {row.progress !== undefined && !row.sealed ? (
             <View style={styles.progressTrack}>
               <View style={[styles.progressFill, { width: `${Math.min(1, row.progress) * 100}%` }]} />
             </View>
