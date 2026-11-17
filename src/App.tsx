@@ -431,7 +431,7 @@ const Screens: FC<{ settings: Settings; address: Address; night: boolean; onCand
           // Tomorrow keeps its name until dawn gives its lines the day's.
           onRenameTitle={isTomorrow ? undefined : (name) => store.renameList(openList.id, name)}
           onBack={() => setOpenListId(null)}
-          onPullUp={
+          onClear={
             items.some((item) => item.done)
               ? () => {
                   say(items.filter((item) => item.done).length >= BIG_CLEAR ? 'bigClear' : 'strike');
@@ -483,6 +483,16 @@ const Screens: FC<{ settings: Settings; address: Address; night: boolean; onCand
                   <Text style={styles.deskLabel}>Unmark all</Text>
                 </Pressable>
               ) : null}
+              {items.some((item) => item.done) ? (
+                <Pressable
+                  onPress={() => shelf.current?.clear()}
+                  hitSlop={12}
+                  accessibilityRole="button"
+                  accessibilityHint="Removes the struck lines from this scroll"
+                >
+                  <Text style={styles.deskLabel}>Clear struck</Text>
+                </Pressable>
+              ) : null}
               <Pressable
                 onPress={() => {
                   say('stored');
@@ -494,7 +504,7 @@ const Screens: FC<{ settings: Settings; address: Address; night: boolean; onCand
                 accessibilityRole="button"
                 accessibilityHint="Stores this scroll in the chest"
               >
-                <Text style={styles.deskLabel}>Put away</Text>
+                <Text style={styles.deskLabel}>To the chest</Text>
               </Pressable>
             </>
           ) : null}
@@ -567,7 +577,6 @@ const Screens: FC<{ settings: Settings; address: Address; night: boolean; onCand
                     ? standing.dust(dusty.name, address)
                     : standing.decree(address),
             )}
-            onPress={() => settings.chooseAddress(null)}
           />
         }
         onAdd={(names, index) => {

@@ -9,7 +9,18 @@ import { Finial, hasFinial } from './Finial';
 import { ROLL_LIGHT, ROLL_LIGHT_AT } from './Roller';
 import { type Lead, RowLead } from './RowLead';
 
-export type RowInputHandle = { finish: () => void };
+// One of each, made once: an entrance built afresh on every render can be taken for a new one and played again.
+const LAID_DOWN = FadeInDown.duration(300).easing(Easing.out(Easing.cubic));
+const APPEAR = FadeIn.duration(120);
+const INKED = FadeIn.duration(220);
+
+export type RowInputHandle = {
+  finish: () => void;
+  /** Nothing has been written in it yet. */
+  isBlank: () => boolean;
+  /** Puts the caret back in it and brings the keyboard up. */
+  focus: () => void;
+};
 
 type RowInputProps = {
   /** What to show in the margin for the text typed so far. */
@@ -48,10 +59,12 @@ export const RowInput: FC<RowInputProps> = ({ leadFor, paper, placeholder, initi
   const ended = useRef(false);
 
   // autoFocus alone does not take when the row is opened from outside the list (the inkwell), so ask again.
+  // Once it has taken, it is left alone: asking again after that could fight whatever the keyboard is doing.
+  const focused = useRef(false);
   useEffect(() => {
     const timers = [60, 250, 600, 1100, 1800].map((delay) =>
       setTimeout(() => {
-        if (!input.current?.isFocused()) input.current?.focus();
+        if (!focused.current && !ended.current && !input.current?.isFocused()) input.current?.focus();
       }, delay),
     );
     return () => timers.forEach(clearTimeout);
@@ -71,7 +84,11 @@ export const RowInput: FC<RowInputProps> = ({ leadFor, paper, placeholder, initi
   // Finishing from outside keeps what was written and puts a blank row away, focused or not.
   useEffect(() => {
     if (!handleRef) return;
-    handleRef.current = { finish: () => end(latest.current) };
+    handleRef.current = {
+      finish: () => end(latest.current),
+      isBlank: () => latest.current.trim() === '',
+      focus: () => input.current?.focus(),
+    };
     return () => {
       handleRef.current = null;
     };
@@ -116,9 +133,7 @@ export const RowInput: FC<RowInputProps> = ({ leadFor, paper, placeholder, initi
     <Animated.View
       // A new scroll is laid on the shelf from above and comes to rest without a bounce, as paper does; a new line is
       // inked onto the page.
-      entering={
-        rolled && !laid ? FadeInDown.duration(300).easing(Easing.out(Easing.cubic)) : FadeIn.duration(laid ? 120 : 220)
-      }
+      entering={rolled && !laid ? LAID_DOWN : laid ? APPEAR : INKED}
       style={[styles.row, rolled ? styles.rolledRow : { backgroundColor: paper }]}
     >
       {/* A scroll being named lies on the shelf like the others: rounded by the light, with its rod's ends showing. */}
@@ -135,6 +150,9 @@ export const RowInput: FC<RowInputProps> = ({ leadFor, paper, placeholder, initi
           submitBehavior="submit"
           onSubmitEditing={submit}
           onChangeText={change}
+          onFocus={() => {
+            focused.current = true;
+          }}
           onBlur={() => end(latest.current)}
           placeholder={placeholder}
           placeholderTextColor={colors.inkFaded}

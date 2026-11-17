@@ -11,6 +11,7 @@ import {
   useState,
 } from 'react';
 import {
+  type GestureResponderEvent,
   Keyboard,
   Pressable,
   ScrollView as NativeScrollView,
@@ -59,7 +60,9 @@ import { WaxSeal } from './WaxSeal';
 
 const PULL_RESISTANCE = 0.6;
 /** How far the sheet must be lifted before letting go clears the finished rows: a deliberate pull, not a stray scroll. */
-const CLEAR_AT = ROW_HEIGHT * 1.8;
+const ROLL_UP_AT = ROW_HEIGHT * 1.8;
+/** A finger that has travelled further than this was dragging, not tapping. */
+const TAP_SLOP = 10;
 const PRESS_GUARD_MS = 150;
 /** How far past the point of adding a row a pull must go before letting go rolls the scroll up: far enough that no one does it by accident. */
 const BACK_DISTANCE = ROW_HEIGHT * 4.2;
@@ -91,6 +94,8 @@ const pullLabels = {
 export type GestureListActions = {
   /** Opens a new row for writing at the end of the unfinished ones, as a tap on the empty desk does. */
   add: () => void;
+  /** Sweeps the finished rows away one after another, then clears them. */
+  clear: () => void;
 };
 
 export type GestureListRow = {
@@ -142,8 +147,8 @@ type GestureListProps = {
   onOpen?: (id: string) => void;
   onRenameTitle?: (title: string) => void;
   onBack?: () => void;
-  /** Pulling up past the end of the rows clears the finished ones. Absent when there are none. */
-  onPullUp?: () => void;
+  /** Clears the finished rows, once they have been swept away. Absent when there are none. */
+  onClear?: () => void;
   /** Filled with the things a parent may ask of the list. */
   actions?: RefObject<GestureListActions | null>;
   /** Drawn in the margin beside "Finis" once every item is done. */
@@ -168,7 +173,7 @@ export const GestureList: FC<GestureListProps> = ({
   onOpen,
   onRenameTitle,
   onBack,
-  onPullUp,
+  onClear,
   finisArt,
   leadActionLabel,
   actions,
@@ -182,7 +187,7 @@ export const GestureList: FC<GestureListProps> = ({
   const scrollOffset = useRef(0);
   const [atTop, setAtTop] = useState(true);
   const [atBottom, setAtBottom] = useState(true);
-  const [clearArmed, setClearArmed] = useState(false);
+  const [rollArmed, setRollArmed] = useState(false);
   // While true, finished rows are primed to sweep off the sheet one after another as they are removed.
   const [sweeping, setSweeping] = useState(false);
   const extent = useRef({ content: 0, viewport: 0 });
@@ -350,8 +355,6 @@ export const GestureList: FC<GestureListProps> = ({
     if (!pulling.current && !busy) action();
   };
 
-  useImperativeHandle(actions, () => ({ add: () => press(() => setAddIndex(endIndex)) }));
-
   const arm = (action: PullAction) => {
     setPullAction(action);
     if (action !== 'none') tick();
@@ -369,20 +372,26 @@ export const GestureList: FC<GestureListProps> = ({
     if (action === 'back') leave();
   };
 
-  const endPullUp = (clear: boolean) => {
-    setTimeout(() => {
-      pulling.current = false;
-    }, PRESS_GUARD_MS);
-    setClearArmed(false);
-    if (!clear || !onPullUp) return;
-    // Finished rows sweep away one after another; only then are they actually removed.
+  /** Finished rows sweep away one after another; only then are they actually removed. */
+  const sweepAway = () => {
+    if (!onClear || sweeping) return;
     const cascade = Math.max(0, sweepOrder.size - 1) * SWEEP_STAGGER_MS + SWEEP_MS;
     play('paper');
     setSweeping(true);
     setTimeout(() => {
-      onPullUp();
+      onClear();
       setSweeping(false);
     }, cascade);
+  };
+
+  useImperativeHandle(actions, () => ({ add: () => press(() => setAddIndex(endIndex)), clear: sweepAway }));
+
+  const endPushUp = (rollUp: boolean) => {
+    setTimeout(() => {
+      pulling.current = false;
+    }, PRESS_GUARD_MS);
+    setRollArmed(false);
+    if (rollUp) leave();
   };
 
   const pan = usePanGesture({
@@ -454,15 +463,16 @@ export const GestureList: FC<GestureListProps> = ({
     },
   });
 
-  // Pulling up past the last row lifts the scroll and, far enough, clears what is finished.
+  // Pushing up from the foot of the scroll, or from the desk beneath it, lifts it and, far enough, rolls it back up.
   const raise = useSharedValue(0);
   const raiseArmed = useSharedValue(false);
-  const armClear = (armedNow: boolean) => {
-    setClearArmed(armedNow);
+  const armRoll = (armedNow: boolean) => {
+    setRollArmed(armedNow);
     if (armedNow) tick();
   };
   const pullUp = usePanGesture({
-    enabled: onPullUp !== undefined && atBottom && !busy && !dragging,
+    // A row being written does not stand in the way: rolling up keeps what was written in it.
+    enabled: onBack !== undefined && atBottom && !dragging && editingId === null && titleDraft === null,
     maxPointers: 1,
     // Upward travel only: a pair leaves the downward side open-ended so a pull down never activates this.
     activeOffsetY: [-14, FAR],
@@ -475,23 +485,23 @@ export const GestureList: FC<GestureListProps> = ({
       'worklet';
       const distance = Math.max(0, -event.translationY) * PULL_RESISTANCE;
       raise.value = distance;
-      const next = distance > CLEAR_AT;
+      const next = distance > ROLL_UP_AT;
       if (next !== raiseArmed.value) {
         raiseArmed.value = next;
-        scheduleOnRN(armClear, next);
+        scheduleOnRN(armRoll, next);
       }
     },
     onDeactivate: (event) => {
       'worklet';
-      const clear = !event.canceled && raiseArmed.value;
+      const rollUp = !event.canceled && raiseArmed.value;
       raiseArmed.value = false;
       raise.value = withSpring(0, SPRING);
-      scheduleOnRN(endPullUp, clear);
+      scheduleOnRN(endPushUp, rollUp);
     },
   });
   const raiseStyle = useAnimatedStyle(() => ({ transform: [{ translateY: -raise.value }] }));
   const clearHintStyle = useAnimatedStyle(() => ({
-    opacity: interpolate(raise.value, [0, CLEAR_AT * 0.4], [0, 1], 'clamp'),
+    opacity: interpolate(raise.value, [0, ROLL_UP_AT * 0.4], [0, 1], 'clamp'),
   }));
 
   const gesture = useSimultaneousGestures(pan, pullUp, pinch);
@@ -567,9 +577,23 @@ export const GestureList: FC<GestureListProps> = ({
 
   const inputHandle = useRef<RowInputHandle | null>(null);
   // A touch on bare desk or paper while a row is being written finishes it: what was written is kept, a blank is put away.
-  const touchBare = () => {
+  // Where a touch on bare desk or paper began, so that a drag across it is not taken for a tap.
+  const touchedAt = useRef({ x: 0, y: 0 });
+  const touchBareBegan = (event: GestureResponderEvent) => {
+    touchedAt.current = { x: event.nativeEvent.pageX, y: event.nativeEvent.pageY };
+  };
+  const touchBare = (event: GestureResponderEvent) => {
+    const { pageX, pageY } = event.nativeEvent;
+    if (Math.abs(pageX - touchedAt.current.x) > TAP_SLOP || Math.abs(pageY - touchedAt.current.y) > TAP_SLOP) return;
     if (addIndex !== null) {
-      inputHandle.current?.finish();
+      const open = inputHandle.current;
+      // On a scroll, a blank row stays where it is and takes the caret back: closing it here and opening another on
+      // the next touch would make it come and go. On the shelf a blank scroll is put away.
+      if (!isShelf && open?.isBlank()) {
+        open.focus();
+        return;
+      }
+      open?.finish();
       Keyboard.dismiss();
       return;
     }
@@ -713,7 +737,7 @@ export const GestureList: FC<GestureListProps> = ({
             </Animated.View>
           ) : null}
           <Animated.Text style={[styles.clearHint, { bottom: insets.bottom + 10 }, clearHintStyle]}>
-            {clearArmed ? 'Release to clear the finished' : 'Pull to clear the finished'}
+            {rollArmed ? 'Release to roll up' : 'Push to roll up'}
           </Animated.Text>
           <Animated.View style={[styles.fill, raiseStyle]}>
           <ScrollView
@@ -821,7 +845,7 @@ export const GestureList: FC<GestureListProps> = ({
                 accessibilityLabel={deskIsQuiet ? undefined : isShelf ? 'Add a scroll' : 'Add a row'}
                 accessible={!deskIsQuiet}
                 disabled={addIndex === null && (busy || deskIsQuiet)}
-                onPress={touchBare}
+                onPressIn={touchBareBegan} onPress={touchBare}
               >
                 {rowCount === 0 && !busy && drawings['empty-shelf'] ? (
                   <LineArt
@@ -845,7 +869,7 @@ export const GestureList: FC<GestureListProps> = ({
                 <Roller paper={colors.paperTo} />
               </View>
             )}
-            <Pressable style={styles.tapZone} accessible={false} disabled={addIndex === null && (busy || deskIsQuiet)} onPress={touchBare} />
+            <Pressable style={styles.tapZone} accessible={false} disabled={addIndex === null && (busy || deskIsQuiet)} onPressIn={touchBareBegan} onPress={touchBare} />
           </ScrollView>
           </Animated.View>
         </View>
