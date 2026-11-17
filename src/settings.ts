@@ -31,6 +31,8 @@ export const useSettings = () => {
   const [seal, setSeal] = useState<string | null>(null);
   /** Whether the home screen icon follows the paper. Off by default: iOS interrupts with an alert on every change. */
   const [matchIcon, setMatchIcon] = useState(false);
+  /** Whether the candle lights itself at dusk and goes out at dawn. On unless turned off. */
+  const [followHour, setFollowHour] = useState(true);
   const [loaded, setLoaded] = useState(false);
   /** The kept settings could not be read this launch, so nothing is saved over them. */
   const unread = useRef(false);
@@ -62,6 +64,9 @@ export const useSettings = () => {
           sealInitial = stored.seal;
           setSeal(stored.seal);
         }
+        if (typeof stored === 'object' && stored !== null && 'followHour' in stored && stored.followHour === false) {
+          setFollowHour(false);
+        }
         if (typeof stored === 'object' && stored !== null && 'matchIcon' in stored && stored.matchIcon === true) {
           setMatchIcon(true);
         }
@@ -77,8 +82,10 @@ export const useSettings = () => {
   useEffect(() => {
     // Settings that could not be read are still there: saving now would put these defaults over them.
     if (!loaded || unread.current) return;
-    AsyncStorage.setItem(STORAGE_KEY, JSON.stringify({ sound, theme, address, scribe, matchIcon, seal })).catch(() => undefined);
-  }, [loaded, sound, theme, address, scribe, matchIcon, seal]);
+    AsyncStorage.setItem(STORAGE_KEY, JSON.stringify({ sound, theme, address, scribe, matchIcon, seal, followHour })).catch(() => undefined);
+  }, [loaded, sound, theme, address, scribe, matchIcon, seal, followHour]);
+
+  const toggleFollowHour = useCallback(() => setFollowHour((on) => !on), []);
 
   const toggleSound = useCallback(() => {
     setSound((on) => {
@@ -121,5 +128,5 @@ export const useSettings = () => {
     });
   }, []);
 
-  return { loaded, sound, toggleSound, theme, chooseTheme, seal, chooseSeal, matchIcon, toggleMatchIcon, address, chooseAddress, scribe, nextScribeMode };
+  return { loaded, followHour, toggleFollowHour, sound, toggleSound, theme, chooseTheme, seal, chooseSeal, matchIcon, toggleMatchIcon, address, chooseAddress, scribe, nextScribeMode };
 };

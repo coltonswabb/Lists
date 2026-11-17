@@ -11,7 +11,7 @@ const CHRONICLE_KEY = 'decree/chronicle/v1';
 /** The chronicle keeps this many entries; older ones fall away. */
 const CHRONICLE_LENGTH = 1000;
 /** Daily scrolls are renewed from this hour, so a late night still counts as the day before. */
-const DAWN_HOUR = 4;
+export const DAWN_HOUR = 4;
 
 const newId = () => `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
 

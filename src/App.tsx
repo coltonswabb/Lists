@@ -33,7 +33,7 @@ import { type Address, say, standing } from './scribe';
 import { useSettings } from './settings';
 import { ThemeProvider, useTheme } from './ThemeContext';
 import { play, playNote } from './sounds';
-import { dawnDay, isTutorial, plannedDay, useLists } from './store';
+import { DAWN_HOUR, dawnDay, isTutorial, plannedDay, useLists } from './store';
 import { fonts, type Palette, paletteOf, roman } from './theme';
 import type { Item, List } from './types';
 import { listenForWidgetStrikes, syncWidget, takeWidgetStrikes } from './widgetSync';
@@ -555,6 +555,7 @@ const Screens: FC<{ settings: Settings; address: Address; night: boolean; onCand
         rows={shelfLists.map((list) => {
           const items = itemsOf(list);
           const open = openCount(items);
+          const lines = items.filter((item) => !item.section);
           const sealed = items.length > 0 && open === 0;
           // A scroll made by candlelight for a day to come is marked so on the night's shelf.
           const morrow = !list.tomorrow && list.plannedFor !== undefined && list.plannedFor > today;
@@ -565,6 +566,7 @@ const Screens: FC<{ settings: Settings; address: Address; night: boolean; onCand
             id: list.id,
             text: list.name,
             note: isTutorial(list) ? 'Tutorial' : undefined,
+            progress: lines.length > 0 ? lines.filter((item) => item.done).length / lines.length : undefined,
             badge: mark ? `${mark} · ${roman(open)}` : roman(open),
             badgeMarked: mark !== null,
             sealed: sealed && !morrow,
@@ -660,6 +662,10 @@ const Screens: FC<{ settings: Settings; address: Address; night: boolean; onCand
   );
 };
 
+/** The hour the candle is lit when it follows the clock. It is snuffed at dawn, the hour the day's scrolls are laid out. */
+const DUSK_HOUR = 19;
+const nightByClock = (now: Date) => now.getHours() >= DUSK_HOUR || now.getHours() < DAWN_HOUR;
+
 /** The widest a page of the app is drawn, however wide the screen. */
 export const PAGE_WIDTH = 640;
 const columnStyle = { flex: 1, width: '100%', maxWidth: PAGE_WIDTH, alignSelf: 'center' } as const;
@@ -673,6 +679,8 @@ export const App: FC = () => {
   const settings = useSettings();
   // Night is not a paper: it is the candle's side of the desk, drawn in Night Vigil whatever the day's paper.
   const [night, setNight] = useState(false);
+  // The hour of the day, which the daylight is drawn by.
+  const [hour, setHour] = useState(() => new Date().getHours());
   const palette = useMemo(() => paletteOf(night ? 'vigil' : settings.theme), [night, settings.theme]);
   // The sky being drawn over the desk while the candle turns day to night or back.
   const [turning, setTurning] = useState<'night' | 'day' | null>(null);
@@ -682,6 +690,46 @@ export const App: FC = () => {
     play('wheel');
     setTurning(night ? 'day' : 'night');
   };
+
+  // The candle follows the hour unless told not to: lit at dusk, snuffed at dawn. Touching it still turns the
+  // desk at once, and that choice stands until the hour next crosses dusk or dawn.
+  const { loaded: settingsLoaded, followHour } = settings;
+  const phase = useRef<boolean | null>(null);
+  const nightRef = useRef(night);
+  const turningRef = useRef(turning);
+  useEffect(() => {
+    nightRef.current = night;
+    turningRef.current = turning;
+  }, [night, turning]);
+  useEffect(() => {
+    if (!settingsLoaded) return;
+    const look = (animate: boolean) => {
+      const now = new Date();
+      setHour(now.getHours());
+      if (!followHour) {
+        phase.current = null;
+        return;
+      }
+      const dark = nightByClock(now);
+      if (phase.current === dark) return;
+      phase.current = dark;
+      if (nightRef.current === dark || turningRef.current) return;
+      // With the desk in view the sky is drawn turning; coming back to the app, it has simply turned.
+      if (animate) {
+        play('wheel');
+        setTurning(dark ? 'night' : 'day');
+      } else setNight(dark);
+    };
+    look(false);
+    const timer = setInterval(() => look(AppState.currentState === 'active'), 30000);
+    const subscription = AppState.addEventListener('change', (state) => {
+      if (state === 'active') look(false);
+    });
+    return () => {
+      clearInterval(timer);
+      subscription.remove();
+    };
+  }, [settingsLoaded, followHour]);
   return (
     <GestureHandlerRootView style={{ flex: 1, backgroundColor: palette.desk }}>
       <SafeAreaProvider>
@@ -689,7 +737,7 @@ export const App: FC = () => {
           <StatusBar style="light" />
           <Desk night={night} />
           {/* The room's light falls on the desk, beneath the scrolls lying on it: the moon and the candle by night, the sun by day. */}
-          {night ? <NightLight /> : <DayLight />}
+          {night ? <NightLight /> : <DayLight hour={hour} />}
           {/* On a wide screen the scrolls keep a page's width, centred on the desk, instead of stretching across it. */}
           <View style={columnStyle}>
             {!fontsLoaded || !settings.loaded ? null : settings.address ? (

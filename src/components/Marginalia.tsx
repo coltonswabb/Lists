@@ -87,6 +87,8 @@ type MarginaliaProps = {
   seed: string;
   /** Moves the choice on from there: a different turn draws a different creature. */
   turn?: number;
+  /** Held within this box instead of filling the writing column: for a small drawing beside something else. */
+  within?: { width: number; height: number };
   ink: string;
   accent: string;
 };
@@ -105,18 +107,16 @@ const INK_AFTER_MS = 420;
  * beside their text. Imported pen drawings are tinted with the paper's ink, so they read on every
  * paper. Which one is drawn changes each time a scroll is finished.
  */
-export const Marginalia: FC<MarginaliaProps> = ({ seed, turn = 0, ink, accent }) => {
+export const Marginalia: FC<MarginaliaProps> = ({ seed, turn = 0, within, ink, accent }) => {
   const { width: windowWidth } = useWindowDimensions();
   const screenWidth = Math.min(windowWidth, 640);
   const pick = Math.abs(hash(seed)) + turn;
   const drawing = marginalia[pick % Math.max(1, marginalia.length)];
   if (drawing) {
     // Wide drawings fill the column; tall ones are held to the same height, so none crowds the page.
-    const width = Math.min(
-      MAX_WIDTH,
-      screenWidth - SHEET_INSET - COLUMN_START - COLUMN_END,
-      (MAX_HEIGHT * drawing.width) / drawing.height,
-    );
+    const width = within
+      ? Math.min(within.width, (within.height * drawing.width) / drawing.height)
+      : Math.min(MAX_WIDTH, screenWidth - SHEET_INSET - COLUMN_START - COLUMN_END, (MAX_HEIGHT * drawing.width) / drawing.height);
     const height = (width * drawing.height) / drawing.width;
     return (
       // Drawn in once the scroll has unrolled, or once the last line has been struck.
@@ -133,7 +133,7 @@ export const Marginalia: FC<MarginaliaProps> = ({ seed, turn = 0, ink, accent })
   }
   const draw = drawings[pick % drawings.length] ?? snail;
   return (
-    <Svg width={120} height={80} viewBox="0 0 120 80" accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+    <Svg width={within ? Math.min(within.width, within.height * 1.5) : 120} height={within ? Math.min(within.height, within.width / 1.5) : 80} viewBox="0 0 120 80" accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
       {draw(ink, accent)}
     </Svg>
   );

@@ -107,6 +107,8 @@ export type GestureListRow = {
   badge?: string;
   /** Shelf only: a few small words written under the scroll's name, saying what kind of scroll it is. */
   note?: string;
+  /** Shelf only: the share of the scroll's lines already struck, 0 to 1, shown as a line of gold along the roll. */
+  progress?: number;
   /** What the row's text becomes when opened for editing, if that differs from what is shown. */
   editText?: string;
   /** Draws the badge in the accent colour at its usual size: a word that marks the row out, such as NEW. */
@@ -673,6 +675,12 @@ export const GestureList: FC<GestureListProps> = ({
         )}
         <View style={[styles.rolled, { backgroundColor: paperFor(index) }]}>
           {content}
+          {/* How far along the scroll is: a line of gold leaf along the foot of the roll, as long as the share struck. */}
+          {row.progress !== undefined && row.progress > 0 && !row.sealed ? (
+            <View style={styles.progressTrack}>
+              <View style={[styles.progressFill, { width: `${Math.min(1, row.progress) * 100}%` }]} />
+            </View>
+          ) : null}
           {/* Light from above, laid over everything on the roll, so the painted initial curves with the paper it is on. */}
           <LinearGradient colors={ROLL_LIGHT} locations={ROLL_LIGHT_AT} style={styles.rollLight} pointerEvents="none" />
         </View>
@@ -929,6 +937,8 @@ const makeStyles = (colors: Palette) =>
     zIndex: 1,
   },
   rollLight: { ...StyleSheet.absoluteFill, borderRadius: 3 },
+  progressTrack: { position: 'absolute', left: 12, right: 12, bottom: 5, height: 2, borderRadius: 1, backgroundColor: colors.rule },
+  progressFill: { height: 2, borderRadius: 1, backgroundColor: colors.complete },
   rowText: { color: colors.ink, fontFamily: fonts.body, fontSize: 21 },
   // A noted scroll's name sits a little higher and tighter, to leave room for the note beneath it.
   notedText: { lineHeight: 24 },

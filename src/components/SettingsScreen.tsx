@@ -7,6 +7,10 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { addresses } from '../scribe';
 import type { useSettings } from '../settings';
 import { useTheme } from '../ThemeContext';
+import { DeckleEdge } from './DeckleEdge';
+import { PaperOverlay } from './PaperOverlay';
+import { Roller, ROLLER_HEIGHT } from './Roller';
+import { RowLead } from './RowLead';
 import { WaxSeal } from './WaxSeal';
 import { fonts, mixColors, type Palette, type ThemeName, themeNames, themes } from '../theme';
 
@@ -37,6 +41,14 @@ export const SettingsScreen: FC<SettingsScreenProps> = ({ settings, onClose, onB
     },
   ];
 
+  // Each part of the scroll opens as a heading does on any other: a painted initial, and the word beside it.
+  const heading = (text: string) => (
+    <View style={styles.headingRow} accessibilityRole="header">
+      <RowLead lead={{ kind: 'initial', text, pigment: colors.accent, letter: colors.paperFrom, flourish: colors.accent }} />
+      <Text style={styles.heading}>{text}</Text>
+    </View>
+  );
+
   return (
     <Animated.View entering={FadeIn.duration(200)} style={[styles.screen, { paddingTop: insets.top }]}>
       <View style={styles.header}>
@@ -47,8 +59,13 @@ export const SettingsScreen: FC<SettingsScreenProps> = ({ settings, onClose, onB
       </View>
       <View style={styles.body}>
       <ScrollView contentContainerStyle={{ paddingTop: 6, paddingBottom: insets.bottom + 20 }}>
-        <Text style={styles.heading}>Paper</Text>
-        <View accessibilityRole="radiogroup">
+        {/* The settings are a scroll of their own, on the paper now chosen, hung from the same rods as any other. */}
+        <View style={styles.topRoller}>
+          <Roller paper={colors.paperFrom} />
+        </View>
+        <LinearGradient colors={[colors.paperFrom, colors.paperTo]} style={styles.sheet}>
+        {heading('Paper')}
+        <View accessibilityRole="radiogroup" style={styles.papers}>
           {themeNames.map((name) => (
             <PaperChoice
               key={name}
@@ -92,7 +109,18 @@ export const SettingsScreen: FC<SettingsScreenProps> = ({ settings, onClose, onB
             <WaxSeal size={34} />
           </View>
         </Pressable>
-        <Text style={[styles.heading, styles.later]}>The scribe</Text>
+        {heading('The desk')}
+        <Pressable
+          style={styles.row}
+          onPress={settings.toggleFollowHour}
+          accessibilityRole="switch"
+          accessibilityState={{ checked: settings.followHour }}
+          accessibilityHint="Whether night falls on the desk by itself at dusk"
+        >
+          <Text style={styles.label}>Candle</Text>
+          <Text style={styles.value}>{settings.followHour ? 'follows the hour' : 'is thine to light'}</Text>
+        </Pressable>
+        {heading('The scribe')}
         <View>
           {rows.map((row) => (
             <Pressable key={row.label} style={styles.row} onPress={row.onPress} accessibilityRole="button" accessibilityHint="Changes to the next choice">
@@ -101,7 +129,7 @@ export const SettingsScreen: FC<SettingsScreenProps> = ({ settings, onClose, onB
             </Pressable>
           ))}
         </View>
-        <Text style={[styles.heading, styles.later]}>The library</Text>
+        {heading('The library')}
         <Pressable style={styles.row} onPress={onBackup} accessibilityRole="button">
           <Text style={styles.label}>Back up</Text>
           <Text style={styles.value}>to a file</Text>
@@ -110,6 +138,14 @@ export const SettingsScreen: FC<SettingsScreenProps> = ({ settings, onClose, onB
           <Text style={styles.label}>Restore</Text>
           <Text style={styles.value}>from a file</Text>
         </Pressable>
+          <View style={styles.foot} />
+          <PaperOverlay />
+          <DeckleEdge side="left" />
+          <DeckleEdge side="right" />
+        </LinearGradient>
+        <View style={styles.bottomRoller}>
+          <Roller paper={colors.paperTo} />
+        </View>
       </ScrollView>
         {/* Rows slide away into the desk's shadow under the title, not off a hard edge. */}
         <LinearGradient colors={[mixColors(colors.desk, '#000000', 0.45), 'rgba(0,0,0,0)']} style={styles.fade} pointerEvents="none" />
@@ -178,17 +214,24 @@ const makeStyles = (colors: Palette) =>
     fade: { position: 'absolute', top: 0, left: 0, right: 0, height: 18 },
     title: { color: colors.onDesk, fontFamily: fonts.display, fontSize: 30 },
     action: { color: colors.onDesk, fontFamily: fonts.bodyItalic, fontSize: 18 },
-    heading: {
-      marginHorizontal: 22,
-      marginBottom: 8,
-      color: colors.onDeskFaded,
-      fontFamily: fonts.bodyItalic,
-      fontSize: 18,
+    papers: { paddingBottom: 10, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.rule },
+    topRoller: { zIndex: 1, marginBottom: -ROLLER_HEIGHT / 2 },
+    bottomRoller: { zIndex: 1, marginTop: -ROLLER_HEIGHT / 2 },
+    sheet: { marginHorizontal: 20, paddingTop: ROLLER_HEIGHT / 2, overflow: 'hidden' },
+    foot: { height: ROLLER_HEIGHT / 2 + 14 },
+    headingRow: {
+      height: 62,
+      paddingHorizontal: 16,
+      flexDirection: 'row',
+      alignItems: 'center',
+      borderBottomWidth: StyleSheet.hairlineWidth,
+      borderBottomColor: colors.rule,
     },
+    heading: { marginLeft: 3, color: colors.ink, fontFamily: fonts.display, fontSize: 26 },
     choice: {
-      height: 64,
-      marginHorizontal: 20,
-      marginBottom: 8,
+      height: 60,
+      marginHorizontal: 14,
+      marginTop: 8,
       paddingLeft: 10,
       flexDirection: 'row',
       alignItems: 'center',
@@ -210,17 +253,15 @@ const makeStyles = (colors: Palette) =>
     sealRoom: { width: 44, alignItems: 'center' },
     seal: { width: 26, height: 26, borderRadius: 13, alignItems: 'center', justifyContent: 'center' },
     sealMark: { fontSize: 13, fontWeight: '700' },
-    later: { marginTop: 16 },
+    // A line of the scroll: ruled beneath like any other, with what it is set to written in red at its end.
     row: {
       height: 58,
-      marginHorizontal: 20,
-      marginBottom: 8,
       paddingHorizontal: 18,
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'space-between',
-      borderRadius: 3,
-      backgroundColor: colors.paperFrom,
+      borderBottomWidth: StyleSheet.hairlineWidth,
+      borderBottomColor: colors.rule,
     },
     sealValue: { flexDirection: 'row', alignItems: 'center', gap: 10 },
     label: { color: colors.ink, fontFamily: fonts.body, fontSize: 21 },

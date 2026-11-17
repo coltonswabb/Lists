@@ -90,7 +90,20 @@ const DAPPLES = [
  * lays the shifting shade of leaves across it, the light between them stirring as the branch outside does,
  * with dust hanging in it. Never touchable.
  */
-export const DayLight: FC = () => {
+/**
+ * The day's three lights. Morning comes in pale and low from the left; at midday it stands overhead, at its
+ * brightest and whitest; by afternoon it has gone round to the right and deepened to gold.
+ */
+const LIGHTS = {
+  morning: { from: '14%', tone: ['#fff1d0', '#ffe2a6', '#ffd98a'], strength: 0.26, dapple: '#ffe6ad', mirrored: false },
+  midday: { from: '50%', tone: ['#fff6e0', '#ffe9b8', '#ffd98a'], strength: 0.3, dapple: '#fff0c8', mirrored: false },
+  afternoon: { from: '86%', tone: ['#ffcf7a', '#ffb648', '#f09a2e'], strength: 0.34, dapple: '#ffc35e', mirrored: true },
+} as const;
+
+const lightAt = (hour: number) => (hour < 11 ? LIGHTS.morning : hour < 15 ? LIGHTS.midday : LIGHTS.afternoon);
+
+export const DayLight: FC<{ hour: number }> = ({ hour }) => {
+  const light = lightAt(hour);
   const { width, height } = useWindowDimensions();
   const still = useReducedMotion();
   const drift = useSharedValue(0);
@@ -121,17 +134,23 @@ export const DayLight: FC = () => {
     <View pointerEvents="none" style={StyleSheet.absoluteFill} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
       <Svg width={width} height={height} style={StyleSheet.absoluteFill}>
         <Defs>
-          <RadialGradient id="morning" cx="12%" cy="0%" r="95%">
-            <Stop offset="0" stopColor="#ffd98a" stopOpacity={0.3} />
-            <Stop offset="0.45" stopColor="#ffc766" stopOpacity={0.12} />
-            <Stop offset="1" stopColor="#ffb648" stopOpacity={0} />
+          <RadialGradient id="morning" cx={light.from} cy="0%" r="95%">
+            <Stop offset="0" stopColor={light.tone[0]} stopOpacity={light.strength} />
+            <Stop offset="0.45" stopColor={light.tone[1]} stopOpacity={light.strength * 0.4} />
+            <Stop offset="1" stopColor={light.tone[2]} stopOpacity={0} />
           </RadialGradient>
         </Defs>
         {/* The day itself: warmth pouring in from the head of the desk and thinning toward its foot. */}
         <Rect width={width} height={height} fill="url(#morning)" />
       </Svg>
       <Animated.View style={[styles.shade, { left: width * 0.04, top: height * 0.36, width: shade.w, height: shade.h }, shadeStyle]}>
-        <Svg width={shade.w} height={shade.h} viewBox={`0 0 ${SHADE.width} ${SHADE.height}`}>
+        <Svg
+          width={shade.w}
+          height={shade.h}
+          viewBox={`0 0 ${SHADE.width} ${SHADE.height}`}
+          // The shade falls the other way once the sun has gone round.
+          style={light.mirrored ? styles.mirrored : undefined}
+        >
           <Defs>
             {/* Light through leaves has no edges by the time it reaches the desk. */}
             <Filter id="leafsoften" x="-30%" y="-30%" width="160%" height="160%">
@@ -140,7 +159,7 @@ export const DayLight: FC = () => {
           </Defs>
           <G filter="url(#leafsoften)">
             {DAPPLES.map((dapple) => (
-              <Circle key={`${dapple.x}-${dapple.y}`} cx={dapple.x} cy={dapple.y} r={dapple.r} fill="#ffd27a" opacity={dapple.light} />
+              <Circle key={`${dapple.x}-${dapple.y}`} cx={dapple.x} cy={dapple.y} r={dapple.r} fill={light.dapple} opacity={dapple.light} />
             ))}
           </G>
         </Svg>
@@ -152,8 +171,8 @@ export const DayLight: FC = () => {
               key={mote.phase}
               drift={drift}
               mote={mote}
-              from={{ x: width * 0.2, y: height * 0.12 }}
-              to={{ x: width * 0.62, y: height * 0.8 }}
+              from={{ x: width * (light.mirrored ? 0.8 : 0.2), y: height * 0.12 }}
+              to={{ x: width * (light.mirrored ? 0.38 : 0.62), y: height * 0.8 }}
               spread={width * 0.5}
             />
           ))}
@@ -163,5 +182,6 @@ export const DayLight: FC = () => {
 
 const styles = StyleSheet.create({
   shade: { position: 'absolute' },
+  mirrored: { transform: [{ scaleX: -1 }] },
   mote: { position: 'absolute', left: 0, top: 0, backgroundColor: '#ffe9b8' },
 });
