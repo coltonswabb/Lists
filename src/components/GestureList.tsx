@@ -168,6 +168,8 @@ type GestureListProps = {
   actions?: RefObject<GestureListActions | null>;
   /** Shelf only: how a scroll being named is dressed, given its name so far: its ribbon's colour, and its vellum if it is a dark kind. */
   dressFor?: (name: string) => { ribbon?: string; vellum?: Vellum };
+  /** Room left clear at the foot of the list for things standing on the desk below it, so no row lies under them. */
+  footRoom?: number;
   /** Scroll only: how the sheet is dressed for the kind of scroll it is. */
   trim?: ScrollTrim;
   /** Drawn in the margin beside "Finis" once every item is done. */
@@ -194,6 +196,7 @@ export const GestureList: FC<GestureListProps> = ({
   onBack,
   onClear,
   trim,
+  footRoom = 0,
   dressFor,
   finisArt,
   leadActionLabel,
@@ -814,7 +817,7 @@ export const GestureList: FC<GestureListProps> = ({
         </View>
       )}
       <GestureDetector gesture={gesture}>
-        <View style={styles.viewport}>
+        <View style={[styles.viewport, footRoom > 0 && { marginBottom: footRoom }]}>
           {isShelf ? (
             <Animated.View pointerEvents="none" style={[styles.descending, descendingStyle]}>
               <View style={styles.rolledScroll}>

@@ -14,7 +14,7 @@ import { ChestScreen } from './components/ChestScreen';
 import { ChronicleScreen } from './components/ChronicleScreen';
 import { DayLight } from './components/DayLight';
 import { DayNightVeil } from './components/DayNightVeil';
-import { DeskThings } from './components/DeskThings';
+import { CROWDED_ROOM, DeskThings, isCrowded } from './components/DeskThings';
 import { NightLight } from './components/NightLight';
 import { PatternSheet } from './components/PatternSheet';
 import { SealPress } from './components/SealPress';
@@ -163,7 +163,7 @@ type Settings = ReturnType<typeof useSettings>;
 const Screens: FC<{ settings: Settings; address: Address; night: boolean; onCandle: () => void }> = ({ settings, address, night, onCandle }) => {
   const { colors, styles } = useTheme(makeStyles);
   const insets = useSafeAreaInsets();
-  const { width: windowWidth } = useWindowDimensions();
+  const { width: windowWidth, height: windowHeight } = useWindowDimensions();
   // Wide enough for the shelf and an open scroll to lie side by side, as on an iPad.
   const wide = windowWidth >= WIDE_AT;
   const shelfWidth = Math.round(Math.min(400, Math.max(300, windowWidth * 0.38)));
@@ -790,6 +790,8 @@ const Screens: FC<{ settings: Settings; address: Address; night: boolean; onCand
           say('strike');
           store.deleteList(id);
         }}
+        // On a crowded shelf the candle and inkwell are drawn smaller and the scrolls stop above them.
+        footRoom={isCrowded(windowHeight, insets.top, insets.bottom, shelfLists.length) ? CROWDED_ROOM : 0}
         // A scroll being named wears the kind chosen for it, or failing that the kind its name so far suggests.
         dressFor={(name) => {
           const kind = kinds[namingAs ?? guessKind(name)];
