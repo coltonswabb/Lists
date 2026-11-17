@@ -79,9 +79,9 @@ const BEAMS = [
  * brightest and whitest; by afternoon it has gone round to the right and deepened to gold.
  */
 const LIGHTS = {
-  morning: { from: '14%', tone: ['#fff1d0', '#ffe2a6', '#ffd98a'], strength: 0.26, dapple: '#ffe6ad', mirrored: false },
-  midday: { from: '50%', tone: ['#fff6e0', '#ffe9b8', '#ffd98a'], strength: 0.3, dapple: '#fff0c8', mirrored: false },
-  afternoon: { from: '86%', tone: ['#ffcf7a', '#ffb648', '#f09a2e'], strength: 0.34, dapple: '#ffc35e', mirrored: true },
+  morning: { from: '14%', tone: ['#fff1d0', '#ffe2a6', '#ffd98a'], strength: 0.19, dapple: '#ffe6ad', mirrored: false },
+  midday: { from: '50%', tone: ['#fff6e0', '#ffe9b8', '#ffd98a'], strength: 0.22, dapple: '#fff0c8', mirrored: false },
+  afternoon: { from: '86%', tone: ['#ffcf7a', '#ffb648', '#f09a2e'], strength: 0.25, dapple: '#ffc35e', mirrored: true },
 } as const;
 
 const lightAt = (hour: number) => (hour < 11 ? LIGHTS.morning : hour < 15 ? LIGHTS.midday : LIGHTS.afternoon);
@@ -114,7 +114,8 @@ export const DayLight: FC<{ hour: number }> = ({ hour }) => {
 
   // How far a shaft has slid sideways by the time it reaches the desk's foot: the sun's slant for the hour.
   const lean = width * (light.from === '50%' ? 0.06 : 0.42);
-  const reach = height * 0.92;
+  // The shafts are spent well above the foot of the desk, where the candle and the inkwell stand in the room's plain light.
+  const reach = height * 0.74;
   const shaft = (beam: { at: number; wide: number }) => {
     const left = width * beam.at;
     const right = left + width * beam.wide;
@@ -151,7 +152,7 @@ export const DayLight: FC<{ hour: number }> = ({ hour }) => {
             </Defs>
             <G filter={`url(#haze${index})`}>
               {set.map((beam) => (
-                <Path key={beam.at} d={shaft(beam)} fill={`url(#shaft${index})`} opacity={beam.light} />
+                <Path key={beam.at} d={shaft(beam)} fill={`url(#shaft${index})`} opacity={beam.light * 0.68} />
               ))}
             </G>
           </Svg>

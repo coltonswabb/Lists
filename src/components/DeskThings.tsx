@@ -146,6 +146,7 @@ export const DeskThings: FC<DeskThingsProps> = ({ scrolls, onPen, onCandle, nigh
           accessibilityState={{ checked: night }}
           style={{ width: CANDLE, height: candleHeight }}
         >
+          <GroundShadow width={CANDLE * 1.7} left={-CANDLE * 0.35} top={candleHeight - 13} />
           <Animated.View
             style={[styles.glow, { left: CANDLE * WICK.x - GLOW / 2, top: candleHeight * WICK.y - GLOW / 2 - FLAME.height / 2 }, glowStyle]}
           >
@@ -204,6 +205,7 @@ export const DeskThings: FC<DeskThingsProps> = ({ scrolls, onPen, onCandle, nigh
           accessibilityLabel="Pen a new scroll"
           style={{ width: INKWELL, height: inkHeight }}
         >
+          <GroundShadow width={INKWELL * 0.95} left={-INKWELL * 0.12} top={inkHeight - 14} />
           {/* The pot stays put; only the feather above its rim moves, hinged where the quill meets the ink. */}
           <View style={[styles.clip, { top: split, height: inkHeight - split, width: INKWELL }]}>
             <Image source={inkwell.source} style={{ width: INKWELL, height: inkHeight, marginTop: -split }} />
@@ -223,7 +225,30 @@ export const DeskThings: FC<DeskThingsProps> = ({ scrolls, onPen, onCandle, nigh
   );
 };
 
+/**
+ * The shadow a thing standing on the desk throws round its foot: darkest where it touches the wood and gone
+ * within a hand's breadth. Without it, a thing lit from above looks as if it hangs over the desk.
+ */
+const GroundShadow: FC<{ width: number; left: number; top: number }> = ({ width, left, top }) => {
+  const height = Math.round(width * 0.3);
+  return (
+    <View pointerEvents="none" style={[styles.shadow, { width, height, left, top }]}>
+      <Svg width={width} height={height}>
+        <Defs>
+          <RadialGradient id="ground" cx="50%" cy="50%" r="50%">
+            <Stop offset="0" stopColor="#000000" stopOpacity={0.62} />
+            <Stop offset="0.55" stopColor="#000000" stopOpacity={0.3} />
+            <Stop offset="1" stopColor="#000000" stopOpacity={0} />
+          </RadialGradient>
+        </Defs>
+        <Ellipse cx={width / 2} cy={height / 2} rx={width / 2} ry={height / 2} fill="url(#ground)" />
+      </Svg>
+    </View>
+  );
+};
+
 const styles = StyleSheet.create({
+  shadow: { position: 'absolute' },
   things: {
     position: 'absolute',
     left: 22,
