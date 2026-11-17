@@ -636,6 +636,25 @@ export const GestureList: FC<GestureListProps> = ({
       />
     );
 
+  /** A row's words as they are written: a rubric on the first letter under a heading, or on a missive the name of whoever it is for. */
+  const written = (row: GestureListRow, index: number): ReactNode => {
+    if (rubricated[index]) {
+      return (
+        <>
+          <Text style={styles.rubric}>{row.text.charAt(0)}</Text>
+          {row.text.slice(1)}
+        </>
+      );
+    }
+    const named = trim?.names && !row.section && !row.done ? /^([^:\n]{1,24}):\s+(\S.*)$/.exec(row.text) : null;
+    if (!named) return row.text;
+    return (
+      <>
+        <Text style={styles.rubric}>{named[1]}:</Text> {named[2]}
+      </>
+    );
+  };
+
   const rowContent = (row: GestureListRow, index: number) => {
     const content = (
       <>
@@ -658,8 +677,7 @@ export const GestureList: FC<GestureListProps> = ({
             numberOfLines={isShelf || row.section ? 1 : 2}
             maxFontSizeMultiplier={MAX_TEXT_SCALE}
           >
-            {rubricated[index] ? <Text style={styles.rubric}>{row.text.charAt(0)}</Text> : null}
-            {rubricated[index] ? row.text.slice(1) : row.text}
+            {written(row, index)}
           </Text>
         )}
         {row.sealed ? (

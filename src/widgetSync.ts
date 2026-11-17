@@ -1,7 +1,8 @@
 import { Platform } from 'react-native';
 
 import { type Address, standing } from './scribe';
-import type { Palette } from './theme';
+import { kindOf, kinds } from './kinds';
+import { onVellum, type Palette } from './theme';
 import type { List } from './types';
 import type { ScrollWidgetProps } from './widgets/ScrollWidget';
 
@@ -12,7 +13,12 @@ let lastPayload: string | null = null;
 /** The widget shows the first scroll that still has something to do, or the first scroll at all. */
 export const widgetProps = (lists: List[], palette: Palette, address: Address): ScrollWidgetProps => {
   const open = (list: List) => list.items.filter((item) => !item.section && !item.done);
-  const list = lists.find((candidate) => open(candidate).length > 0) ?? lists[0];
+  // What must not fail is shown before anything else while it has lines left.
+  const pressing = lists.find((candidate) => kindOf(candidate) === 'spell' && open(candidate).length > 0);
+  const list = pressing ?? lists.find((candidate) => open(candidate).length > 0) ?? lists[0];
+  // The widget wears the scroll's kind: its ribbon's colour on the painted initial, and a dark kind's own vellum.
+  const kind = list ? kinds[kindOf(list)] : kinds.decree;
+  const dressed = onVellum(palette, kind.vellum);
   const items = list ? open(list) : [];
   const shown = items.slice(0, MAX_ITEMS);
   return {
@@ -22,12 +28,13 @@ export const widgetProps = (lists: List[], palette: Palette, address: Address): 
     struck: [],
     remaining: items.length,
     note: list ? standing.done(address) : standing.blank(address),
-    paper: palette.paperFrom,
-    paperTo: palette.paperTo,
+    paper: dressed.paperFrom,
+    paperTo: dressed.paperTo,
     desk: palette.desk,
-    ink: palette.ink,
-    faded: palette.inkFaded,
-    accent: palette.accent,
+    ink: dressed.ink,
+    faded: dressed.inkFaded,
+    accent: dressed.accent,
+    initial: kind.vellum ? dressed.accent : (kind.ribbon ?? dressed.accent),
   };
 };
 

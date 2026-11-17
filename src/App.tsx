@@ -8,7 +8,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { pickBackup, shareBackup } from './backup';
-import { kindOf, kinds } from './kinds';
+import { type Kind, kindNames, kindOf, kinds } from './kinds';
 import { PaneWidth } from './PaneWidth';
 import { ChestScreen } from './components/ChestScreen';
 import { ChronicleScreen } from './components/ChronicleScreen';
@@ -22,6 +22,7 @@ import { tick } from './haptics';
 import { Desk } from './components/Desk';
 import { GestureList, type GestureListActions, type GestureListRow, STAMP_DELAY_MS } from './components/GestureList';
 import { Marginalia, nextDrawing } from './components/Marginalia';
+import { KindFilter } from './components/KindFilter';
 import { ScribeLine } from './components/ScribeLine';
 import { ScrollMenu } from './components/ScrollMenu';
 import { ScribeWelcome } from './components/ScribeWelcome';
@@ -32,7 +33,7 @@ import { UndoToast } from './components/UndoToast';
 import { formatReminder } from './reminder';
 import { listenForReminderActions, syncReminders } from './reminders';
 import { readPatterns, usePatterns } from './patterns';
-import { type Address, say, standing } from './scribe';
+import { type Address, say, sayOneOf, standing } from './scribe';
 import { useSettings } from './settings';
 import { ThemeProvider, useTheme } from './ThemeContext';
 import { play, playNote } from './sounds';
@@ -68,6 +69,45 @@ const nightView = (lists: List[], today: string): List[] =>
     .map((list) =>
       list.tomorrow || !isDue(list.plannedFor, today) ? list : { ...list, items: list.items.filter((item) => !item.section && !isDue(item.plannedFor, today)) },
     );
+
+/**
+ * The shelf in the order the day wants it. What must not fail comes first while it has lines left; at the week's
+ * end the revels step forward and the ledgers step back. Otherwise the scrolls lie as they were put.
+ */
+const arranged = (lists: List[], night: boolean, now = new Date()): List[] => {
+  if (night) return lists;
+  const weekend = now.getDay() === 0 || now.getDay() === 6;
+  const place = (list: List) => {
+    const kind = kindOf(list);
+    if (kind === 'spell' && list.items.some((item) => !item.section && !item.done)) return 0;
+    if (weekend && kind === 'revel') return 1;
+    if (weekend && kind === 'ledger') return 3;
+    return 2;
+  };
+  return lists
+    .map((list, index) => ({ list, index, place: place(list) }))
+    .sort((a, b) => a.place - b.place || a.index - b.index)
+    .map(({ list }) => list);
+};
+
+/**
+ * How far along a scroll is, 0 to 1. A quest is counted by its stages, each heading and the lines under it
+ * being one: the line of gold grows a stage at a time. Any other scroll is counted by its lines.
+ */
+const shareDone = (list: List, kind: Kind): number | undefined => {
+  const lines = list.items.filter((item) => !item.section);
+  if (lines.length === 0) return undefined;
+  if (kind === 'quest' && list.items.some((item) => item.section)) {
+    const stages: Item[][] = [];
+    for (const item of list.items) {
+      if (item.section) stages.push([]);
+      else stages[stages.length - 1]?.push(item);
+    }
+    const real = stages.filter((stage) => stage.length > 0);
+    if (real.length > 0) return real.filter((stage) => stage.every((item) => item.done)).length / real.length;
+  }
+  return lines.filter((item) => item.done).length / lines.length;
+};
 
 const itemsOf = (list: List) => list.items.filter((item) => !item.section);
 const openCount = (items: Item[]) => items.filter((item) => !item.done).length;
@@ -107,6 +147,9 @@ const scrollRows = (items: Item[], today: string): { rows: GestureListRow[]; vis
   return { rows, visible };
 };
 
+/** How long a kind picked from the quill's sheet waits for its scroll to be named before it is forgotten. */
+const PENDING_KIND_MS = 2 * 60 * 1000;
+
 /** Long enough for the seal to come down and be taken away before the scribe asks about the tutorial. */
 const TUTORIAL_OFFER_MS = 1900;
 
@@ -128,11 +171,18 @@ const Screens: FC<{ settings: Settings; address: Address; night: boolean; onCand
   const { patterns, keep: keepPattern, forget: forgetPattern, replace: replacePatterns } = usePatterns();
   /** The Library's sheet offering a blank scroll or a kept pattern. */
   const [choosing, setChoosing] = useState(false);
+  /** The kind picked in that sheet for the scroll about to be named, and when: it holds only while the name is being written. */
+  const pendingKind = useRef<{ kind: Kind | null; at: number }>({ kind: null, at: 0 });
   /** The sheet over an open scroll holding what can be done to the whole of it. */
   const [menuOpen, setMenuOpen] = useState(false);
   /** Counts the seals pressed, so each press is its own animation; null when none is showing. */
   const [sealing, setSealing] = useState<number | null>(null);
-  const pressSeal = () => setSealing((last) => (last ?? 0) + 1);
+  /** The light that breaks from under the seal, for a kind of scroll whose finishing has one. */
+  const [sealFlare, setSealFlare] = useState<string | undefined>(undefined);
+  const pressSeal = (flare?: string) => {
+    setSealFlare(flare);
+    setSealing((last) => (last ?? 0) + 1);
+  };
   /** Which margin drawing a finished scroll is given: begun at random, and moved on each time a scroll is finished. */
   const [finisTurn, setFinisTurn] = useState(() => Math.floor(Math.random() * 1000));
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -219,13 +269,22 @@ const Screens: FC<{ settings: Settings; address: Address; night: boolean; onCand
   const today = dawnDay(new Date());
   const dayLists = useMemo(() => dayView(store.lists, today), [store.lists, today]);
   /** The scrolls on the shelf. By day, the day's. By night, all of them, with Tomorrow last. */
-  const shelfLists = useMemo(() => (night ? nightView(store.lists, today) : dayLists), [night, store.lists, dayLists, today]);
+  const allShelf = useMemo(() => (night ? nightView(store.lists, today) : dayLists), [night, store.lists, dayLists, today]);
+  /** The kinds of scroll on the shelf, and the one it is narrowed to when a ribbon over it has been touched. */
+  const shelfKinds = useMemo(() => kindNames.filter((kind) => allShelf.some((list) => !list.tomorrow && kindOf(list) === kind)), [allShelf]);
+  const [onlyKind, setOnlyKind] = useState<Kind | null>(null);
+  const narrowed = onlyKind !== null && shelfKinds.includes(onlyKind) ? onlyKind : null;
+  const shelfLists = useMemo(
+    // The Tomorrow scroll is the scribe's own and stays on the shelf whatever it is narrowed to.
+    () => arranged(narrowed ? allShelf.filter((list) => list.tomorrow || kindOf(list) === narrowed) : allShelf, night),
+    [allShelf, narrowed, night],
+  );
   /** What lies in the chest, most recently put away first. */
   const storedLists = useMemo(
     () => store.lists.filter((list) => list.stored).sort((a, b) => (b.storedAt ?? 0) - (a.storedAt ?? 0)),
     [store.lists],
   );
-  const openList = shelfLists.find((list) => list.id === openListId);
+  const openList = allShelf.find((list) => list.id === openListId);
   // A dark kind of scroll is written on vellum of its own, bright on dark, whatever the paper.
   const openVellum = openList ? kinds[kindOf(openList)].vellum : undefined;
   const scrollColors = useMemo(() => onVellum(colors, openVellum), [colors, openVellum]);
@@ -440,11 +499,16 @@ const Screens: FC<{ settings: Settings; address: Address; night: boolean; onCand
               if (remaining === 1) play('amen');
               else playNote(items.length - remaining);
             }
-            if (finishing) say(remaining === 1 ? 'finish' : 'complete');
+            // The scribe answers in the manner of the scroll: brisk over a ledger, hushed over a spell.
+            if (finishing) {
+              if (remaining === 1 && !night && kinds[kind].finished) sayOneOf([kinds[kind].finished], 'finish');
+              else if (remaining === 1 && !night) say('finish');
+              else sayOneOf(kinds[kind].struck, 'complete');
+            }
             // By night only tomorrow's lines are in view, so striking the last of them does not finish the scroll.
             if (finishing && remaining === 1 && !night) {
               setFreshSeal(openList.id);
-              pressSeal();
+              pressSeal(kinds[kind].flare);
               // Each finishing is rewarded with a different drawing from the last.
               setFinisTurn((turn) => turn + nextDrawing());
               // The teaching scroll has done its work once every line on it is struck: offer to put it away.
@@ -512,12 +576,25 @@ const Screens: FC<{ settings: Settings; address: Address; night: boolean; onCand
               {night ? (
                 // By candlelight the scroll shows only what is written for tomorrow; sealing and clearing are the day's work.
                 <Text style={styles.deskNote}>Lines written by candlelight join this scroll at dawn.</Text>
+              ) : remaining === 0 && kind === 'market' ? (
+                // A market scroll is for the same errand again: once the basket is full, every line is put back for next time.
+                <Pressable
+                  onPress={() => {
+                    say('restore');
+                    store.uncheckAll(openList.id);
+                  }}
+                  hitSlop={12}
+                  accessibilityRole="button"
+                  accessibilityHint="Puts every line back, ready for the next trip"
+                >
+                  <Text style={[styles.deskLabel, styles.deskLabelOn]}>Fill it again</Text>
+                </Pressable>
               ) : remaining === 0 ? (
                 // Every line struck: the scroll is finished, and the next thing to do with it is seal it into the chronicle.
                 <Pressable
                   onPress={() => {
                     say('seal');
-                    pressSeal();
+                    pressSeal(kinds[kind].flare);
                     store.sealList(openList.id);
                     setOpenListId(null);
                   }}
@@ -618,7 +695,7 @@ const Screens: FC<{ settings: Settings; address: Address; night: boolean; onCand
           }}
         />
         <UndoToast undo={store.undo} onUndo={undoLast} onDismiss={store.dismissUndo} offset={44} />
-        {sealing !== null ? <SealPress key={sealing} onDone={() => setSealing(null)} /> : null}
+        {sealing !== null ? <SealPress key={sealing} flare={sealFlare} onDone={() => setSealing(null)} /> : null}
       </>
     );
       })();
@@ -648,7 +725,6 @@ const Screens: FC<{ settings: Settings; address: Address; night: boolean; onCand
         rows={shelfLists.map((list) => {
           const items = itemsOf(list);
           const open = openCount(items);
-          const lines = items.filter((item) => !item.section);
           const sealed = items.length > 0 && open === 0;
           // A scroll made by candlelight for a day to come is marked so on the night's shelf.
           // So is one of the day's own scrolls that has had lines written on it for tomorrow.
@@ -661,7 +737,7 @@ const Screens: FC<{ settings: Settings; address: Address; night: boolean; onCand
             text: list.name,
             note: isTutorial(list) ? 'Tutorial' : undefined,
             ribbon: kinds[kindOf(list)].ribbon ?? undefined,
-            progress: lines.length > 0 ? lines.filter((item) => item.done).length / lines.length : undefined,
+            progress: shareDone(list, kindOf(list)),
             badge: mark ? `${mark} · ${roman(open)}` : roman(open),
             badgeMarked: mark !== null,
             sealed: sealed && !morrow,
@@ -669,6 +745,7 @@ const Screens: FC<{ settings: Settings; address: Address; night: boolean; onCand
           };
         })}
         subheader={
+          <>
           <ScribeLine
             standing={spoken(
               night
@@ -680,11 +757,17 @@ const Screens: FC<{ settings: Settings; address: Address; night: boolean; onCand
                     : standing.decree(address),
             )}
           />
+          {/* With more than one kind of scroll on the shelf, a ribbon for each stands over it, to narrow the shelf to one. */}
+          {shelfKinds.length > 1 ? <KindFilter present={shelfKinds} only={narrowed} onOnly={setOnlyKind} /> : null}
+          </>
         }
         onAdd={(names, index) => {
           say('newScroll');
           // A scroll begun by candlelight is for tomorrow: it joins the day's shelf at dawn.
-          store.addLists(names, shelfPosition(index), night ? plannedDay(new Date()) : undefined);
+          // The kind chosen from the quill's sheet a moment ago, if one was; otherwise the name will suggest one.
+          const chosen = Date.now() - pendingKind.current.at < PENDING_KIND_MS ? pendingKind.current.kind : null;
+          pendingKind.current = { kind: null, at: 0 };
+          store.addLists(names, shelfPosition(index), night ? plannedDay(new Date()) : undefined, chosen ?? undefined);
         }}
         // Tomorrow is the scribe's own: it cannot be renamed, cast out or sealed.
         onRename={(id, name) => {
@@ -701,7 +784,8 @@ const Screens: FC<{ settings: Settings; address: Address; night: boolean; onCand
         onComplete={(id) => {
           if (isTomorrowScroll(id)) return;
           say('seal');
-          pressSeal();
+          const sealedList = store.lists.find((list) => list.id === id);
+          pressSeal(sealedList ? kinds[kindOf(sealedList)].flare : undefined);
           store.sealList(id);
         }}
       />
@@ -711,13 +795,8 @@ const Screens: FC<{ settings: Settings; address: Address; night: boolean; onCand
         night={night}
         onPen={() => {
           tick();
-          // With patterns kept, the scribe first asks which sheet to cut. By night a blank one is simply begun.
-          if (patterns.length > 0 && !night) {
-            setChoosing(true);
-            return;
-          }
-          say('penning');
-          shelf.current?.add();
+          // The scribe asks what the scroll is for, and offers the patterns kept.
+          setChoosing(true);
         }}
       />
       <PatternSheet
@@ -727,6 +806,13 @@ const Screens: FC<{ settings: Settings; address: Address; night: boolean; onCand
         onForget={(pattern) => forgetPattern(pattern.id)}
         onBlank={() => {
           setChoosing(false);
+          pendingKind.current = { kind: null, at: 0 };
+          say('penning');
+          shelf.current?.add();
+        }}
+        onKind={(kind) => {
+          setChoosing(false);
+          pendingKind.current = { kind, at: Date.now() };
           say('penning');
           shelf.current?.add();
         }}
@@ -753,7 +839,7 @@ const Screens: FC<{ settings: Settings; address: Address; night: boolean; onCand
       </View>
       {/* With a scroll open beside the shelf, the notice and the seal are the scroll's to show. */}
       {scrollPane ? null : <UndoToast undo={store.undo} onUndo={undoLast} onDismiss={store.dismissUndo} offset={44} />}
-      {sealing !== null && !scrollPane ? <SealPress key={sealing} onDone={() => setSealing(null)} /> : null}
+      {sealing !== null && !scrollPane ? <SealPress key={sealing} flare={sealFlare} onDone={() => setSealing(null)} /> : null}
     </>
   );
   if (!wide) return library;

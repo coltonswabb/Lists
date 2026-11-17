@@ -5,6 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { drawings, parchment, waxSeal } from '../art';
 import { capitalize, describeDay, isSameDay, officeOf } from '../calendar';
+import { kindNames, kindOf, kinds } from '../kinds';
 import { type Address, addresses } from '../scribe';
 import { useTheme } from '../ThemeContext';
 import { fonts, mixColors, type Palette, roman } from '../theme';
@@ -58,6 +59,15 @@ const tallyOf = (sealed: SealedList[]) => {
   return `${roman(sealed.length)} ${sealed.length === 1 ? 'scroll' : 'scrolls'} sealed, ${roman(lines)} ${lines === 1 ? 'line' : 'lines'} struck in all`;
 };
 
+/** The same, by what the scrolls were for: "II quests won · I spell cast". Nothing when every one was a plain decree. */
+const kindTally = (sealed: SealedList[]) =>
+  kindNames
+    .filter((kind) => kind !== 'decree')
+    .map((kind) => ({ kind, count: sealed.filter((scroll) => kindOf(scroll) === kind).length }))
+    .filter(({ count }) => count > 0)
+    .map(({ kind, count }) => `${roman(count)} ${kinds[kind].tally[count === 1 ? 0 : 1]}`)
+    .join('  ·  ');
+
 const dayHeading = (date: Date, now: Date) => {
   const named = describeDay(date);
   return isSameDay(date, now) ? `This day, ${named}` : capitalize(named);
@@ -104,6 +114,7 @@ export const ChronicleScreen: FC<ChronicleScreenProps> = ({ entries, sealed, add
           <>
             <Text style={styles.heading}>Sealed scrolls</Text>
             <Text style={styles.tally}>{tallyOf(sealed)}</Text>
+            {kindTally(sealed) ? <Text style={styles.kindTally}>{kindTally(sealed)}</Text> : null}
             {sealed.map((scroll) => (
               <Pressable
                 key={scroll.id}
@@ -241,6 +252,7 @@ const makeStyles = (colors: Palette) =>
     sealedOn: { color: colors.inkFaded, fontFamily: fonts.bodyItalic, fontSize: 15 },
     sealedCount: { marginTop: 2, color: colors.accent, fontFamily: fonts.label, fontSize: 12, letterSpacing: 0.8 },
     earned: { width: EARNED.width, height: EARNED.height, alignItems: 'center', justifyContent: 'center', opacity: 0.85 },
+    kindTally: { marginHorizontal: 22, marginTop: -6, marginBottom: 10, color: colors.onDeskFaded, fontFamily: fonts.bodyItalic, fontSize: 15 },
     tally: { marginHorizontal: 22, marginTop: -4, marginBottom: 10, color: colors.complete, fontFamily: fonts.bodyItalic, fontSize: 16 },
     page: {
       overflow: 'hidden',

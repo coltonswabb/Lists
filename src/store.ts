@@ -382,12 +382,14 @@ export const useLists = () => {
   }, [apply]);
 
   const addLists = useCallback(
-    (names: string[], index: number, plannedFor?: string) => {
+    (names: string[], index: number, plannedFor?: string, kind?: string) => {
+      // A rite is done afresh each day, so one begun as a rite renews at dawn from the start.
+      const asKind = kind ? { kind, ...(kind === 'rite' ? { daily: true, renewedOn: renewalDay(new Date()) } : {}) } : {};
       apply((all) =>
         insertAt(
           all,
           index,
-          names.map((name) => ({ id: newId(), name, items: [], touchedAt: Date.now(), ...(plannedFor ? { plannedFor } : {}) })),
+          names.map((name) => ({ id: newId(), name, items: [], touchedAt: Date.now(), ...(plannedFor ? { plannedFor } : {}), ...asKind })),
         ),
       );
     },

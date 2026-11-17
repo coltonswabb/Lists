@@ -28,13 +28,15 @@ const LIFT_MS = 320;
  * The moment a scroll is finished: the wax seal comes down on the page from above, lands with a
  * thud, spreads a little under the press, rests, and is taken away. Never touchable.
  */
-export const SealPress: FC<{ onDone: () => void }> = ({ onDone }) => {
+export const SealPress: FC<{ onDone: () => void; flare?: string }> = ({ onDone, flare }) => {
   const { width, height } = useWindowDimensions();
   const still = useReducedMotion();
   // 0 is held high above the page, 1 is pressed onto it.
   const press = useSharedValue(still ? 1 : 0);
   const squash = useSharedValue(1);
   const shown = useSharedValue(0);
+  // A light that breaks from under the seal as it lands, for a scroll whose finishing is more than a sealing.
+  const burst = useSharedValue(0);
 
   useEffect(() => {
     const land = () => {
@@ -59,6 +61,7 @@ export const SealPress: FC<{ onDone: () => void }> = ({ onDone }) => {
       }),
     );
     // The wax gives under the press and springs back.
+    burst.value = withDelay(WAIT_MS + DROP_MS, withTiming(1, { duration: 900, easing: Easing.out(Easing.cubic) }));
     squash.value = withDelay(WAIT_MS + DROP_MS, withSequence(withTiming(1.1, { duration: 70 }), withSpring(1, { damping: 9, stiffness: 240 })));
     return undefined;
     // Played once, when the seal is brought out.
@@ -75,10 +78,16 @@ export const SealPress: FC<{ onDone: () => void }> = ({ onDone }) => {
     transform: [{ scale: 1.5 - press.value * 0.42 }],
   }));
 
+  const flareStyle = useAnimatedStyle(() => ({
+    opacity: Math.sin(burst.value * Math.PI) * 0.55,
+    transform: [{ scale: 0.6 + burst.value * 3.4 }],
+  }));
+
   if (!waxSeal) return null;
   return (
     <View pointerEvents="none" style={StyleSheet.absoluteFill} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
       <View style={[styles.place, { left: width / 2 - SIZE / 2, top: height * 0.42 - SIZE / 2 }]}>
+        {flare ? <Animated.View style={[styles.flare, { backgroundColor: flare, shadowColor: flare }, flareStyle]} /> : null}
         <Animated.View style={[styles.shadow, shadowStyle]} />
         <Animated.View style={sealStyle}>
           <WaxSeal size={SIZE} />
@@ -90,6 +99,7 @@ export const SealPress: FC<{ onDone: () => void }> = ({ onDone }) => {
 
 const styles = StyleSheet.create({
   place: { position: 'absolute', width: SIZE, height: SIZE, alignItems: 'center', justifyContent: 'center' },
+  flare: { position: 'absolute', width: SIZE, height: SIZE, borderRadius: SIZE, shadowOpacity: 1, shadowRadius: 40, shadowOffset: { width: 0, height: 0 } },
   shadow: {
     position: 'absolute',
     width: SIZE * 0.8,

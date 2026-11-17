@@ -119,6 +119,18 @@ export const searchLine = (state: SearchState, pick: number): string => {
 };
 
 /** Has the scribe pass a brief remark. */
+/** Says one of these lines, chosen at random, when a remark of this sort would be said: a kind of scroll's own words. */
+export const sayOneOf = (lines: string[], as: Remark) => {
+  if (lines.length === 0) {
+    say(as);
+    return;
+  }
+  if (mode === 'silent' || (mode === 'quiet' && !worthSaying.includes(as))) return;
+  const line = lines[Math.floor(Math.random() * lines.length)] ?? '';
+  const title = addresses[address];
+  listeners.forEach((listener) => listener(line.replace('{t}', title)));
+};
+
 export const say = (remark: Remark) => {
   if (mode === 'silent' || (mode === 'quiet' && !worthSaying.includes(remark))) return;
   const options = remarks[remark];

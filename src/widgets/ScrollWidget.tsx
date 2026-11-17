@@ -43,6 +43,8 @@ export type ScrollWidgetProps = {
   ink: string;
   faded: string;
   accent: string;
+  /** The ground of the painted initial: the colour of the scroll's ribbon. Absent from older data. */
+  initial?: string;
 };
 
 export const WIDGET_NAME = 'ListsScroll';
@@ -119,7 +121,7 @@ const ScrollWidget = (props: ScrollWidgetProps, environment: { widgetFamily?: st
       >
         <HStack spacing={6}>
           <ZStack modifiers={[frame({ width: margin, height: rowHeight + 6 })]}>
-            <RoundedRectangle cornerRadius={2} modifiers={[foregroundStyle(props.accent), frame({ width: 18, height: 18 })]} />
+            <RoundedRectangle cornerRadius={2} modifiers={[foregroundStyle(props.initial ?? props.accent), frame({ width: 18, height: 18 })]} />
             <Text modifiers={[font({ size: 13, weight: 'bold', design: 'serif' }), foregroundStyle(props.paper)]}>
               {title.trim().charAt(0).toUpperCase()}
             </Text>

@@ -16,6 +16,8 @@ export type ScrollTrim = {
   glow?: string;
   /** A second rule is drawn down the right of the sheet, as in an account book. */
   columns?: boolean;
+  /** A line that opens with a name and a colon has the name written in the pigment: who the line is for. */
+  names?: boolean;
 };
 
 type KindSpec = {
@@ -33,10 +35,18 @@ type KindSpec = {
   line: (to: Address) => string;
   /** Words in a scroll's name that suggest this kind, when none has been chosen. */
   hints: string[];
+  /** What the scribe says as a line on it is struck, in this kind's own manner. `{t}` is the form of address. */
+  struck: string[];
+  /** What the scribe says when the last line is struck. */
+  finished: string;
+  /** How the chronicle counts such scrolls once sealed: one, and many. */
+  tally: [one: string, many: string];
+  /** The light that breaks from under the seal as the scroll is finished. Most have none. */
+  flare?: string;
 };
 
 export const kinds: Record<Kind, KindSpec> = {
-  decree: { label: 'Decree', purpose: 'anything at all', ribbon: null, trim: {}, left: ['RES', 'RES'], line: () => '', hints: [] },
+  decree: { label: 'Decree', purpose: 'anything at all', ribbon: null, trim: {}, left: ['RES', 'RES'], line: () => '', hints: [], struck: [], finished: '', tally: ['decree sealed', 'decrees sealed'] },
   ledger: {
     label: 'Ledger',
     purpose: 'work and business',
@@ -46,6 +56,9 @@ export const kinds: Record<Kind, KindSpec> = {
     left: ['NEGOTIUM', 'NEGOTIA'],
     line: (to) => `To business, ${addresses[to]}.`,
     hints: ['work', 'office', 'job', 'client', 'invoice', 'business', 'meeting', 'email', 'ledger'],
+    struck: ['Entered, {t}.', 'Balanced, {t}.', 'One matter the fewer, {t}.', 'To the good, {t}.'],
+    finished: 'The books are closed, {t}. I shall fetch the wax.',
+    tally: ['ledger closed', 'ledgers closed'],
   },
   market: {
     label: 'Market',
@@ -56,6 +69,9 @@ export const kinds: Record<Kind, KindSpec> = {
     left: ['EMENDUM', 'EMENDA'],
     line: (to) => `What shall we fetch, ${addresses[to]}?`,
     hints: ['market', 'grocer', 'shop', 'store', 'buy', 'food', 'pantry', 'errand'],
+    struck: ['In the basket, {t}.', 'Fetched, {t}.', 'A fair price, I trust, {t}.', 'Got, {t}.'],
+    finished: 'The basket is full, {t}.',
+    tally: ['market filled', 'markets filled'],
   },
   quest: {
     label: 'Quest',
@@ -66,6 +82,9 @@ export const kinds: Record<Kind, KindSpec> = {
     left: ['LABOR', 'LABORES'],
     line: (to) => `Onward, ${addresses[to]}.`,
     hints: ['quest', 'goal', 'project', 'plan', 'trip', 'travel', 'journey', 'build', 'learn'],
+    struck: ['A league nearer, {t}.', 'Well fought, {t}.', 'Onward, {t}.', 'The road shortens, {t}.'],
+    finished: 'The venture is won, {t}. I shall fetch the wax.',
+    tally: ['quest won', 'quests won'],
   },
   spell: {
     label: 'Spell',
@@ -77,6 +96,10 @@ export const kinds: Record<Kind, KindSpec> = {
     left: ['VERBUM', 'VERBA'],
     line: (to) => `These must not fail, ${addresses[to]}.`,
     hints: ['spell', 'important', 'urgent', 'must', 'deadline', 'due', 'priority', 'critical'],
+    struck: ['The word is spoken, {t}.', 'It holds, {t}.', 'Bound, {t}.', 'None shall know, {t}.'],
+    finished: 'It is cast, {t}.',
+    tally: ['spell cast', 'spells cast'],
+    flare: '#e2c064',
   },
   revel: {
     label: 'Revel',
@@ -87,16 +110,22 @@ export const kinds: Record<Kind, KindSpec> = {
     left: ['LUDUS', 'LUDI'],
     line: (to) => `At thy leisure, ${addresses[to]}.`,
     hints: ['revel', 'play', 'fun', 'weekend', 'party', 'game', 'movie', 'watch', 'holiday', 'feast'],
+    struck: ['Huzzah, {t}!', 'Merrily done, {t}.', 'A fine sport, {t}.', 'More wine, {t}?'],
+    finished: 'A revel well kept, {t}. I shall fetch the wax.',
+    tally: ['revel kept', 'revels kept'],
   },
   missive: {
     label: 'Missive',
     purpose: 'people to write or speak to',
     ribbon: '#8f2a2a',
     // A letter: clean paper, marked in the red of sealing wax.
-    trim: { wash: 'rgba(255,255,255,0.08)', pigment: '#8f2a2a' },
+    trim: { wash: 'rgba(255,255,255,0.08)', pigment: '#8f2a2a', names: true },
     left: ['EPISTULA', 'EPISTULAE'],
     line: (to) => `Who must hear of it, ${addresses[to]}?`,
     hints: ['missive', 'letter', 'call', 'write to', 'reply', 'message', 'people', 'thank'],
+    struck: ['They have word of it, {t}.', 'Sent, {t}.', 'The rider is away, {t}.', 'Told, {t}.'],
+    finished: 'All have been told, {t}. I shall fetch the wax.',
+    tally: ['missive sent', 'missives sent'],
   },
   rite: {
     label: 'Rite',
@@ -107,6 +136,9 @@ export const kinds: Record<Kind, KindSpec> = {
     left: ['RITUS', 'RITUS'],
     line: (to) => `As every day, ${addresses[to]}.`,
     hints: ['rite', 'routine', 'habit', 'ritual', 'morning', 'evening', 'daily', 'workout', 'gym'],
+    struck: ['As ever, {t}.', 'Observed, {t}.', 'Faithfully done, {t}.', 'The day is kept, {t}.'],
+    finished: 'The day’s rite is kept, {t}.',
+    tally: ['rite kept', 'rites kept'],
   },
 };
 
