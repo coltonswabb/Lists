@@ -69,14 +69,14 @@ export const kinds: Record<Kind, KindSpec> = {
   },
   spell: {
     label: 'Spell',
-    purpose: 'routines and rituals',
+    purpose: 'what must not be forgotten',
     ribbon: '#6b4192',
     // Vellum dyed deep violet, written in silver, its numerals and initials in gold foil that gives off its own light.
     trim: { pigment: '#e6c56a', glow: '#e2c064' },
     vellum: { from: '#2c1845', to: '#42245f', ink: '#edebf6', foil: '#e6c56a' },
     left: ['VERBUM', 'VERBA'],
-    line: (to) => `Speak the words, ${addresses[to]}.`,
-    hints: ['spell', 'routine', 'habit', 'ritual', 'morning', 'evening', 'daily', 'workout', 'gym'],
+    line: (to) => `These must not fail, ${addresses[to]}.`,
+    hints: ['spell', 'important', 'urgent', 'must', 'deadline', 'due', 'priority', 'critical'],
   },
   revel: {
     label: 'Revel',
@@ -105,7 +105,9 @@ export const isKind = (value: unknown): value is Kind => typeof value === 'strin
 /** The kind a scroll's name suggests: the first whose hint appears in it, or a plain decree. */
 export const guessKind = (name: string): Kind => {
   const words = name.toLowerCase();
-  return kindNames.find((kind) => kinds[kind].hints.some((hint) => words.includes(hint))) ?? 'decree';
+  // What must not fail is asked first: "urgent work" is a spell before it is a ledger.
+  const asked: Kind[] = ['spell', ...kindNames.filter((kind) => kind !== 'spell')];
+  return asked.find((kind) => kinds[kind].hints.some((hint) => words.includes(hint))) ?? 'decree';
 };
 
 /** A scroll's kind: the one chosen for it, or failing that the one its name suggests. The scribe's own scrolls are plain. */
