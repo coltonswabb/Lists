@@ -749,6 +749,7 @@ const Screens: FC<{ settings: Settings; address: Address; night: boolean; onCand
             ribbon: kinds[kindOf(list)].ribbon ?? undefined,
             vellum: vellumOf(kindOf(list), colors),
             emblem: kinds[kindOf(list)].emblem ?? undefined,
+            kind: list.tomorrow ? undefined : kindOf(list),
             progress: shareDone(list, kindOf(list)),
             // A marked scroll with nothing on it yet wears its mark alone: "MORROW", not "MORROW · NIL".
             badge: mark ? (open > 0 ? `${mark} · ${roman(open)}` : mark) : roman(open),

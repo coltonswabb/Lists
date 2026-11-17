@@ -4,6 +4,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { type Kind, kindNames, kinds } from '../kinds';
 import { useTheme } from '../ThemeContext';
+import { KindEmblem } from './KindEmblem';
 import { fonts, type Palette } from '../theme';
 
 export type ScrollChoice = {
@@ -60,6 +61,7 @@ export const ScrollMenu: FC<ScrollMenuProps> = ({ open, title, choices, kind, on
                   {kinds[name].purpose}
                 </Text>
               </View>
+              <KindEmblem kind={name} size={28} color={colors.inkFaded} />
             </Pressable>
           ))}
         </View>

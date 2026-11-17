@@ -43,10 +43,10 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { scheduleOnRN } from 'react-native-worklets';
 
-import { drawings, waxSeal } from '../art';
+import { drawings, kindEmblems, waxSeal } from '../art';
 import { success, thud, tick } from '../haptics';
 import { play } from '../sounds';
-import { runeOf, type ScrollTrim } from '../kinds';
+import { type Kind, runeOf, type ScrollTrim } from '../kinds';
 import { usePaneWidth } from '../PaneWidth';
 import { useTheme } from '../ThemeContext';
 import { brightness, accentAt, fonts, mixColors, MAX_TEXT_SCALE, type Palette, type Vellum, paperAt, roman, ROW_HEIGHT, TEXT_SCALE } from '../theme';
@@ -55,6 +55,7 @@ import { Finial, hasFinial } from './Finial';
 import { PaperOverlay } from './PaperOverlay';
 import { ROLL_LIGHT, ROLL_LIGHT_AT, Roller, ROLLER_HEIGHT } from './Roller';
 import { RowInput, type RowInputHandle } from './RowInput';
+import { KindEmblem } from './KindEmblem';
 import { LineArt } from './LineArt';
 import { MarginVine } from './MarginVine';
 import { LEAD_WIDTH, type Lead, RowLead } from './RowLead';
@@ -124,8 +125,10 @@ export type GestureListRow = {
   vellum?: Vellum;
   /** Cannot be cast out or struck: the scribe's own, which a swipe only nudges. */
   fixed?: boolean;
-  /** Shelf only: the kind's small sign, set beside the count. */
+  /** Shelf only: the kind's small sign, set beside the count, for where its emblem has not been drawn. */
   emblem?: string;
+  /** Shelf only: the kind of scroll, whose drawn emblem is set beside the count. */
+  kind?: Kind;
   /** Shelf only: the colour of the ribbon tied round the roll, which is also the ground of its painted initial. */
   ribbon?: string;
   /** Shelf only: the share of the scroll's lines already struck, 0 to 1, shown as a line of gold along the roll. */
@@ -742,7 +745,11 @@ export const GestureList: FC<GestureListProps> = ({
           </Text>
         )}
         {/* The kind's sign, in its ribbon's colour, so a scroll's kind can be told without reading its name. */}
-        {isShelf && row.emblem && !row.sealed ? (
+        {isShelf && row.kind && kindEmblems[row.kind] && !row.sealed ? (
+          <View style={styles.emblemArt}>
+            <KindEmblem kind={row.kind} size={30} color={row.vellum ? row.vellum.foil : row.ribbon && colors.darkPaper ? mixColors(row.ribbon, '#ffffff', 0.45) : (row.ribbon ?? colors.inkFaded)} />
+          </View>
+        ) : isShelf && row.emblem && !row.sealed ? (
           <Text style={[styles.emblem, { color: row.vellum ? row.vellum.foil : row.ribbon && colors.darkPaper ? mixColors(row.ribbon, '#ffffff', 0.45) : (row.ribbon ?? colors.inkFaded) }]} maxFontSizeMultiplier={1.2}>
             {row.emblem}
           </Text>
@@ -1070,6 +1077,7 @@ const makeStyles = (colors: Palette) =>
   // Room at the roll's end for the ribbon, so the count is not written under it.
   ribboned: { paddingRight: 34 },
   emblem: { marginLeft: 10, fontSize: 17 },
+  emblemArt: { marginLeft: 10, width: 30, height: 30, alignItems: 'center', justifyContent: 'center' },
   // Below the roll, under the ribbon: two ends of unequal length, the nearer the longer.
   ribbonEnds: { position: 'absolute', right: 27, flexDirection: 'row', gap: 1, alignItems: 'flex-start', top: ROW_HEIGHT - 8 },
   ribbonEnd: { width: 4, height: 7, borderBottomLeftRadius: 1, borderBottomRightRadius: 1, opacity: 0.9 },

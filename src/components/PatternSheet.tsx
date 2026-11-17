@@ -5,6 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { type Kind, kindNames, kinds } from '../kinds';
 import type { Pattern } from '../patterns';
 import { useTheme } from '../ThemeContext';
+import { KindEmblem } from './KindEmblem';
 import { fonts, type Palette, roman } from '../theme';
 
 type PatternSheetProps = {
@@ -50,13 +51,13 @@ export const PatternSheet: FC<PatternSheetProps> = ({ open, patterns, onBlank, o
               <View style={styles.kindWords}>
                 <Text style={styles.kindLabel} numberOfLines={1}>
                   {kinds[name].label}
-                  {kinds[name].emblem ? <Text style={styles.kindEmblem}>  {kinds[name].emblem}</Text> : null}
                 </Text>
                 {/* What it is for, so a kind can be chosen before its name means anything. */}
                 <Text style={styles.kindFor} numberOfLines={2}>
                   {kinds[name].purpose}
                 </Text>
               </View>
+              <KindEmblem kind={name} size={30} color={colors.inkFaded} />
             </Pressable>
           ))}
         </View>
@@ -120,7 +121,6 @@ const makeStyles = (colors: Palette) =>
     },
     ribbon: { width: 7, height: 34, borderRadius: 1 },
     kindWords: { flex: 1 },
-    kindEmblem: { color: colors.inkFaded, fontFamily: undefined, fontSize: 14 },
     kindFor: { color: colors.inkFaded, fontFamily: fonts.bodyItalic, fontSize: 13, lineHeight: 15 },
     kindLabel: { color: colors.ink, fontFamily: fonts.body, fontSize: 17 },
     row: {

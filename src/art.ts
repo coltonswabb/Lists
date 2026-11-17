@@ -21,6 +21,65 @@ export const marginalia: Drawing[] = [
   { source: require('../assets/art/margin-12.png'), width: 900, height: 259 },
 ];
 
+/** Marginal drawings that belong to one paper's book, by paper, in the order of their file names. */
+export const bookMarginalia: Partial<Record<ThemeName, Drawing[]>> = {
+  codex: [
+    { source: require('../assets/art/margin-codex-01.png'), width: 485, height: 821 },
+    { source: require('../assets/art/margin-codex-02.png'), width: 737, height: 822 },
+    { source: require('../assets/art/margin-codex-03.png'), width: 873, height: 635 },
+  ],
+  lapis: [
+    { source: require('../assets/art/margin-lapis-01.png'), width: 738, height: 875 },
+    { source: require('../assets/art/margin-lapis-02.png'), width: 681, height: 846 },
+    { source: require('../assets/art/margin-lapis-03.png'), width: 900, height: 655 },
+  ],
+  scriptorium: [
+    { source: require('../assets/art/margin-scriptorium-01.png'), width: 748, height: 729 },
+    { source: require('../assets/art/margin-scriptorium-02.png'), width: 702, height: 697 },
+    { source: require('../assets/art/margin-scriptorium-03.png'), width: 900, height: 392 },
+  ],
+  verdant: [
+    { source: require('../assets/art/margin-verdant-01.png'), width: 806, height: 728 },
+    { source: require('../assets/art/margin-verdant-02.png'), width: 651, height: 921 },
+    { source: require('../assets/art/margin-verdant-03.png'), width: 890, height: 590 },
+  ],
+  vigil: [
+    { source: require('../assets/art/margin-vigil-01.png'), width: 710, height: 737 },
+    { source: require('../assets/art/margin-vigil-02.png'), width: 900, height: 466 },
+    { source: require('../assets/art/margin-vigil-03.png'), width: 717, height: 737 },
+  ],
+};
+
+/** The top-left corner of each book's page border, to be turned over for the other corners. */
+export const borders: Partial<Record<ThemeName, Drawing>> = {
+  codex: { source: require('../assets/art/border-codex.png'), width: 900, height: 913 },
+  lapis: { source: require('../assets/art/border-lapis.png'), width: 900, height: 860 },
+  scriptorium: { source: require('../assets/art/border-scriptorium.png'), width: 900, height: 878 },
+  verdant: { source: require('../assets/art/border-verdant.png'), width: 900, height: 930 },
+  vigil: { source: require('../assets/art/border-vigil.png'), width: 900, height: 889 },
+};
+
+/** The frame drawn round a painted initial, in each book's own manner. */
+export const initialFrames: Partial<Record<ThemeName, Drawing>> = {
+  codex: { source: require('../assets/art/initial-codex.png'), width: 900, height: 908 },
+  lapis: { source: require('../assets/art/initial-lapis.png'), width: 900, height: 900 },
+  scriptorium: { source: require('../assets/art/initial-scriptorium.png'), width: 900, height: 890 },
+  verdant: { source: require('../assets/art/initial-verdant.png'), width: 900, height: 898 },
+  vigil: { source: require('../assets/art/initial-vigil.png'), width: 900, height: 892 },
+};
+
+/** A small emblem for each kind of scroll. */
+export const kindEmblems: Partial<Record<'decree' | 'ledger' | 'market' | 'quest' | 'spell' | 'revel' | 'missive' | 'rite', Drawing>> = {
+  decree: { source: require('../assets/art/kind-decree.png'), width: 900, height: 464 },
+  ledger: { source: require('../assets/art/kind-ledger.png'), width: 898, height: 755 },
+  market: { source: require('../assets/art/kind-market.png'), width: 761, height: 798 },
+  missive: { source: require('../assets/art/kind-missive.png'), width: 898, height: 488 },
+  quest: { source: require('../assets/art/kind-quest.png'), width: 765, height: 1044 },
+  revel: { source: require('../assets/art/kind-revel.png'), width: 822, height: 810 },
+  rite: { source: require('../assets/art/kind-rite.png'), width: 900, height: 703 },
+  spell: { source: require('../assets/art/kind-spell.png'), width: 769, height: 805 },
+};
+
 /** Single line drawings by name, when they have been made. */
 export const drawings: Partial<Record<'quill' | 'flourish' | 'divider' | 'empty-shelf' | 'initial-frame' | 'tick' | 'strike' | 'nil-found' | 'sky-wheel' | 'sky-corner', Drawing>> = {
   'divider': { source: require('../assets/art/divider.png'), width: 900, height: 66 },

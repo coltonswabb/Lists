@@ -1,7 +1,7 @@
 import type { FC } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
-import { drawings } from '../art';
+import { drawings, initialFrames } from '../art';
 import { useTheme } from '../ThemeContext';
 import { type Palette, fonts, MAX_TEXT_SCALE } from '../theme';
 import { LineArt } from './LineArt';
@@ -21,7 +21,7 @@ const FLOURISH = LEAD_WIDTH * 1.9;
 const FRAME = LEAD_WIDTH * 1.62;
 
 export const RowLead: FC<{ lead: Lead }> = ({ lead }) => {
-  const { styles } = useTheme(makeStyles);
+  const { colors, styles } = useTheme(makeStyles);
   if (lead.kind === 'done') {
     return (
       <View style={styles.cell}>
@@ -44,7 +44,8 @@ export const RowLead: FC<{ lead: Lead }> = ({ lead }) => {
     );
   }
   // A vinework frame when it has been drawn; otherwise the looser pen-flourish.
-  const border = lead.flourish ? drawings['initial-frame'] : undefined;
+  // Each book frames its initials in its own manner, where that has been drawn.
+  const border = lead.flourish ? (initialFrames[colors.name] ?? drawings['initial-frame']) : undefined;
   const frame = lead.flourish && !border ? drawings.flourish : undefined;
   return (
     <View style={[styles.cell, styles.block, { backgroundColor: lead.pigment }]}>

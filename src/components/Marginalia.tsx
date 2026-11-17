@@ -2,7 +2,8 @@ import type { FC, ReactNode } from 'react';
 import { Image } from 'react-native';
 import Svg, { Circle, Path } from 'react-native-svg';
 
-import { marginalia } from '../art';
+import { bookMarginalia, marginalia } from '../art';
+import { usePalette } from '../ThemeContext';
 import { usePaneWidth } from '../PaneWidth';
 import { InkIn } from './InkIn';
 import { LEAD_WIDTH } from './RowLead';
@@ -79,7 +80,7 @@ const hash = (text: string) => [...text].reduce((sum, char) => (sum * 31 + char.
 
 /** A step to a different drawing than the one now shown, whichever that is. */
 export const nextDrawing = () => {
-  const count = marginalia.length || drawings.length;
+  const count = marginalia.length + 3 || drawings.length;
   return count > 1 ? 1 + Math.floor(Math.random() * (count - 1)) : 0;
 };
 
@@ -112,7 +113,10 @@ export const Marginalia: FC<MarginaliaProps> = ({ seed, turn = 0, within, ink, a
   const windowWidth = usePaneWidth();
   const screenWidth = Math.min(windowWidth, 640);
   const pick = Math.abs(hash(seed)) + turn;
-  const drawing = marginalia[pick % Math.max(1, marginalia.length)];
+  // A book's own drawings come before the ones every book shares, so each paper has creatures of its own.
+  const { name } = usePalette();
+  const pool = [...(bookMarginalia[name] ?? []), ...marginalia];
+  const drawing = pool[pick % Math.max(1, pool.length)];
   if (drawing) {
     // Wide drawings fill the column; tall ones are held to the same height, so none crowds the page.
     const width = within

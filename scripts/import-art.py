@@ -42,7 +42,16 @@ PAD = 12  # transparent pixels kept around the trimmed drawing
 # transparent, which keeps the anti-aliased edges of the pen strokes smooth.
 PAPER, INK = 235, 70
 SINGLES = ("quill", "flourish", "divider", "empty-shelf", "initial-frame", "tick", "strike", "nil-found", "sky-wheel", "sky-corner")
-LINE_ART = re.compile(r"^(margin-\d+|" + "|".join(SINGLES) + r")$")
+PAPERS = "scriptorium|vigil|lapis|verdant|codex"
+KINDS = ("decree", "ledger", "market", "quest", "spell", "revel", "missive", "rite")
+# Art that belongs to one kind of scroll or to one paper's book: an emblem for each kind; and for each book a
+# corner of border, a frame for a painted initial, and its own marginal drawings.
+KIND = re.compile(r"^kind-(" + "|".join(KINDS) + r")$")
+BORDER = re.compile(rf"^border-({PAPERS})$")
+FRAME = re.compile(rf"^initial-({PAPERS})$")
+BOOK_MARGIN = re.compile(rf"^margin-({PAPERS})-\d+$")
+MARGIN = re.compile(r"^margin-\d+$")
+LINE_ART = re.compile(rf"^(margin-\d+|kind-({'|'.join(KINDS)})|border-({PAPERS})|initial-({PAPERS})|margin-({PAPERS})-\d+|" + "|".join(SINGLES) + r")$")
 # Painted objects cut out of a white ground, and the longest side each is scaled to.
 OBJECTS = {"wax-seal": 192, "wax-seal-blank": 300, "finial-brass": 200, "finial-iron": 200, "desk-inkwell": 480, "desk-candle": 420, "sky-sun": 640, "sky-moon": 560}
 # Full-bleed paintings behind the turn of day and night, kept as JPEGs: they have no transparency and are large.
@@ -284,10 +293,34 @@ def write_module(drawings):
         "export const marginalia: Drawing[] = [",
     ]
     for name, (w, h) in sorted(drawings.items()):
-        if name.startswith("margin-"):
+        if MARGIN.match(name):
             lines.append(f"  {entry(name, w, h)},")
     lines.append("];")
-    singles = {n: s for n, s in drawings.items() if LINE_ART.match(n) and not n.startswith("margin-")}
+    lines += ["", "/** Marginal drawings that belong to one paper's book, by paper, in the order of their file names. */", "export const bookMarginalia: Partial<Record<ThemeName, Drawing[]>> = {"]
+    papers = sorted({BOOK_MARGIN.match(n).group(1) for n in drawings if BOOK_MARGIN.match(n)})
+    for paper in papers:
+        lines.append(f"  {paper}: [")
+        for name, (w, h) in sorted(drawings.items()):
+            if name.startswith(f"margin-{paper}-"):
+                lines.append(f"    {entry(name, w, h)},")
+        lines.append("  ],")
+    lines.append("};")
+    lines += ["", "/** The top-left corner of each book's page border, to be turned over for the other corners. */", "export const borders: Partial<Record<ThemeName, Drawing>> = {"]
+    for name, (w, h) in sorted(drawings.items()):
+        if BORDER.match(name):
+            lines.append(f"  {name[7:]}: {entry(name, w, h)},")
+    lines.append("};")
+    lines += ["", "/** The frame drawn round a painted initial, in each book's own manner. */", "export const initialFrames: Partial<Record<ThemeName, Drawing>> = {"]
+    for name, (w, h) in sorted(drawings.items()):
+        if FRAME.match(name):
+            lines.append(f"  {name[8:]}: {entry(name, w, h)},")
+    lines.append("};")
+    lines += ["", "/** A small emblem for each kind of scroll. */", "export const kindEmblems: Partial<Record<" + " | ".join(f"'{k}'" for k in KINDS) + ", Drawing>> = {"]
+    for name, (w, h) in sorted(drawings.items()):
+        if KIND.match(name):
+            lines.append(f"  {name[5:]}: {entry(name, w, h)},")
+    lines.append("};")
+    singles = {n: s for n, s in drawings.items() if n in SINGLES}
     lines += ["", "/** Single line drawings by name, when they have been made. */", "export const drawings: Partial<Record<" + " | ".join(f"'{n}'" for n in SINGLES) + ", Drawing>> = {"]
     for name, (w, h) in sorted(singles.items()):
         lines.append(f"  '{name}': {entry(name, w, h)},")
