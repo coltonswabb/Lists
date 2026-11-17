@@ -790,7 +790,7 @@ const Screens: FC<{ settings: Settings; address: Address; night: boolean; onCand
           say('strike');
           store.deleteList(id);
         }}
-        // On a crowded shelf the candle and inkwell are drawn smaller and the scrolls stop above them.
+        // On a crowded shelf the scrolls stop above the candle and inkwell, which stay where they always stand.
         footRoom={isCrowded(windowHeight, insets.top, insets.bottom, shelfLists.length) ? CROWDED_ROOM : 0}
         // A scroll being named wears the kind chosen for it, or failing that the kind its name so far suggests.
         dressFor={(name) => {
@@ -808,7 +808,6 @@ const Screens: FC<{ settings: Settings; address: Address; night: boolean; onCand
         }}
       />
       <DeskThings
-        scrolls={shelfLists.length}
         onCandle={onCandle}
         night={night}
         onPen={() => {

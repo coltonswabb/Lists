@@ -1,5 +1,5 @@
 import { type FC, useEffect, useRef } from 'react';
-import { Image, Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
+import { Image, Pressable, StyleSheet, View } from 'react-native';
 import Animated, {
   Easing,
   useAnimatedStyle,
@@ -35,22 +35,17 @@ const NIB = { x: 0.295, y: 0.625 };
 /** Space round the feather so it is not cut off as it swings. */
 const SWING = 16;
 
-/** How much smaller the things are drawn on a crowded shelf. */
-const CROWDED_SCALE = 0.7;
-
 /** Whether the shelf holds too many scrolls for the things to stand below them at their full size. */
 export const isCrowded = (screen: number, top: number, bottom: number, scrolls: number) =>
   screen - top - HEADER - scrolls * ROW_HEIGHT - (bottom + FOOT) < HEIGHT;
 
 /**
  * The room the things take at the foot of a crowded shelf, which the shelf leaves clear so that no scroll lies
- * under them. The candle is the way back to day and the quill the way to a new scroll, so they are never put away.
+ * under them and they stand in the same place, at the same size, on every shelf. The candle is the way back to day and the quill the way to a new scroll, so they are never put away.
  */
-export const CROWDED_ROOM = Math.round(HEIGHT * CROWDED_SCALE) + 6;
+export const CROWDED_ROOM = HEIGHT + 4;
 
 type DeskThingsProps = {
-  /** How many scrolls lie on the shelf: with too many, the things are drawn smaller and the shelf stops above them. */
-  scrolls: number;
   /** The quill is taken up: start a new scroll. */
   onPen: () => void;
   /** The candle is touched: turn day to night, or night to day. */
@@ -65,9 +60,8 @@ type DeskThingsProps = {
  * The candle stands snuffed by day; touching it lights it and night falls, and touching it again
  * snuffs it, with a thread of smoke, and the day comes back.
  */
-export const DeskThings: FC<DeskThingsProps> = ({ scrolls, onPen, onCandle, night }) => {
+export const DeskThings: FC<DeskThingsProps> = ({ onPen, onCandle, night }) => {
   const insets = useSafeAreaInsets();
-  const { height: screen } = useWindowDimensions();
   const still = useReducedMotion();
   const { inkwell, candle } = deskProps;
 
@@ -123,7 +117,6 @@ export const DeskThings: FC<DeskThingsProps> = ({ scrolls, onPen, onCandle, nigh
     transform: [{ translateY: dip.value * 3 }, { rotate: `${dip.value * -9}deg` }],
   }));
 
-  const crowded = isCrowded(screen, insets.top, insets.bottom, scrolls);
 
   const pen = () => {
     if (!still) {
@@ -144,7 +137,7 @@ export const DeskThings: FC<DeskThingsProps> = ({ scrolls, onPen, onCandle, nigh
   const split = inkHeight * FEATHER_ABOVE;
 
   return (
-    <View pointerEvents="box-none" style={[styles.things, { bottom: insets.bottom + FOOT }, crowded && styles.crowded]}>
+    <View pointerEvents="box-none" style={[styles.things, { bottom: insets.bottom + FOOT }]}>
       {candle ? (
         <Pressable
           onPress={() => {
@@ -269,8 +262,6 @@ const styles = StyleSheet.create({
     alignItems: 'flex-end',
     justifyContent: 'space-between',
   },
-  // Drawn smaller from the desk's foot upward, so they still stand on the same line.
-  crowded: { transform: [{ scale: CROWDED_SCALE }], transformOrigin: 'bottom' },
   glow: { position: 'absolute', width: GLOW, height: GLOW },
   smoke: { position: 'absolute', width: SMOKE.width, height: SMOKE.height },
   flame: { position: 'absolute', width: FLAME.width, height: FLAME.height },

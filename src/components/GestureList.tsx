@@ -66,6 +66,8 @@ const PULL_RESISTANCE = 0.6;
 const ROLL_UP_AT = ROW_HEIGHT * 0.9;
 /** A push released faster than this, in points a second, rolls the scroll up however short it was. */
 const FLICK_UP = 900;
+/** How far into shadow the last scroll on the shelf lies, as a share of black: the first lies in none. */
+const SHELF_SHADE = 0.38;
 /** A finger that has travelled further than this was dragging, not tapping. */
 const TAP_SLOP = 10;
 const PRESS_GUARD_MS = 150;
@@ -669,9 +671,12 @@ export const GestureList: FC<GestureListProps> = ({
   const rollOf = (row: GestureListRow, index: number) => {
     // The first scroll is the paper's lightest tone and the last its deepest, so the run down the shelf is as wide as it can be.
     const place = rowCount > 1 ? index / (rowCount - 1) : 0;
-    if (row.vellum) return mixColors(row.vellum.from, row.vellum.to, rowCount > 1 ? place : 0.5);
+    // And each lies a little further into shadow than the one above it, whatever it is made of, so the shelf
+    // plainly darkens toward its foot.
+    const shaded = (color: string) => mixColors(color, '#000000', place * SHELF_SHADE);
+    if (row.vellum) return shaded(mixColors(row.vellum.from, row.vellum.to, rowCount > 1 ? place : 0.5));
     const paper = mixColors(colors.paperFrom, colors.paperTo, place);
-    return row.ribbon ? mixColors(paper, row.ribbon, 0.14) : paper;
+    return shaded(row.ribbon ? mixColors(paper, row.ribbon, 0.14) : paper);
   };
 
   /** A row's words as they are written: a rubric on the first letter under a heading, or on a missive the name of whoever it is for. */
