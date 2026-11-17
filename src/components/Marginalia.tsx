@@ -1,8 +1,9 @@
 import type { FC, ReactNode } from 'react';
-import { Image, useWindowDimensions } from 'react-native';
+import { Image } from 'react-native';
 import Svg, { Circle, Path } from 'react-native-svg';
 
 import { marginalia } from '../art';
+import { usePaneWidth } from '../PaneWidth';
 import { InkIn } from './InkIn';
 import { LEAD_WIDTH } from './RowLead';
 
@@ -108,7 +109,7 @@ const INK_AFTER_MS = 420;
  * paper. Which one is drawn changes each time a scroll is finished.
  */
 export const Marginalia: FC<MarginaliaProps> = ({ seed, turn = 0, within, ink, accent }) => {
-  const { width: windowWidth } = useWindowDimensions();
+  const windowWidth = usePaneWidth();
   const screenWidth = Math.min(windowWidth, 640);
   const pick = Math.abs(hash(seed)) + turn;
   const drawing = marginalia[pick % Math.max(1, marginalia.length)];

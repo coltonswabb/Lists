@@ -4,8 +4,8 @@
 // modifiers, no hooks, and nothing from module scope. The system draws Lock Screen widgets in its
 // own single tone, so no colours are passed.
 
-import { Text, VStack } from '@expo/ui/swift-ui';
-import { containerBackground, font, lineLimit, widgetURL } from '@expo/ui/swift-ui/modifiers';
+import { AccessoryWidgetBackground, Capsule, Circle, HStack, RoundedRectangle, Spacer, Text, VStack, ZStack } from '@expo/ui/swift-ui';
+import { containerBackground, font, frame, kerning, lineLimit, opacity, widgetURL } from '@expo/ui/swift-ui/modifiers';
 import { createWidget } from 'expo-widgets';
 
 export type LockWidgetProps = {
@@ -52,28 +52,50 @@ const LockWidget = (props: LockWidgetProps, environment: { widgetFamily?: string
   }
 
   if (family === 'accessoryCircular') {
+    // A seal's round: the count left in numerals on the system's own disc.
     return (
-      <VStack spacing={0} modifiers={[containerBackground('#00000000', 'widget'), widgetURL(link)]}>
-        <Text modifiers={[font({ size: remaining > 99 ? 13 : 18, weight: 'bold', design: 'serif' }), lineLimit(1)]}>
-          {remaining > 0 ? roman(remaining) : 'FINIS'}
-        </Text>
-        {remaining > 0 ? <Text modifiers={[font({ size: 9, weight: 'medium', design: 'serif' })]}>RES</Text> : null}
-      </VStack>
+      <ZStack modifiers={[containerBackground('#00000000', 'widget'), widgetURL(link)]}>
+        <AccessoryWidgetBackground />
+        <VStack spacing={0}>
+          <Text modifiers={[font({ size: remaining > 99 ? 12 : remaining > 0 ? 17 : 11, weight: 'bold', design: 'serif' }), lineLimit(1)]}>
+            {remaining > 0 ? roman(remaining) : 'FINIS'}
+          </Text>
+          {remaining > 0 ? <Text modifiers={[font({ size: 8, weight: 'medium', design: 'serif' }), kerning(1)]}>RES</Text> : null}
+        </VStack>
+      </ZStack>
     );
   }
 
+  // The scroll in little, in the one tone the Lock Screen allows: its rod with a knob at each end, the painted
+  // initial as a paler block behind its letter, and the first lines numbered down the margin.
+  const numerals = ['I', 'II'];
   return (
-    <VStack alignment="leading" spacing={1} modifiers={[containerBackground('#00000000', 'widget'), widgetURL(link)]}>
-      <Text modifiers={[font({ size: 14, weight: 'bold', design: 'serif' }), lineLimit(1)]}>
-        {remaining > 0 ? `${title}  ${roman(remaining)}` : title}
-      </Text>
+    <VStack alignment="leading" spacing={2} modifiers={[containerBackground('#00000000', 'widget'), widgetURL(link)]}>
+      <HStack spacing={1}>
+        <Circle modifiers={[frame({ width: 4, height: 4 })]} />
+        <Capsule modifiers={[opacity(0.55), frame({ height: 3 })]} />
+        <Circle modifiers={[frame({ width: 4, height: 4 })]} />
+      </HStack>
+      <HStack spacing={5}>
+        <ZStack modifiers={[frame({ width: 15, height: 15 })]}>
+          <RoundedRectangle cornerRadius={2} modifiers={[opacity(0.3)]} />
+          <Text modifiers={[font({ size: 10, weight: 'bold', design: 'serif' })]}>{title.trim().charAt(0).toUpperCase()}</Text>
+        </ZStack>
+        <Text modifiers={[font({ size: 13, weight: 'bold', design: 'serif' }), lineLimit(1)]}>{title}</Text>
+        <Spacer />
+        {remaining > 0 ? (
+          <Text modifiers={[font({ size: 9, weight: 'medium', design: 'serif' }), kerning(1), opacity(0.7), lineLimit(1)]}>{roman(remaining)}</Text>
+        ) : null}
+      </HStack>
       {items.length === 0 ? (
-        <Text modifiers={[font({ size: 12, design: 'serif' }), lineLimit(1)]}>All is done.</Text>
+        <Text modifiers={[font({ size: 12, design: 'serif' }), opacity(0.8), lineLimit(1)]}>❦  All is done.</Text>
       ) : (
         items.slice(0, 2).map((text, index) => (
-          <Text key={`${index}-${text}`} modifiers={[font({ size: 12, design: 'serif' }), lineLimit(1)]}>
-            {text}
-          </Text>
+          <HStack key={`${index}-${text}`} spacing={5}>
+            <Text modifiers={[font({ size: 8, weight: 'medium', design: 'serif' }), opacity(0.7), frame({ width: 15 })]}>{numerals[index] ?? ''}</Text>
+            <Text modifiers={[font({ size: 12, design: 'serif' }), lineLimit(1)]}>{text}</Text>
+            <Spacer />
+          </HStack>
         ))
       )}
     </VStack>

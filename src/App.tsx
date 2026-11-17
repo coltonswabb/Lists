@@ -2,12 +2,13 @@ import { EBGaramond_500Medium, EBGaramond_500Medium_Italic } from '@expo-google-
 import { PirataOne_400Regular } from '@expo-google-fonts/pirata-one';
 import { useFonts } from 'expo-font';
 import { StatusBar } from 'expo-status-bar';
-import { type FC, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Alert, AppState, BackHandler, Pressable, StyleSheet, Text, View } from 'react-native';
+import { type FC, type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Alert, AppState, BackHandler, Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { pickBackup, shareBackup } from './backup';
+import { PaneWidth } from './PaneWidth';
 import { ChestScreen } from './components/ChestScreen';
 import { ChronicleScreen } from './components/ChronicleScreen';
 import { DayLight } from './components/DayLight';
@@ -95,11 +96,20 @@ const scrollRows = (items: Item[], today: string): { rows: GestureListRow[]; vis
 /** Long enough for the seal to come down and be taken away before the scribe asks about the tutorial. */
 const TUTORIAL_OFFER_MS = 1900;
 
+/** The widest a page of the app is drawn, however wide the screen. */
+export const PAGE_WIDTH = 640;
+/** From this width the shelf and the open scroll are drawn side by side. */
+const WIDE_AT = 760;
+
 type Settings = ReturnType<typeof useSettings>;
 
 const Screens: FC<{ settings: Settings; address: Address; night: boolean; onCandle: () => void }> = ({ settings, address, night, onCandle }) => {
   const { colors, styles } = useTheme(makeStyles);
   const insets = useSafeAreaInsets();
+  const { width: windowWidth } = useWindowDimensions();
+  // Wide enough for the shelf and an open scroll to lie side by side, as on an iPad.
+  const wide = windowWidth >= WIDE_AT;
+  const shelfWidth = Math.round(Math.min(400, Math.max(300, windowWidth * 0.38)));
   const store = useLists();
   const { patterns, keep: keepPattern, forget: forgetPattern, replace: replacePatterns } = usePatterns();
   /** The Library's sheet offering a blank scroll or a kept pattern. */
@@ -214,6 +224,8 @@ const Screens: FC<{ settings: Settings; address: Address; night: boolean; onCand
   }, [night, store.loaded, ensureTomorrow]);
 
   const shelf = useRef<GestureListActions>(null);
+  /** The open scroll's own, kept apart from the shelf's: on a wide screen both are on the desk at once. */
+  const scrollActions = useRef<GestureListActions>(null);
 
   useEffect(() => {
     if (!openList && !searching && !settingsOpen && !chronicleOpen && !chestOpen) return;
@@ -272,8 +284,11 @@ const Screens: FC<{ settings: Settings; address: Address; night: boolean; onCand
       .catch(() => Alert.alert('The backup could not be read', 'Nothing was changed.'));
   };
 
+  // A screen that stands alone keeps a page's width on a wide desk, centred, as it does on a phone.
+  const page = (screen: ReactNode) => (wide ? <View style={styles.page}>{screen}</View> : screen);
+
   if (settingsOpen) {
-    return (
+    return page(
       <>
         <SettingsScreen settings={settings} onClose={() => setSettingsOpen(false)} onBackup={backUp} onRestore={restoreFromFile} />
         <UndoToast undo={store.undo} onUndo={undoLast} onDismiss={store.dismissUndo} offset={44} />
@@ -282,7 +297,7 @@ const Screens: FC<{ settings: Settings; address: Address; night: boolean; onCand
   }
 
   if (chestOpen) {
-    return (
+    return page(
       <>
         <ChestScreen
           stored={storedLists}
@@ -304,7 +319,7 @@ const Screens: FC<{ settings: Settings; address: Address; night: boolean; onCand
   }
 
   if (chronicleOpen) {
-    return (
+    return page(
       <>
         <ChronicleScreen
           entries={store.entries}
@@ -326,7 +341,7 @@ const Screens: FC<{ settings: Settings; address: Address; night: boolean; onCand
   }
 
   if (searching) {
-    return (
+    return page(
       <SearchScreen
         lists={store.lists}
         onClose={() => setSearching(false)}
@@ -340,7 +355,9 @@ const Screens: FC<{ settings: Settings; address: Address; night: boolean; onCand
     );
   }
 
-  if (openList) {
+  const scrollPane = !openList
+    ? null
+    : (() => {
     const isTomorrow = openList.tomorrow === true;
     // The scroll as kept, which may hold lines the day's view leaves out.
     const kept = store.lists.find((list) => list.id === openList.id) ?? openList;
@@ -358,7 +375,7 @@ const Screens: FC<{ settings: Settings; address: Address; night: boolean; onCand
       <>
         <GestureList
           key={openList.id}
-          actions={shelf}
+          actions={scrollActions}
           title={openList.name}
           // Latin in the readout only, as on an instrument's faceplate: "things" left, or "the end".
           readout={items.length > 0 && remaining === 0 ? 'FINIS' : `${roman(remaining)} RES`}
@@ -450,7 +467,20 @@ const Screens: FC<{ settings: Settings; address: Address; night: boolean; onCand
         {/* What can be done to the whole scroll stands at the foot of the desk, as the Library's own labels do. */}
         <View style={[styles.controls, isTomorrow && styles.controlsCentred, { paddingBottom: insets.bottom + 12 }]}>
           {isTomorrow ? (
-            <Text style={styles.deskNote}>At dawn this is laid on the shelf as the day’s scroll.</Text>
+            <>
+              <Text style={styles.deskNote}>At dawn this is laid on the shelf as the day’s scroll.</Text>
+              {/* Lines struck here before dawn can still be cleared away, as on any other scroll. */}
+              {items.some((item) => item.done) ? (
+                <Pressable
+                  onPress={() => scrollActions.current?.clear()}
+                  hitSlop={12}
+                  accessibilityRole="button"
+                  accessibilityHint="Removes the struck lines from this scroll"
+                >
+                  <Text style={styles.deskLabel}>Clear struck</Text>
+                </Pressable>
+              ) : null}
+            </>
           ) : items.length > 0 ? (
             <>
               <Pressable
@@ -490,7 +520,7 @@ const Screens: FC<{ settings: Settings; address: Address; night: boolean; onCand
               ) : null}
               {items.some((item) => item.done) ? (
                 <Pressable
-                  onPress={() => shelf.current?.clear()}
+                  onPress={() => scrollActions.current?.clear()}
                   hitSlop={12}
                   accessibilityRole="button"
                   accessibilityHint="Removes the struck lines from this scroll"
@@ -530,7 +560,9 @@ const Screens: FC<{ settings: Settings; address: Address; night: boolean; onCand
         {sealing !== null ? <SealPress key={sealing} onDone={() => setSealing(null)} /> : null}
       </>
     );
-  }
+      })();
+  // On a phone the open scroll takes the whole desk; on a wide screen it lies beside the shelf.
+  if (scrollPane && !wide) return scrollPane;
 
   if (!store.loaded) return null;
 
@@ -540,7 +572,7 @@ const Screens: FC<{ settings: Settings; address: Address; night: boolean; onCand
     (list) => openCount(itemsOf(list)) > 0 && list.touchedAt !== undefined && openedAt - list.touchedAt > WEEK_MS,
   );
 
-  return (
+  const library = (
     <>
       <GestureList
         key="shelf"
@@ -656,9 +688,28 @@ const Screens: FC<{ settings: Settings; address: Address; night: boolean; onCand
           <Text style={styles.deskLabel}>Settings</Text>
         </Pressable>
       </View>
-      <UndoToast undo={store.undo} onUndo={undoLast} onDismiss={store.dismissUndo} offset={44} />
-      {sealing !== null ? <SealPress key={sealing} onDone={() => setSealing(null)} /> : null}
+      {/* With a scroll open beside the shelf, the notice and the seal are the scroll's to show. */}
+      {scrollPane ? null : <UndoToast undo={store.undo} onUndo={undoLast} onDismiss={store.dismissUndo} offset={44} />}
+      {sealing !== null && !scrollPane ? <SealPress key={sealing} onDone={() => setSealing(null)} /> : null}
     </>
+  );
+  if (!wide) return library;
+
+  return (
+    <View style={styles.panes}>
+      <PaneWidth.Provider value={shelfWidth}>
+        <View style={[styles.pane, { width: shelfWidth }]}>{library}</View>
+      </PaneWidth.Provider>
+      <PaneWidth.Provider value={Math.min(PAGE_WIDTH, windowWidth - shelfWidth)}>
+        <View style={[styles.pane, styles.scrollPane]}>
+          {scrollPane ?? (
+            <View style={styles.noScroll}>
+              <Text style={styles.deskNote}>Choose a scroll from the shelf to unroll it here.</Text>
+            </View>
+          )}
+        </View>
+      </PaneWidth.Provider>
+    </View>
   );
 };
 
@@ -666,9 +717,9 @@ const Screens: FC<{ settings: Settings; address: Address; night: boolean; onCand
 const DUSK_HOUR = 19;
 const nightByClock = (now: Date) => now.getHours() >= DUSK_HOUR || now.getHours() < DAWN_HOUR;
 
-/** The widest a page of the app is drawn, however wide the screen. */
-export const PAGE_WIDTH = 640;
 const columnStyle = { flex: 1, width: '100%', maxWidth: PAGE_WIDTH, alignSelf: 'center' } as const;
+/** With the shelf beside it, the desk is as wide as the two together. */
+const wideColumnStyle = { ...columnStyle, maxWidth: PAGE_WIDTH + 400 } as const;
 
 export const App: FC = () => {
   const [fontsLoaded] = useFonts({
@@ -677,6 +728,7 @@ export const App: FC = () => {
     EBGaramond_500Medium_Italic,
   });
   const settings = useSettings();
+  const { width: windowWidth } = useWindowDimensions();
   // Night is not a paper: it is the candle's side of the desk, drawn in Night Vigil whatever the day's paper.
   const [night, setNight] = useState(false);
   // The hour of the day, which the daylight is drawn by.
@@ -739,7 +791,7 @@ export const App: FC = () => {
           {/* The room's light falls on the desk, beneath the scrolls lying on it: the moon and the candle by night, the sun by day. */}
           {night ? <NightLight /> : <DayLight hour={hour} />}
           {/* On a wide screen the scrolls keep a page's width, centred on the desk, instead of stretching across it. */}
-          <View style={columnStyle}>
+          <View style={windowWidth >= WIDE_AT && settings.address ? wideColumnStyle : columnStyle}>
             {!fontsLoaded || !settings.loaded ? null : settings.address ? (
               <Screens settings={settings} address={settings.address} night={night} onCandle={turnSky} />
             ) : (
@@ -772,6 +824,12 @@ const makeStyles = (colors: Palette) =>
   controls: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', columnGap: 18, rowGap: 10, paddingHorizontal: 20, paddingTop: 12 },
     // Labels that sit on the desk rather than on paper: the accent is tuned for paper and can be too dark here.
     controlsCentred: { justifyContent: 'center' },
+    page: { flex: 1, width: '100%', maxWidth: PAGE_WIDTH, alignSelf: 'center' },
+    panes: { flex: 1, flexDirection: 'row' },
+    // Each pane keeps what slides about in it to itself.
+    pane: { overflow: 'hidden' },
+    scrollPane: { flex: 1 },
+    noScroll: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 40 },
     deskNote: { color: colors.onDeskFaded, fontFamily: fonts.bodyItalic, fontSize: 15, textAlign: 'center' },
     deskLabel: { color: colors.onDesk, fontFamily: fonts.bodyItalic, fontSize: 18, opacity: 0.85 },
     // A label whose setting is on, in gold leaf.

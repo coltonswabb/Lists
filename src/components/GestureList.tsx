@@ -46,6 +46,7 @@ import { scheduleOnRN } from 'react-native-worklets';
 import { drawings, waxSeal } from '../art';
 import { success, thud, tick } from '../haptics';
 import { play } from '../sounds';
+import { usePaneWidth } from '../PaneWidth';
 import { useTheme } from '../ThemeContext';
 import { accentAt, fonts, MAX_TEXT_SCALE, type Palette, paperAt, roman, ROW_HEIGHT, TEXT_SCALE } from '../theme';
 import { DeckleEdge } from './DeckleEdge';
@@ -182,9 +183,10 @@ export const GestureList: FC<GestureListProps> = ({
 }) => {
   const { colors, styles } = useTheme(makeStyles);
   const insets = useSafeAreaInsets();
-  const { width: windowWidth, height: screenHeight } = useWindowDimensions();
+  const { height: screenHeight } = useWindowDimensions();
   // The page is never drawn wider than this (see PAGE_WIDTH in App), whatever the screen.
-  const screenWidth = Math.min(windowWidth, 640);
+  const paneWidth = usePaneWidth();
+  const screenWidth = Math.min(paneWidth, 640);
   const scrollView = useRef<ComponentRef<typeof NativeScrollView>>(null);
   const scrollOffset = useRef(0);
   const [atTop, setAtTop] = useState(true);
