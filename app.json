@@ -143,6 +143,12 @@
         "projectId": "d27c7234-4682-4791-a72a-7f53a6aaea1e"
       }
     },
-    "owner": "coltonswabb"
+    "owner": "coltonswabb",
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/d27c7234-4682-4791-a72a-7f53a6aaea1e"
+    }
   }
 }
