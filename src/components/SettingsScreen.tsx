@@ -169,7 +169,7 @@ const PaperChoice: FC<PaperChoiceProps> = ({ name, chosen, onChoose }) => {
       onPress={onChoose}
       accessibilityRole="radio"
       accessibilityState={{ selected: chosen }}
-      accessibilityLabel={paper.label}
+      accessibilityLabel={`${paper.label}, ${paper.book}`}
       style={[styles.choice, { backgroundColor: paper.desk, borderColor: chosen ? paper.rod : 'transparent' }]}
     >
       <View style={[styles.knob, { backgroundColor: paper.accent }]} />
@@ -181,9 +181,15 @@ const PaperChoice: FC<PaperChoiceProps> = ({ name, chosen, onChoose }) => {
         style={styles.strip}
       >
         <Text style={[styles.numeral, { color: paper.accent }]}>I</Text>
-        <Text style={[styles.sample, { color: paper.ink }]} numberOfLines={1}>
-          {paper.label}
-        </Text>
+        <View style={styles.sampleWords}>
+          <Text style={[styles.sample, { color: paper.ink }]} numberOfLines={1}>
+            {paper.label}
+          </Text>
+          {/* What book the paper is from, in its second pigment, so the choice is between books and not colours. */}
+          <Text style={[styles.book, { color: paper.accent2 }]} numberOfLines={1}>
+            {paper.book}
+          </Text>
+        </View>
       </LinearGradient>
       <View style={[styles.collar, { backgroundColor: paper.rod }]} />
       <View style={[styles.knob, { backgroundColor: paper.accent }]} />
@@ -250,7 +256,9 @@ const makeStyles = (colors: Palette) =>
       borderRadius: 2,
     },
     numeral: { width: 26, fontFamily: fonts.label, fontSize: 15, letterSpacing: 0.6 },
-    sample: { flex: 1, fontFamily: fonts.body, fontSize: 19 },
+    sampleWords: { flex: 1 },
+    sample: { fontFamily: fonts.body, fontSize: 18, lineHeight: 20 },
+    book: { fontFamily: fonts.bodyItalic, fontSize: 12, lineHeight: 14 },
     sealRoom: { width: 44, alignItems: 'center' },
     seal: { width: 26, height: 26, borderRadius: 13, alignItems: 'center', justifyContent: 'center' },
     sealMark: { fontSize: 13, fontWeight: '700' },

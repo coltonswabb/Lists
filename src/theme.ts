@@ -34,6 +34,10 @@ type ThemeSpec = {
   paperTo: string;
   ink: string;
   accent: string;
+  /** The second pigment of the book: headings' initials alternate between it and the accent, as a manuscript's do. */
+  accent2: string;
+  /** What kind of book the paper is from, in a few words. */
+  book: string;
   rod: string;
   onDesk: string;
 };
@@ -46,6 +50,8 @@ export const themes = {
     paperTo: '#e6ad5c',
     ink: '#23201c',
     accent: '#bf3418',
+    accent2: '#2c4f8c',
+    book: 'a monastery psalter, in red and blue',
     rod: '#ad8a45',
     onDesk: '#ebe3d0',
   },
@@ -56,6 +62,8 @@ export const themes = {
     paperTo: '#5c3c1d',
     ink: '#efe6d2',
     accent: '#f0a43f',
+    accent2: '#9bb6e2',
+    book: 'a book of hours, read by one candle',
     rod: '#6f5a32',
     onDesk: '#e6dcc6',
   },
@@ -66,6 +74,8 @@ export const themes = {
     paperTo: '#86a8dd',
     ink: '#14244c',
     accent: '#a12a20',
+    accent2: '#a8771c',
+    book: 'a sea-chart, in vermilion and gold',
     rod: '#b8963f',
     onDesk: '#e3e8f2',
   },
@@ -76,6 +86,8 @@ export const themes = {
     paperTo: '#a3bd84',
     ink: '#1e3223',
     accent: '#7c1d16',
+    accent2: '#3c6a2c',
+    book: 'a herbal, in madder and leaf-green',
     rod: '#9a8444',
     onDesk: '#e6e6d2',
   },
@@ -86,6 +98,8 @@ export const themes = {
     paperTo: '#84407f',
     ink: '#ece7f2',
     accent: '#e4b651',
+    accent2: '#dcd7ea',
+    book: 'a royal charter, in gold and silver',
     rod: '#b8963f',
     onDesk: '#e3dcea',
   },
@@ -106,6 +120,12 @@ const toRgb = (hex: string): Rgb => {
 };
 
 const alpha = (hex: string, opacity: number) => `rgba(${toRgb(hex).join(',')},${opacity})`;
+
+/** How bright a colour is, 0 to 255, as the eye weighs red, green and blue. */
+export const brightness = (color: string): number => {
+  const [r, g, b] = toRgb(color);
+  return r * 0.299 + g * 0.587 + b * 0.114;
+};
 
 /** How far apart two colours are, as a distance between them in red, green and blue: 0 the same, about 440 black from white. */
 export const colorGap = (one: string, other: string): number => {

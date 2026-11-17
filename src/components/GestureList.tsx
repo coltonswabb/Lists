@@ -49,13 +49,14 @@ import { play } from '../sounds';
 import { runeOf, type ScrollTrim } from '../kinds';
 import { usePaneWidth } from '../PaneWidth';
 import { useTheme } from '../ThemeContext';
-import { accentAt, fonts, mixColors, MAX_TEXT_SCALE, type Palette, type Vellum, paperAt, roman, ROW_HEIGHT, TEXT_SCALE } from '../theme';
+import { brightness, accentAt, fonts, mixColors, MAX_TEXT_SCALE, type Palette, type Vellum, paperAt, roman, ROW_HEIGHT, TEXT_SCALE } from '../theme';
 import { DeckleEdge } from './DeckleEdge';
 import { Finial, hasFinial } from './Finial';
 import { PaperOverlay } from './PaperOverlay';
 import { ROLL_LIGHT, ROLL_LIGHT_AT, Roller, ROLLER_HEIGHT } from './Roller';
 import { RowInput, type RowInputHandle } from './RowInput';
 import { LineArt } from './LineArt';
+import { MarginVine } from './MarginVine';
 import { LEAD_WIDTH, type Lead, RowLead } from './RowLead';
 import { SWEEP_MS, SwipeRow } from './SwipeRow';
 import { WaxSeal } from './WaxSeal';
@@ -70,7 +71,7 @@ const FLICK_UP = 900;
  * How far into shadow the last scroll on the shelf lies, as a share of black: the first lies in none. Pale paper
  * goes muddy long before dark paper stops showing it, so it is shaded less.
  */
-const SHELF_SHADE = { pale: 0.16, dark: 0.38 };
+const SHELF_SHADE = { pale: 0.16, dark: 0.3 };
 /** A finger that has travelled further than this was dragging, not tapping. */
 const TAP_SLOP = 10;
 const PRESS_GUARD_MS = 150;
@@ -317,6 +318,12 @@ export const GestureList: FC<GestureListProps> = ({
     scrollView.current?.scrollTo({ y: Math.max(0, scrollOffset.current + direction * ROW_HEIGHT * 1.5), animated: true });
   };
 
+  /** Each heading's place among the headings, counted from the first. */
+  const sectionOrder = new Map(rows.filter((row) => row.section).map((row, order) => [row.id, order]));
+  /** How much of the scroll is done, which is how far the vine in its margin has climbed. */
+  const shareDone = itemRows.length > 0 ? itemRows.filter((row) => row.done).length / itemRows.length : 0;
+  const [sheetTall, setSheetTall] = useState(0);
+
   const leadFor = (row: GestureListRow, index: number): Lead => {
     // On the shelf a dark kind's initial is foil on its own dark vellum; any other is the paper's colour on its ribbon's.
     if (isShelf) {
@@ -326,7 +333,9 @@ export const GestureList: FC<GestureListProps> = ({
     }
     // A kind's pigment is mixed for pale paper; on a dark one it is lightened so it can still be read.
     const pigment = trim?.pigment && colors.darkPaper ? mixColors(trim.pigment, '#ffffff', 0.5) : trim?.pigment;
-    if (row.section) return { kind: 'initial', text: row.text, pigment: pigment ?? colors.accent, letter: colors.paperFrom, flourish: pigment ?? colors.accent };
+    // Headings' initials alternate between the book's two pigments, as a manuscript's do, unless the scroll's kind has its own.
+    const own = pigment ?? ((sectionOrder.get(row.id) ?? 0) % 2 === 0 ? colors.accent : colors.accent2);
+    if (row.section) return { kind: 'initial', text: row.text, pigment: own, letter: colors.paperFrom, flourish: own };
     if (row.done) return { kind: 'done', color: colors.inkFaded };
     // A spell is numbered in runes; a list with no order to it carries its kind's mark in place of a number.
     const number = numbers[index] ?? 0;
@@ -680,7 +689,10 @@ export const GestureList: FC<GestureListProps> = ({
     // plainly darkens toward its foot.
     const shaded = (color: string) => mixColors(color, '#000000', place * (colors.darkPaper ? SHELF_SHADE.dark : SHELF_SHADE.pale));
     if (row.vellum) return shaded(mixColors(row.vellum.from, row.vellum.to, rowCount > 1 ? place : 0.5));
-    const paper = mixColors(colors.paperFrom, colors.paperTo, place);
+    // The lighter of the paper's two tones is always at the head of the shelf: a dark paper runs light to deep the
+    // other way about from a pale one, and would otherwise brighten toward the foot and undo the shadow.
+    const [head, foot] = brightness(colors.paperFrom) >= brightness(colors.paperTo) ? [colors.paperFrom, colors.paperTo] : [colors.paperTo, colors.paperFrom];
+    const paper = mixColors(head, foot, place);
     // Only a breath of the kind's colour: more than that greys a coloured paper, whose own colour is the point of it.
     return shaded(row.ribbon ? mixColors(paper, row.ribbon, 0.05) : paper);
   };
@@ -879,6 +891,9 @@ export const GestureList: FC<GestureListProps> = ({
               style={[isShelf ? styles.shelf : styles.sheet, sheetStyle]}
               onLayout={(event) => {
                 measuredHeight.current = event.nativeEvent.layout.height;
+                // The vine is drawn to the sheet's length; a change of a point or two is not worth drawing it again.
+                const tall = Math.round(event.nativeEvent.layout.height);
+                if (!isShelf && Math.abs(tall - sheetTall) > 2) setSheetTall(tall);
               }}
             >
               <Animated.View style={[styles.pullSpace, pullSpaceStyle]}>
@@ -979,6 +994,7 @@ export const GestureList: FC<GestureListProps> = ({
               {trim?.wash ? <View pointerEvents="none" style={[StyleSheet.absoluteFill, { backgroundColor: trim.wash }]} /> : null}
               {trim?.columns ? <View pointerEvents="none" style={styles.column} /> : null}
               {trim?.trail ? <View pointerEvents="none" style={[styles.trail, { borderLeftColor: trim.pigment ?? colors.accent }]} /> : null}
+              {isShelf || busy ? null : <MarginVine height={sheetTall} share={shareDone} stem={colors.ink} leaf={trim?.pigment ?? colors.accent2} berry={colors.complete} />}
               {isShelf ? null : <PaperOverlay />}
               {isShelf ? null : <DeckleEdge side="left" />}
               {isShelf ? null : <DeckleEdge side="right" />}
