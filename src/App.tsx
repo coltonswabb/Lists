@@ -64,13 +64,13 @@ const scrollRows = (items: Item[], today: string): { rows: GestureListRow[]; vis
       if (folded) return;
       // A reminder shows as its time, and reappears in the text when the row is edited so it survives the edit.
       const reminder = item.remindAt && !item.done ? formatReminder(item.remindAt, new Date(), item.repeat) : null;
-      // Something planned by candlelight for a day to come is marked, where it is shown at all.
-      const morrow = item.plannedFor !== undefined && item.plannedFor > today;
+      // Something planned by candlelight is marked: MORROW while it is still to come, NEW on the day it arrives.
+      const mark = item.done || item.plannedFor === undefined ? null : item.plannedFor > today ? 'MORROW' : item.plannedFor === today ? 'NEW' : null;
       rows.push(
         reminder
-          ? { ...item, badge: reminder.toUpperCase(), editText: `${item.text} @ ${reminder}` }
-          : morrow
-            ? { ...item, badge: 'MORROW' }
+          ? { ...item, badge: mark ? `${mark} · ${reminder.toUpperCase()}` : reminder.toUpperCase(), badgeMarked: mark !== null, editText: `${item.text} @ ${reminder}` }
+          : mark
+            ? { ...item, badge: mark, badgeMarked: true }
             : item,
       );
       visible.push(item);
@@ -474,7 +474,17 @@ const Screens: FC<{ settings: Settings; address: Address; night: boolean; onCand
           const sealed = items.length > 0 && open === 0;
           // A scroll made by candlelight for a day to come is marked so on the night's shelf.
           const morrow = !list.tomorrow && list.plannedFor !== undefined && list.plannedFor > today;
-          return { id: list.id, text: list.name, badge: morrow ? 'MORROW' : roman(open), sealed, stamp: sealed && list.id === freshSeal };
+          // And one that arrived this morning, or that holds lines which did, is marked NEW for the day.
+          const fresh = !list.tomorrow && (list.plannedFor === today || items.some((item) => !item.done && item.plannedFor === today));
+          const mark = morrow ? 'MORROW' : fresh ? 'NEW' : null;
+          return {
+            id: list.id,
+            text: list.name,
+            badge: mark ? `${mark} · ${roman(open)}` : roman(open),
+            badgeMarked: mark !== null,
+            sealed: sealed && !morrow,
+            stamp: sealed && list.id === freshSeal,
+          };
         })}
         subheader={
           <ScribeLine

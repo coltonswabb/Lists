@@ -150,6 +150,8 @@ const renewDue = (lists: List[], now = new Date()): List[] => {
           name: capitalize(describeDay(dateOf(day))),
           items: list.items.map((item) => (item.done ? { ...item, done: false } : item)),
           touchedAt: now.getTime(),
+          // Marks it as having arrived this morning, for as long as this day lasts.
+          plannedFor: day,
         };
       }
       return { ...list, items: [], plannedFor: dayAfter(day) };

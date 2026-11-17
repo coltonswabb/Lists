@@ -108,6 +108,8 @@ export type GestureListRow = {
   badge?: string;
   /** What the row's text becomes when opened for editing, if that differs from what is shown. */
   editText?: string;
+  /** Draws the badge in the accent colour at its usual size: a word that marks the row out, such as NEW. */
+  badgeMarked?: boolean;
   /** Draws the badge in the accent colour: a reward mark rather than a count. */
   badgeAccent?: boolean;
   /** Shelf only: stamps the scroll with a wax seal in place of its badge. */
@@ -586,7 +588,7 @@ export const GestureList: FC<GestureListProps> = ({
             )}
           </Animated.View>
         ) : row.badge ? (
-          <Text style={[styles.badge, row.badgeAccent && styles.badgeAccent]}>{row.badge}</Text>
+          <Text style={[styles.badge, row.badgeMarked && styles.badgeMarked, row.badgeAccent && styles.badgeAccent]}>{row.badge}</Text>
         ) : null}
       </>
     );
@@ -836,6 +838,7 @@ const makeStyles = (colors: Palette) =>
   rubric: { color: colors.accent },
   doneText: { color: colors.inkFaded, textDecorationLine: 'line-through', textDecorationColor: colors.accent },
   badge: { color: colors.inkFaded, fontFamily: fonts.label, fontSize: 14, letterSpacing: 1, marginLeft: 12 },
+  badgeMarked: { color: colors.accent },
   badgeAccent: { color: colors.accent, fontSize: 18 },
   seal: {
     width: 30,
