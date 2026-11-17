@@ -1,6 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
+import { capitalize, describeDay } from './calendar';
 import { parseReminder } from './reminder';
 import type { ChronicleEntry, Item, List, SealedList } from './types';
 
@@ -117,14 +118,44 @@ const dayOf = (date: Date) =>
 const renewalDay = (now: Date) =>
   dayOf(now.getHours() >= DAWN_HOUR ? now : new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1));
 
-/** Renews every daily scroll whose day has turned: all its items are unmarked. */
+const dateOf = (day: string) => {
+  const [year = 1970, month = 1, date = 1] = day.split('-').map(Number);
+  return new Date(year, month - 1, date);
+};
+const dayAfter = (day: string) => {
+  const date = dateOf(day);
+  return dayOf(new Date(date.getFullYear(), date.getMonth(), date.getDate() + 1));
+};
+
+/** The day now being planned for by candlelight: the one that begins at the next dawn. */
+const plannedDay = (now: Date) => dayAfter(renewalDay(now));
+
+/**
+ * What dawn does. Every daily scroll whose day has turned is renewed: all its items are unmarked.
+ * And if the Tomorrow scroll's day has come, what was planned on it is laid on the shelf as a
+ * scroll named for the day, and Tomorrow is left blank for the next night.
+ */
 const renewDue = (lists: List[], now = new Date()): List[] => {
   const day = renewalDay(now);
-  return lists.map((list) =>
-    list.daily && list.renewedOn !== day
+  let laid: List | undefined;
+  const kept = lists.map((list) => {
+    if (list.tomorrow) {
+      if (list.plannedFor && list.plannedFor > day) return list;
+      if (list.items.length > 0) {
+        laid = {
+          id: newId(),
+          name: capitalize(describeDay(dateOf(day))),
+          items: list.items.map((item) => (item.done ? { ...item, done: false } : item)),
+          touchedAt: now.getTime(),
+        };
+      }
+      return { ...list, items: [], plannedFor: dayAfter(day) };
+    }
+    return list.daily && list.renewedOn !== day
       ? { ...list, renewedOn: day, items: list.items.map((item) => (item.done ? { ...item, done: false } : item)) }
-      : list,
-  );
+      : list;
+  });
+  return laid ? [laid, ...kept] : kept;
 };
 
 /**
@@ -313,17 +344,29 @@ export const useLists = () => {
   const dismissUndo = useCallback(() => setUndo(null), []);
 
   /**
-   * Unmarks daily scrolls whose day has turned. Called when the app comes back to the front.
-   * Says whether any scroll was in fact renewed, so the scribe can mention it.
+   * Does what dawn does, if dawn has passed since it was last done. Called when the app comes back
+   * to the front. Says what happened, so the scribe can mention it: last night's plans were laid
+   * out, or daily scrolls were renewed, or nothing.
    */
-  const renew = useCallback((): boolean => {
+  const renew = useCallback((): 'planned' | 'renewed' | null => {
     const before = current.current;
     applyAll((all) => {
       const lists = renewDue(all.lists);
-      return lists.some((list, index) => list !== all.lists[index]) ? { ...all, lists } : all;
+      const changed = lists.length !== all.lists.length || lists.some((list, index) => list !== all.lists[index]);
+      return changed ? { ...all, lists } : all;
     });
-    return current.current !== before;
+    if (current.current === before) return null;
+    return current.current.lists.length > before.lists.length ? 'planned' : 'renewed';
   }, [applyAll]);
+
+  /** Makes sure there is a Tomorrow scroll to write on. It lies off the shelf, after the others. */
+  const ensureTomorrow = useCallback(() => {
+    apply((all) =>
+      all.some((list) => list.tomorrow)
+        ? all
+        : [...all, { id: newId(), name: 'Tomorrow', items: [], tomorrow: true, plannedFor: plannedDay(new Date()) }],
+    );
+  }, [apply]);
 
   const addLists = useCallback(
     (names: string[], index: number) => {
@@ -574,6 +617,7 @@ export const useLists = () => {
     dismissUndo,
     renew,
     addLists,
+    ensureTomorrow,
     addListFrom,
     remindLater,
     renameList,

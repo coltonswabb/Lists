@@ -50,6 +50,11 @@ const remarks = {
     'I shall wipe it clean at every cockcrow, {t}.',
     'The same toil daily, {t}. How devout.',
   ],
+  planned: [
+    'Last night’s plans are laid out, {t}.',
+    'As thou didst plan by candle, {t}.',
+    'The day is drawn up, {t}. It wants only doing.',
+  ],
   renewOff: ['Once is enough, {t}.', 'It shall stand as written, {t}.', 'No more fresh starts, {t}.'],
   renewed: [
     'Dawn has come, {t}. The page is clean again.',
@@ -85,6 +90,7 @@ export const standing = {
   },
   dust: (scroll: string, to: Address) => `“${scroll}” gathers dust, ${addresses[to]}.`,
   decree: (to: Address) => `What is thy decree, ${addresses[to]}?`,
+  morrow: (to: Address) => `What of the morrow, ${addresses[to]}?`,
   blank: (to: Address) => `The page awaits, ${addresses[to]}.`,
   done: (to: Address) => `All is done, ${addresses[to]}.`,
 } as const;

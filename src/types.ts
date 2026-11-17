@@ -25,6 +25,10 @@ export type List = {
   daily?: boolean;
   /** The day (YYYY-MM-DD, local) a daily scroll was last renewed. */
   renewedOn?: string;
+  /** The one scroll written by candlelight for the day to come. It is kept off the shelf. */
+  tomorrow?: boolean;
+  /** On the Tomorrow scroll: the day (YYYY-MM-DD, local) it is being planned for. */
+  plannedFor?: string;
 };
 
 /** A scroll taken off the shelf and kept in the chronicle. */

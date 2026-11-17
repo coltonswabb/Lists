@@ -79,7 +79,7 @@ export const DayNightVeil: FC<DayNightVeilProps> = ({ to, onCovered, onDone }) =
   const wheelSize = Math.min(width * 1.18, height * 0.62);
   const bodySize = wheelSize * 0.52;
   const centre = { x: width / 2, y: height * 0.44 };
-  const cornerSize = Math.min(width * 0.5, 230);
+  const cornerSize = Math.min(width * 0.56, 260);
 
   const veilStyle = useAnimatedStyle(() => ({ opacity: veil.value }));
   const wheelStyle = useAnimatedStyle(() => ({
@@ -130,6 +130,6 @@ const styles = StyleSheet.create({
   centred: { position: 'absolute', alignItems: 'center', justifyContent: 'center' },
   wheel: { opacity: 0.8 },
   corner: { position: 'absolute' },
-  // Clear of the screen's rounded corners.
-  cornerInset: { padding: 14 },
+  // Hard into the corner, as on Night Vigil's desk. Each corner is turned over as a whole, so this holds for all four.
+  cornerInset: { marginLeft: -5, marginTop: 4 },
 });

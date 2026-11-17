@@ -71,7 +71,7 @@ const scrollRows = (items: Item[]): { rows: GestureListRow[]; visible: Item[] } 
 
 type Settings = ReturnType<typeof useSettings>;
 
-const Screens: FC<{ settings: Settings; address: Address; onCandle: () => void }> = ({ settings, address, onCandle }) => {
+const Screens: FC<{ settings: Settings; address: Address; night: boolean; onCandle: () => void }> = ({ settings, address, night, onCandle }) => {
   const { colors, styles } = useTheme(makeStyles);
   const insets = useSafeAreaInsets();
   const store = useLists();
@@ -114,8 +114,11 @@ const Screens: FC<{ settings: Settings; address: Address; onCandle: () => void }
   // Daily scrolls renew at dawn, so a day can turn while the app sits in the background.
   useEffect(() => {
     const subscription = AppState.addEventListener('change', (state) => {
-      if (state === 'active' && renew()) say('renewed');
-      if (state === 'active') strikeFromWidget();
+      if (state !== 'active') return;
+      // Dawn may have come while the app was away: last night's plans are laid out, or daily scrolls renewed.
+      const dawn = renew();
+      if (dawn) say(dawn);
+      strikeFromWidget();
     });
     return () => subscription.remove();
   }, [renew, strikeFromWidget]);
@@ -138,7 +141,8 @@ const Screens: FC<{ settings: Settings; address: Address; onCandle: () => void }
   useEffect(() => {
     if (!store.loaded) return;
     void syncReminders(store.lists, address);
-    void syncWidget(store.lists, colors, address);
+    // The widget shows the day's scrolls; what is planned for tomorrow stays by the candle.
+    void syncWidget(store.lists.filter((list) => !list.tomorrow), colors, address);
   }, [store.loaded, store.lists, address, colors]);
   // The scroll whose last item was just finished: its seal is stamped on when the shelf next appears.
   const [freshSeal, setFreshSeal] = useState<string | null>(null);
@@ -154,7 +158,15 @@ const Screens: FC<{ settings: Settings; address: Address; onCandle: () => void }
   };
   const [openListId, setOpenListId] = useState<string | null>(null);
   const [searching, setSearching] = useState(false);
-  const openList = store.lists.find((list) => list.id === openListId);
+  /** The scrolls on the shelf: every one but Tomorrow, which is written by candlelight and kept apart. */
+  const shelfLists = store.lists.filter((list) => !list.tomorrow);
+  const tomorrow = store.lists.find((list) => list.tomorrow);
+  // By night there is one scroll, Tomorrow; by day, whichever was opened from the shelf.
+  const openList = night ? tomorrow : store.lists.find((list) => list.id === openListId);
+  const { ensureTomorrow } = store;
+  useEffect(() => {
+    if (night && store.loaded) ensureTomorrow();
+  }, [night, store.loaded, ensureTomorrow]);
 
   const shelf = useRef<GestureListActions>(null);
 
@@ -258,6 +270,9 @@ const Screens: FC<{ settings: Settings; address: Address; onCandle: () => void }
     );
   }
 
+  // The Tomorrow scroll is made the first time night falls; until it is there, nothing is drawn.
+  if (night && !openList) return null;
+
   if (openList) {
     const { rows, visible } = scrollRows(openList.items);
     const items = itemsOf(openList);
@@ -273,6 +288,7 @@ const Screens: FC<{ settings: Settings; address: Address; onCandle: () => void }
       <>
         <GestureList
           key={openList.id}
+          actions={shelf}
           title={openList.name}
           // Latin in the readout only, as on an instrument's faceplate: "things" left, or "the end".
           readout={items.length > 0 && remaining === 0 ? 'FINIS' : `${roman(remaining)} RES`}
@@ -283,7 +299,15 @@ const Screens: FC<{ settings: Settings; address: Address; onCandle: () => void }
           subheader={
             <ScribeLine
               standing={spoken(
-                items.length === 0 ? standing.blank(address) : remaining === 0 ? standing.done(address) : '',
+                night && remaining > 0
+                  ? ''
+                  : night
+                    ? standing.morrow(address)
+                    : items.length === 0
+                      ? standing.blank(address)
+                      : remaining === 0
+                        ? standing.done(address)
+                        : '',
               )}
             />
           }
@@ -318,8 +342,9 @@ const Screens: FC<{ settings: Settings; address: Address; onCandle: () => void }
             if (item.section) store.toggleSection(openList.id, id);
             else if (store.lists.length > 1) setSending({ listId: openList.id, itemId: id, text: item.text });
           }}
-          onRenameTitle={(name) => store.renameList(openList.id, name)}
-          onBack={() => setOpenListId(null)}
+          onRenameTitle={night ? undefined : (name) => store.renameList(openList.id, name)}
+          // Tomorrow is the whole of the night's desk: there is no shelf behind it to go back to, and its name is fixed.
+          onBack={night ? undefined : () => setOpenListId(null)}
           onPullUp={
             items.some((item) => item.done)
               ? () => {
@@ -332,8 +357,26 @@ const Screens: FC<{ settings: Settings; address: Address; onCandle: () => void }
           finisArt={<Marginalia seed={openList.id} ink={colors.ink} accent={colors.accent} />}
         />
         {/* What can be done to the whole scroll stands at the foot of the desk, as the Library's own labels do. */}
-        <View style={[styles.controls, { paddingBottom: insets.bottom + 12 }]}>
-          {items.length > 0 ? (
+        {night ? (
+          <>
+            {/* Room on the desk for the candle that brings the day back, and the inkwell. */}
+            <View style={styles.nightDesk} />
+            <DeskThings
+              scrolls={0}
+              onCandle={onCandle}
+              night
+              onPen={() => {
+                tick();
+                say('penning');
+                shelf.current?.add();
+              }}
+            />
+          </>
+        ) : null}
+        <View style={[styles.controls, night && styles.controlsCentred, { paddingBottom: insets.bottom + 12 }]}>
+          {night ? (
+            <Text style={styles.deskNote}>At dawn this is laid on the shelf as the day’s scroll.</Text>
+          ) : items.length > 0 ? (
             <>
               <Pressable
                 onPress={() => {
@@ -394,7 +437,7 @@ const Screens: FC<{ settings: Settings; address: Address; onCandle: () => void }
   if (!store.loaded) return null;
 
   // A scroll with work left on it that nobody has touched for a week.
-  const dusty = store.lists.find(
+  const dusty = shelfLists.find(
     (list) => openCount(itemsOf(list)) > 0 && list.touchedAt !== undefined && openedAt - list.touchedAt > WEEK_MS,
   );
 
@@ -405,11 +448,11 @@ const Screens: FC<{ settings: Settings; address: Address; onCandle: () => void }
         actions={shelf}
         title="Library"
         // Latin for scrolls; one scroll is a rotulus.
-        readout={`${roman(store.lists.length)} ${store.lists.length === 1 ? 'ROTULUS' : 'ROTULI'}`}
+        readout={`${roman(shelfLists.length)} ${shelfLists.length === 1 ? 'ROTULUS' : 'ROTULI'}`}
         variant="shelf"
         placeholder="New scroll"
         emptyHint="Pull down or tap to add a scroll"
-        rows={store.lists.map((list) => {
+        rows={shelfLists.map((list) => {
           const items = itemsOf(list);
           const open = openCount(items);
           const sealed = items.length > 0 && open === 0;
@@ -442,9 +485,9 @@ const Screens: FC<{ settings: Settings; address: Address; onCandle: () => void }
         }}
       />
       <DeskThings
-        scrolls={store.lists.length}
+        scrolls={shelfLists.length}
         onCandle={onCandle}
-        night={settings.theme === 'vigil'}
+        night={false}
         onPen={() => {
           tick();
           // With patterns kept, the scribe first asks which sheet to cut.
@@ -501,14 +544,16 @@ export const App: FC = () => {
     EBGaramond_500Medium_Italic,
   });
   const settings = useSettings();
-  const palette = useMemo(() => paletteOf(settings.theme), [settings.theme]);
+  // Night is not a paper: it is the candle's side of the desk, drawn in Night Vigil whatever the day's paper.
+  const [night, setNight] = useState(false);
+  const palette = useMemo(() => paletteOf(night ? 'vigil' : settings.theme), [night, settings.theme]);
   // The sky being drawn over the desk while the candle turns day to night or back.
   const [turning, setTurning] = useState<'night' | 'day' | null>(null);
   const turnSky = () => {
     if (turning) return;
     tick();
     play('wheel');
-    setTurning(settings.theme === 'vigil' ? 'day' : 'night');
+    setTurning(night ? 'day' : 'night');
   };
   return (
     <GestureHandlerRootView style={{ flex: 1, backgroundColor: palette.desk }}>
@@ -519,7 +564,7 @@ export const App: FC = () => {
           {/* On a wide screen the scrolls keep a page's width, centred on the desk, instead of stretching across it. */}
           <View style={columnStyle}>
             {!fontsLoaded || !settings.loaded ? null : settings.address ? (
-              <Screens settings={settings} address={settings.address} onCandle={turnSky} />
+              <Screens settings={settings} address={settings.address} night={night} onCandle={turnSky} />
             ) : (
               <ScribeWelcome onChoose={settings.chooseAddress} />
             )}
@@ -530,7 +575,7 @@ export const App: FC = () => {
               onCovered={() => {
                 // As the moon or sun reaches its place: a bell for night, a rising phrase for day.
                 play(turning === 'night' ? 'dusk' : 'dawn');
-                settings.toggleNight();
+                setNight((isNight) => !isNight);
               }}
               onDone={() => {
                 say(turning === 'night' ? 'nightfall' : 'daybreak');
@@ -548,6 +593,9 @@ const makeStyles = (colors: Palette) =>
   StyleSheet.create({
   controls: { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 20, paddingTop: 12 },
     // Labels that sit on the desk rather than on paper: the accent is tuned for paper and can be too dark here.
+    controlsCentred: { justifyContent: 'center' },
+    nightDesk: { height: 108 },
+    deskNote: { color: colors.onDeskFaded, fontFamily: fonts.bodyItalic, fontSize: 15, textAlign: 'center' },
     deskLabel: { color: colors.onDesk, fontFamily: fonts.bodyItalic, fontSize: 18, opacity: 0.85 },
     // A label whose setting is on, in gold leaf.
     deskLabelOn: { color: colors.complete, opacity: 1 },
