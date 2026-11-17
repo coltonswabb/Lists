@@ -196,6 +196,8 @@ export const GestureList: FC<GestureListProps> = ({
     setAtBottom(y >= extent.current.content - extent.current.viewport - 2);
   };
   const [addIndex, setAddIndex] = useState<number | null>(null);
+  // The row being added was pulled down by hand, so it is already lying where it belongs.
+  const [pulledIn, setPulledIn] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [titleDraft, setTitleDraft] = useState<string | null>(null);
   const [pullAction, setPullAction] = useState<PullAction>('none');
@@ -365,7 +367,10 @@ export const GestureList: FC<GestureListProps> = ({
       pulling.current = false;
     }, PRESS_GUARD_MS);
     setPullAction('none');
-    if (action === 'create') setAddIndex(0);
+    if (action === 'create') {
+      setPulledIn(true);
+      setAddIndex(0);
+    }
     if (action === 'back') leave();
   };
 
@@ -411,7 +416,8 @@ export const GestureList: FC<GestureListProps> = ({
       const action = event.canceled ? 'none' : armed.value;
       armed.value = 'none';
       // The input row takes the pulled row's place, so snap instead of springing back.
-      pull.value = action === 'create' ? 0 : withSpring(0, SPRING);
+      // Let go early, the paper is drawn back without a bounce.
+      pull.value = action === 'create' ? 0 : withTiming(0, { duration: 240, easing: Easing.out(Easing.cubic) });
       scheduleOnRN(release, action);
     },
   });
@@ -507,7 +513,8 @@ export const GestureList: FC<GestureListProps> = ({
     // Solid almost at once: it is a scroll lying over the shelf, not a ghost of one.
     opacity: interpolate(pull.value, [0, ROW_HEIGHT * 0.2], [0, 1], 'clamp'),
     transform: [
-      { translateY: Math.min(pull.value - ROW_HEIGHT, 6) },
+      // It comes down into the first place and stops there, however far the pull goes.
+      { translateY: Math.min(pull.value - ROW_HEIGHT, 0) },
       { rotate: `${interpolate(pull.value, [0, ROW_HEIGHT], [-3, 0], 'clamp')}deg` },
     ],
   }));
@@ -532,6 +539,7 @@ export const GestureList: FC<GestureListProps> = ({
       onAdd([remaining], addIndex);
     }
     setAddIndex(null);
+    setPulledIn(false);
   };
 
   const endEdit = (id: string, text: string) => {
@@ -570,6 +578,7 @@ export const GestureList: FC<GestureListProps> = ({
         paper={paperAt(colors, addIndex, paperTotal)}
         placeholder={placeholder}
         rolled={isShelf}
+        laid={pulledIn}
         onLines={addLines}
         onEnd={endAdd}
       />

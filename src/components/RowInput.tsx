@@ -1,7 +1,7 @@
 import { type ComponentRef, type FC, useEffect, useRef, useState } from 'react';
 import { LinearGradient } from 'expo-linear-gradient';
 import { StyleSheet, TextInput, View } from 'react-native';
-import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
+import Animated, { Easing, FadeIn, FadeInDown } from 'react-native-reanimated';
 
 import { useTheme } from '../ThemeContext';
 import { fonts, MAX_TEXT_SCALE, type Palette, ROW_HEIGHT, TEXT_SCALE } from '../theme';
@@ -18,6 +18,8 @@ type RowInputProps = {
   initialText?: string;
   /** Drawn as a rolled scroll on the shelf rather than as a line on a sheet. */
   rolled?: boolean;
+  /** Already lying in its place, as a scroll pulled down by hand is: it only needs to appear, not to be set down again. */
+  laid?: boolean;
   /**
    * Rapid entry: every finished line (Return, or each line of a pasted block) is reported and the
    * input stays open for the next one. Without it the first Return ends the edit.
@@ -27,7 +29,7 @@ type RowInputProps = {
   onEnd: (remaining: string) => void;
 };
 
-export const RowInput: FC<RowInputProps> = ({ leadFor, paper, placeholder, initialText = '', rolled = false, onLines, onEnd }) => {
+export const RowInput: FC<RowInputProps> = ({ leadFor, paper, placeholder, initialText = '', rolled = false, laid = false, onLines, onEnd }) => {
   const { colors, styles } = useTheme(makeStyles);
   const [text, setText] = useState(initialText);
   // What the input holds right now. On iOS a second Return can arrive before a re-render has cleared
@@ -97,8 +99,11 @@ export const RowInput: FC<RowInputProps> = ({ leadFor, paper, placeholder, initi
 
   return (
     <Animated.View
-      // A new scroll is set down on the shelf from above, with a little settle; a new line is inked onto the page.
-      entering={rolled ? FadeInDown.duration(320).springify().damping(16).stiffness(170) : FadeIn.duration(220)}
+      // A new scroll is laid on the shelf from above and comes to rest without a bounce, as paper does; a new line is
+      // inked onto the page.
+      entering={
+        rolled && !laid ? FadeInDown.duration(300).easing(Easing.out(Easing.cubic)) : FadeIn.duration(laid ? 120 : 220)
+      }
       style={[styles.row, rolled ? styles.rolledRow : { backgroundColor: paper }]}
     >
       {/* A scroll being named lies on the shelf like the others: rounded by the light, with its rod's ends showing. */}
