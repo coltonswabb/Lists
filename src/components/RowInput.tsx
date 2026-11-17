@@ -4,7 +4,7 @@ import { StyleSheet, TextInput, View } from 'react-native';
 import Animated, { Easing, FadeIn, FadeInDown } from 'react-native-reanimated';
 
 import { useTheme } from '../ThemeContext';
-import { fonts, MAX_TEXT_SCALE, type Palette, ROW_HEIGHT, TEXT_SCALE } from '../theme';
+import { mixColors, type Vellum, fonts, MAX_TEXT_SCALE, type Palette, ROW_HEIGHT, TEXT_SCALE } from '../theme';
 import { Finial, hasFinial } from './Finial';
 import { ROLL_LIGHT, ROLL_LIGHT_AT } from './Roller';
 import { type Lead, RowLead } from './RowLead';
@@ -33,6 +33,8 @@ type RowInputProps = {
   rolled?: boolean;
   /** Filled in while the input is open with a way to finish it from outside, as a touch elsewhere on the desk does. */
   handleRef?: RefObject<RowInputHandle | null>;
+  /** Rolled only: how the scroll is dressed for its kind, given its name so far: its ribbon, and a dark kind's own vellum. */
+  dressFor?: (name: string) => { ribbon?: string; vellum?: Vellum };
   /** Already lying in its place, as a scroll pulled down by hand is: it only needs to appear, not to be set down again. */
   laid?: boolean;
   /**
@@ -44,7 +46,7 @@ type RowInputProps = {
   onEnd: (remaining: string) => void;
 };
 
-export const RowInput: FC<RowInputProps> = ({ leadFor, paper, placeholder, initialText = '', rolled = false, laid = false, handleRef, onLines, onEnd }) => {
+export const RowInput: FC<RowInputProps> = ({ leadFor, paper, placeholder, initialText = '', rolled = false, laid = false, dressFor, handleRef, onLines, onEnd }) => {
   const { colors, styles } = useTheme(makeStyles);
   const [text, setText] = useState(initialText);
   // What the input holds right now. On iOS a second Return can arrive before a re-render has cleared
@@ -129,6 +131,11 @@ export const RowInput: FC<RowInputProps> = ({ leadFor, paper, placeholder, initi
     if (lines.length > 0) onLines(lines);
   };
 
+  // A scroll being named is already made of what its kind is made of: a dark kind's vellum, bright ink, and its ribbon.
+  const dress = rolled ? dressFor?.(text.trim()) : undefined;
+  const vellum = dress?.vellum;
+  const sheet = vellum ? mixColors(vellum.from, vellum.to, 0.5) : paper;
+
   return (
     <Animated.View
       // A new scroll is laid on the shelf from above and comes to rest without a bounce, as paper does; a new line is
@@ -138,7 +145,7 @@ export const RowInput: FC<RowInputProps> = ({ leadFor, paper, placeholder, initi
     >
       {/* A scroll being named lies on the shelf like the others: rounded by the light, with its rod's ends showing. */}
       {rolled && hasFinial(colors.name) ? <Finial paper={colors.name} side="left" length={34} tuck={18} /> : null}
-      <View style={[styles.inner, rolled && styles.rolledInner, rolled && { backgroundColor: paper }]}>
+      <View style={[styles.inner, rolled && styles.rolledInner, rolled && { backgroundColor: sheet }, dress?.ribbon !== undefined && styles.ribboned]}>
         <RowLead lead={leadFor(text)} />
         <TextInput
           ref={input}
@@ -155,10 +162,11 @@ export const RowInput: FC<RowInputProps> = ({ leadFor, paper, placeholder, initi
           }}
           onBlur={() => end(latest.current)}
           placeholder={placeholder}
-          placeholderTextColor={colors.inkFaded}
+          placeholderTextColor={vellum ? `${vellum.ink}99` : colors.inkFaded}
           selectionColor={colors.accent}
-          style={styles.input}
+          style={[styles.input, vellum ? { color: vellum.ink } : null]}
         />
+        {dress?.ribbon ? <View pointerEvents="none" style={[styles.ribbon, { backgroundColor: dress.ribbon }]} /> : null}
         {rolled ? <LinearGradient colors={ROLL_LIGHT} locations={ROLL_LIGHT_AT} style={styles.rollLight} pointerEvents="none" /> : null}
       </View>
       {rolled && hasFinial(colors.name) ? <Finial paper={colors.name} side="right" length={34} tuck={18} /> : null}
@@ -175,6 +183,8 @@ const makeStyles = (colors: Palette) =>
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: colors.rule,
   },
+  ribboned: { paddingRight: 34 },
+  ribbon: { position: 'absolute', right: 13, top: 0, bottom: 0, width: 9 },
   rolledRow: { backgroundColor: 'transparent', borderBottomWidth: 0, flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-start', paddingHorizontal: 2 },
   inner: { flexDirection: 'row', alignItems: 'center' },
   rolledInner: { flex: 1, height: ROW_HEIGHT - 14, paddingHorizontal: 12, borderRadius: 3, zIndex: 1 },

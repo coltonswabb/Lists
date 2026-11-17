@@ -648,6 +648,7 @@ export const GestureList: FC<GestureListProps> = ({
         paper={paperAt(colors, addIndex, paperTotal)}
         placeholder={placeholder}
         rolled={isShelf}
+        dressFor={dressFor}
         laid={pulledIn}
         handleRef={inputHandle}
         onLines={addLines}
@@ -848,11 +849,18 @@ export const GestureList: FC<GestureListProps> = ({
                 editingId === row.id ? (
                   <RowInput
                     key={row.id}
-                    leadFor={draftLead}
+                    // On the shelf the scroll keeps its own initial while it is renamed; on a sheet the row is read as it is typed.
+                    leadFor={(text) =>
+                      isShelf
+                        ? { kind: 'initial', text: text.trim(), pigment: row.vellum?.foil ?? row.ribbon ?? colors.ink, letter: row.vellum?.from ?? colors.paperFrom }
+                        : draftLead(text)
+                    }
                     paper={paperFor(index, row.done)}
                     placeholder={placeholder}
                     initialText={row.section ? `${row.text}:` : (row.editText ?? row.text)}
                     rolled={isShelf}
+                    // A scroll being renamed keeps the dress it has.
+                    dressFor={() => ({ ribbon: row.ribbon, vellum: row.vellum })}
                     onEnd={(text) => endEdit(row.id, text)}
                   />
                 ) : (
