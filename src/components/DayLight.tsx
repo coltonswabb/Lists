@@ -40,7 +40,7 @@ const Mote: FC<MoteProps> = ({ drift, mote, from, to, spread }) => {
   const style = useAnimatedStyle(() => {
     const along = (drift.value + mote.phase) % 1;
     return {
-      opacity: Math.sin(along * Math.PI) * 0.7,
+      opacity: Math.sin(along * Math.PI) * 0.5,
       transform: [
         { translateX: from.x + (to.x - from.x) * along + (mote.across - 0.5) * spread + Math.sin(along * 9 + mote.phase * 20) * 6 },
         { translateY: from.y + (to.y - from.y) * along },
@@ -79,9 +79,9 @@ const BEAMS = [
  * brightest and whitest; by afternoon it has gone round to the right and deepened to gold.
  */
 const LIGHTS = {
-  morning: { from: '14%', tone: ['#fff1d0', '#ffe2a6', '#ffd98a'], strength: 0.19, dapple: '#ffe6ad', mirrored: false },
-  midday: { from: '50%', tone: ['#fff6e0', '#ffe9b8', '#ffd98a'], strength: 0.22, dapple: '#fff0c8', mirrored: false },
-  afternoon: { from: '86%', tone: ['#ffcf7a', '#ffb648', '#f09a2e'], strength: 0.25, dapple: '#ffc35e', mirrored: true },
+  morning: { from: '14%', tone: ['#fff1d0', '#ffe2a6', '#ffd98a'], strength: 0.13, dapple: '#ffe6ad', mirrored: false },
+  midday: { from: '50%', tone: ['#fff6e0', '#ffe9b8', '#ffd98a'], strength: 0.15, dapple: '#fff0c8', mirrored: false },
+  afternoon: { from: '86%', tone: ['#ffcf7a', '#ffb648', '#f09a2e'], strength: 0.17, dapple: '#ffc35e', mirrored: true },
 } as const;
 
 const lightAt = (hour: number) => (hour < 11 ? LIGHTS.morning : hour < 15 ? LIGHTS.midday : LIGHTS.afternoon);
@@ -152,7 +152,7 @@ export const DayLight: FC<{ hour: number }> = ({ hour }) => {
             </Defs>
             <G filter={`url(#haze${index})`}>
               {set.map((beam) => (
-                <Path key={beam.at} d={shaft(beam)} fill={`url(#shaft${index})`} opacity={beam.light * 0.68} />
+                <Path key={beam.at} d={shaft(beam)} fill={`url(#shaft${index})`} opacity={beam.light * 0.42} />
               ))}
             </G>
           </Svg>
