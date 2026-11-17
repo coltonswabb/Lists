@@ -46,7 +46,7 @@ const oculus = (cx: number, cy: number, r: number) => {
 const PANES = [lancet(14, 100, 88, 372), lancet(118, 100, 88, 372), oculus(WINDOW.width / 2, 52, 32)].join(' ');
 
 /**
- * How the room is lit by night, laid over everything: moonlight through a high gothic window, falling
+ * How the room is lit by night, laid on the desk beneath the scrolls: moonlight through a high gothic window, falling
  * in a faint shaft and landing on the open desk in the window's own shape, cool and still; and the candle's warm light pooling in the
  * lower corner, rising and falling as its flame does. Never touchable.
  */

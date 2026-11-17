@@ -652,6 +652,8 @@ export const App: FC = () => {
         <ThemeProvider value={palette}>
           <StatusBar style="light" />
           <Desk night={night} />
+          {/* The night's light falls on the desk, beneath the scrolls lying on it. */}
+          {night ? <NightLight /> : null}
           {/* On a wide screen the scrolls keep a page's width, centred on the desk, instead of stretching across it. */}
           <View style={columnStyle}>
             {!fontsLoaded || !settings.loaded ? null : settings.address ? (
@@ -660,7 +662,6 @@ export const App: FC = () => {
               <ScribeWelcome onChoose={settings.chooseAddress} />
             )}
           </View>
-          {night ? <NightLight /> : null}
           {turning ? (
             <DayNightVeil
               to={turning}
