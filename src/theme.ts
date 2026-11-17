@@ -138,6 +138,25 @@ export const paletteOf = (name: ThemeName) => {
 
 export type Palette = ReturnType<typeof paletteOf>;
 
+/** A dark skin a scroll is written on in place of the paper: its two tones, the bright ink of its words, and the foil of its marks. */
+export type Vellum = { from: string; to: string; ink: string; foil: string };
+
+/** A palette with a scroll's own dark vellum in place of the paper, so everything drawn on it is drawn bright. */
+export const onVellum = (palette: Palette, vellum: Vellum | undefined): Palette =>
+  vellum === undefined
+    ? palette
+    : {
+        ...palette,
+        paperFrom: vellum.from,
+        paperTo: vellum.to,
+        parchment: vellum.from,
+        ink: vellum.ink,
+        inkFaded: alpha(vellum.ink, 0.62),
+        rule: alpha(vellum.ink, 0.16),
+        accent: vellum.foil,
+        darkPaper: true,
+      };
+
 /** Paper for a row's position: the scroll shades smoothly from `paperFrom` at the top to `paperTo` at the bottom. */
 export const paperAt = (palette: Palette, index: number, total: number, done = false): string => {
   const t = total > 0 ? Math.min(1, index / total) : 0;

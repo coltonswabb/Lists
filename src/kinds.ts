@@ -1,4 +1,5 @@
 import { type Address, addresses } from './scribe';
+import type { Vellum } from './theme';
 import type { List } from './types';
 
 /** What a scroll is for. It changes the scroll's trim and what the scribe calls the things on it, not how it works. */
@@ -24,6 +25,8 @@ type KindSpec = {
   /** The ribbon tied round the rolled scroll and the ground of its painted initial. A plain decree has neither. */
   ribbon: string | null;
   trim: ScrollTrim;
+  /** A dark kind is written on vellum of its own, in bright ink and foil, whatever the paper chosen. */
+  vellum?: Vellum;
   /** Latin for what is left on it, one and many, for the readout. */
   left: [one: string, many: string];
   /** What the scribe says over the open scroll while there is work on it. A plain decree is left in silence. */
@@ -68,8 +71,9 @@ export const kinds: Record<Kind, KindSpec> = {
     label: 'Spell',
     purpose: 'routines and rituals',
     ribbon: '#6b4192',
-    // Vellum dyed violet, the words down its margin giving off their own light.
-    trim: { wash: 'rgba(78,36,128,0.26)', pigment: '#5b2f8a', glow: '#b98cff' },
+    // Vellum dyed deep violet, written in silver, its numerals and initials in gold foil that gives off its own light.
+    trim: { pigment: '#e6c56a', glow: '#e2c064' },
+    vellum: { from: '#2c1845', to: '#42245f', ink: '#edebf6', foil: '#e6c56a' },
     left: ['VERBUM', 'VERBA'],
     line: (to) => `Speak the words, ${addresses[to]}.`,
     hints: ['spell', 'routine', 'habit', 'ritual', 'morning', 'evening', 'daily', 'workout', 'gym'],

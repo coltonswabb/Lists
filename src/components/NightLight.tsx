@@ -47,7 +47,8 @@ const PANES = [lancet(14, 100, 88, 372), lancet(118, 100, 88, 372), oculus(WINDO
 
 /**
  * How the room is lit by night, laid on the desk beneath the scrolls: moonlight through a high gothic window, falling
- * in a faint shaft and landing on the open desk in the window's own shape, cool and still; and the candle's warm light pooling in the
+ * in a faint shaft and landing on the open desk in the window's own shape, cool, dimming a little as thin cloud
+ * crosses the moon and creeping very slowly across the wood; and the candle's warm light pooling in the
  * lower corner, rising and falling as its flame does. Never touchable.
  */
 export const NightLight: FC = () => {
@@ -55,6 +56,9 @@ export const NightLight: FC = () => {
   const still = useReducedMotion();
   const breath = useSharedValue(0);
   const gutter = useSharedValue(0);
+  // Thin cloud crossing the moon, and the slow creep of its light across the desk.
+  const cloud = useSharedValue(0);
+  const creep = useSharedValue(0);
 
   useEffect(() => {
     if (still) return;
@@ -65,7 +69,15 @@ export const NightLight: FC = () => {
       -1,
       true,
     );
-  }, [still, breath, gutter]);
+    // Two long, unequal swells, so the moonlight dims and returns without ever seeming to pulse.
+    cloud.value = withRepeat(withTiming(1, { duration: 9000, easing: Easing.inOut(Easing.sin) }), -1, true);
+    creep.value = withRepeat(withTiming(1, { duration: 23000, easing: Easing.inOut(Easing.sin) }), -1, true);
+  }, [still, breath, gutter, cloud, creep]);
+
+  const moonStyle = useAnimatedStyle(() => ({
+    opacity: 1 - cloud.value * 0.3 + creep.value * 0.06,
+    transform: [{ translateX: (creep.value - 0.5) * 10 }, { translateY: (creep.value - 0.5) * 4 }],
+  }));
 
   const candleStyle = useAnimatedStyle(() => ({
     opacity: 0.78 + breath.value * 0.14 + gutter.value * 0.08,
@@ -77,6 +89,7 @@ export const NightLight: FC = () => {
 
   return (
     <View pointerEvents="none" style={StyleSheet.absoluteFill} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+      <Animated.View style={[StyleSheet.absoluteFill, moonStyle]}>
       <Svg width={width} height={height} style={StyleSheet.absoluteFill}>
         <Defs>
           <LinearGradient id="moonbeam" x1="0" y1="0" x2="0" y2="1">
@@ -104,6 +117,7 @@ export const NightLight: FC = () => {
           <Path d={PANES} fill="url(#moonbeam)" fillRule="evenodd" filter="url(#soften)" />
         </G>
       </Svg>
+      </Animated.View>
       <Animated.View style={[styles.candle, { width: width * 1.5, height: width * 1.5, left: -width * 0.6, top: height - width * 1.05 }, candleStyle]}>
         <Svg width="100%" height="100%">
           <Defs>

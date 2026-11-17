@@ -37,7 +37,7 @@ import { useSettings } from './settings';
 import { ThemeProvider, useTheme } from './ThemeContext';
 import { play, playNote } from './sounds';
 import { DAWN_HOUR, dawnDay, isTutorial, plannedDay, useLists } from './store';
-import { fonts, type Palette, paletteOf, roman } from './theme';
+import { onVellum, fonts, type Palette, paletteOf, roman } from './theme';
 import type { Item, List } from './types';
 import { listenForWidgetStrikes, syncWidget, takeWidgetStrikes } from './widgetSync';
 
@@ -226,6 +226,9 @@ const Screens: FC<{ settings: Settings; address: Address; night: boolean; onCand
     [store.lists],
   );
   const openList = shelfLists.find((list) => list.id === openListId);
+  // A dark kind of scroll is written on vellum of its own, bright on dark, whatever the paper.
+  const openVellum = openList ? kinds[kindOf(openList)].vellum : undefined;
+  const scrollColors = useMemo(() => onVellum(colors, openVellum), [colors, openVellum]);
   /** Where a place on the shelf as shown falls among all the scrolls kept, some of which may be hidden. */
   const shelfPosition = (shown: number) => {
     const at = shelfLists[shown];
@@ -390,6 +393,7 @@ const Screens: FC<{ settings: Settings; address: Address; night: boolean; onCand
     };
     return (
       <>
+        <ThemeProvider value={scrollColors}>
         <GestureList
           key={openList.id}
           actions={scrollActions}
@@ -482,8 +486,9 @@ const Screens: FC<{ settings: Settings; address: Address; night: boolean; onCand
               : undefined
           }
           leadActionLabel={store.lists.length > 1 ? 'Carry to another scroll' : undefined}
-          finisArt={<Marginalia seed={openList.id} turn={finisTurn} ink={colors.ink} accent={colors.accent} />}
+          finisArt={<Marginalia seed={openList.id} turn={finisTurn} ink={scrollColors.ink} accent={scrollColors.accent} />}
         />
+        </ThemeProvider>
         {/* What can be done to the whole scroll stands at the foot of the desk, as the Library's own labels do. */}
         <View style={[styles.controls, isTomorrow && styles.controlsCentred, { paddingBottom: insets.bottom + 12 }]}>
           {isTomorrow ? (
