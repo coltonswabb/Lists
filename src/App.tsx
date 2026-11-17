@@ -22,6 +22,7 @@ import { Desk } from './components/Desk';
 import { GestureList, type GestureListActions, type GestureListRow, STAMP_DELAY_MS } from './components/GestureList';
 import { Marginalia, nextDrawing } from './components/Marginalia';
 import { ScribeLine } from './components/ScribeLine';
+import { ScrollMenu } from './components/ScrollMenu';
 import { ScribeWelcome } from './components/ScribeWelcome';
 import { SearchScreen } from './components/SearchScreen';
 import { SendSheet } from './components/SendSheet';
@@ -114,6 +115,8 @@ const Screens: FC<{ settings: Settings; address: Address; night: boolean; onCand
   const { patterns, keep: keepPattern, forget: forgetPattern, replace: replacePatterns } = usePatterns();
   /** The Library's sheet offering a blank scroll or a kept pattern. */
   const [choosing, setChoosing] = useState(false);
+  /** The sheet over an open scroll holding what can be done to the whole of it. */
+  const [menuOpen, setMenuOpen] = useState(false);
   /** Counts the seals pressed, so each press is its own animation; null when none is showing. */
   const [sealing, setSealing] = useState<number | null>(null);
   const pressSeal = () => setSealing((last) => (last ?? 0) + 1);
@@ -483,41 +486,7 @@ const Screens: FC<{ settings: Settings; address: Address; night: boolean; onCand
             </>
           ) : items.length > 0 ? (
             <>
-              <Pressable
-                onPress={() => {
-                  say(openList.daily ? 'renewOff' : 'renew');
-                  store.setDaily(openList.id, !openList.daily);
-                }}
-                hitSlop={12}
-                accessibilityRole="switch"
-                accessibilityLabel="Renew at dawn"
-                accessibilityState={{ checked: openList.daily === true }}
-              >
-                <Text style={[styles.deskLabel, openList.daily && styles.deskLabelOn]}>
-                  {openList.daily ? 'Renewed at dawn' : 'Renew at dawn'}
-                </Text>
-              </Pressable>
-              <Pressable
-                onPress={() => {
-                  // Kept already: the same label takes it back.
-                  if (keptAs) forgetPattern(keptAs.id);
-                  else {
-                    say('pattern');
-                    keepPattern(openList);
-                  }
-                }}
-                hitSlop={12}
-                accessibilityRole="switch"
-                accessibilityLabel="Keep pattern"
-                accessibilityState={{ checked: keptAs !== undefined }}
-              >
-                <Text style={[styles.deskLabel, keptAs && styles.deskLabelOn]}>{keptAs ? 'Unkeep pattern' : 'Keep pattern'}</Text>
-              </Pressable>
-              {items.some((item) => item.done) ? (
-                <Pressable onPress={() => store.uncheckAll(openList.id)} hitSlop={12} accessibilityRole="button">
-                  <Text style={styles.deskLabel}>Unmark all</Text>
-                </Pressable>
-              ) : null}
+              {/* Only what is wanted often stands here: clearing what is struck, when something is. The rest is behind More. */}
               {items.some((item) => item.done) ? (
                 <Pressable
                   onPress={() => scrollActions.current?.clear()}
@@ -527,23 +496,66 @@ const Screens: FC<{ settings: Settings; address: Address; night: boolean; onCand
                 >
                   <Text style={styles.deskLabel}>Clear struck</Text>
                 </Pressable>
-              ) : null}
-              <Pressable
-                onPress={() => {
-                  say('stored');
-                  play('paper', 0.78);
-                  store.storeList(openList.id);
-                  setOpenListId(null);
-                }}
-                hitSlop={12}
-                accessibilityRole="button"
-                accessibilityHint="Stores this scroll in the chest"
-              >
-                <Text style={styles.deskLabel}>To the chest</Text>
+              ) : (
+                <View />
+              )}
+              <Pressable onPress={() => setMenuOpen(true)} hitSlop={12} accessibilityRole="button" accessibilityHint="Shows what can be done to this scroll">
+                <Text style={styles.deskLabel}>More</Text>
               </Pressable>
             </>
           ) : null}
         </View>
+        <ScrollMenu
+          open={menuOpen}
+          title={openList.name}
+          onClose={() => setMenuOpen(false)}
+          choices={[
+            {
+              label: 'Renew at dawn',
+              note: 'Every line is unmarked each morning, for a list done daily.',
+              on: openList.daily === true,
+              onPress: () => {
+                say(openList.daily ? 'renewOff' : 'renew');
+                store.setDaily(openList.id, !openList.daily);
+              },
+            },
+            {
+              label: 'Keep as a pattern',
+              note: 'New scrolls can then be cut to this one’s lines, from the quill.',
+              on: keptAs !== undefined,
+              onPress: () => {
+                if (keptAs) forgetPattern(keptAs.id);
+                else {
+                  say('pattern');
+                  keepPattern(openList);
+                }
+              },
+            },
+            ...(items.some((item) => item.done)
+              ? [
+                  {
+                    label: 'Unmark all',
+                    note: 'Every struck line is put back as not done.',
+                    onPress: () => {
+                      store.uncheckAll(openList.id);
+                      setMenuOpen(false);
+                    },
+                  },
+                ]
+              : []),
+            {
+              label: 'To the chest',
+              note: 'Put the scroll away, off the shelf, until it is wanted again.',
+              onPress: () => {
+                setMenuOpen(false);
+                say('stored');
+                play('paper', 0.78);
+                store.storeList(openList.id);
+                setOpenListId(null);
+              },
+            },
+          ]}
+        />
         <SendSheet
           item={sending?.text ?? null}
           scrolls={store.lists.filter((list) => list.id !== openList.id && !list.stored)}
