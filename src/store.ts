@@ -179,6 +179,9 @@ const takeBack = (entries: ChronicleEntry[], itemIds: string[], now = new Date()
   return drop.size === 0 ? entries : entries.filter((_, index) => !drop.has(index));
 };
 
+/** What the Restore toast says of a thing cast out: usually that, and now and then the scribe's grander way of putting it. */
+const castOut = (name: string) => (Math.random() < 0.35 ? `Struck “${name}” from memory` : `Cast out “${name}”`);
+
 const BACKUP_APP = 'decree';
 const BACKUP_VERSION = 1;
 
@@ -406,7 +409,7 @@ export const useLists = () => {
   const deleteList = useCallback(
     (id: string) => {
       const name = current.current.lists.find((l) => l.id === id)?.name ?? 'list';
-      apply((all) => all.filter((l) => l.id !== id), `Cast out “${name}”`);
+      apply((all) => all.filter((l) => l.id !== id), castOut(name));
     },
     [apply],
   );
@@ -544,7 +547,7 @@ export const useLists = () => {
     (listId: string, id: string) => {
       const items = current.current.lists.find((l) => l.id === listId)?.items ?? [];
       const text = items.find((i) => i.id === id)?.text ?? 'item';
-      applyToItems(listId, (all) => all.filter((i) => i.id !== id), `Cast out “${text}”`);
+      applyToItems(listId, (all) => all.filter((i) => i.id !== id), castOut(text));
     },
     [applyToItems],
   );

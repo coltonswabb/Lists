@@ -21,7 +21,7 @@ export const isAddress = (value: unknown): value is Address => typeof value === 
 const remarks = {
   add: ['So it is written.', 'Duly noted, {t}.', 'It is set down, {t}.'],
   complete: ['Very good, {t}.', 'It is done, {t}.', 'As thou wishest, {t}.', 'Most excellent, {t}.'],
-  strike: ['Struck from the record.', 'Consider it forgotten, {t}.', 'It never was, {t}.'],
+  strike: ['Struck from the record.', 'Struck from memory, {t}.', 'Consider it forgotten, {t}.', 'It never was, {t}.'],
   finish: ['All is done, {t}. I shall fetch the wax.'],
   restore: ['As it was, {t}.', 'Restored, {t}.'],
   penning: ['Penning, {t}.', 'I dip the quill, {t}.', 'Quill at hand, {t}.'],
