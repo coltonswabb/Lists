@@ -8,6 +8,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { pickBackup, shareBackup } from './backup';
+import { ChestScreen } from './components/ChestScreen';
 import { ChronicleScreen } from './components/ChronicleScreen';
 import { DayNightVeil } from './components/DayNightVeil';
 import { DeskThings } from './components/DeskThings';
@@ -43,12 +44,12 @@ const BIG_CLEAR = 5;
 const isDue = (plannedFor: string | undefined, today: string) => plannedFor === undefined || plannedFor <= today;
 
 /**
- * The scrolls as the day sees them: without Tomorrow, without scrolls begun by candlelight for a day
+ * The scrolls as the day sees them: without Tomorrow, without what lies in the chest, without scrolls begun by candlelight for a day
  * to come, and without lines added to the others for a day to come.
  */
 const dayView = (lists: List[], today: string): List[] =>
   lists
-    .filter((list) => !list.tomorrow && isDue(list.plannedFor, today))
+    .filter((list) => !list.tomorrow && !list.stored && isDue(list.plannedFor, today))
     .map((list) => (list.items.every((item) => isDue(item.plannedFor, today)) ? list : { ...list, items: list.items.filter((item) => isDue(item.plannedFor, today)) }));
 
 const itemsOf = (list: List) => list.items.filter((item) => !item.section);
@@ -103,6 +104,7 @@ const Screens: FC<{ settings: Settings; address: Address; night: boolean; onCand
   const pressSeal = () => setSealing((last) => (last ?? 0) + 1);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [chronicleOpen, setChronicleOpen] = useState(false);
+  const [chestOpen, setChestOpen] = useState(false);
   /** When this visit began: a scroll counts as dusty by that moment, so the shelf doesn't change as time ticks. */
   const [openedAt] = useState(Date.now);
   /** The item whose margin was tapped, to be carried to another scroll. */
@@ -160,7 +162,8 @@ const Screens: FC<{ settings: Settings; address: Address; night: boolean; onCand
   // Whatever changes in the lists is mirrored to the system: scheduled reminders and the home screen widget.
   useEffect(() => {
     if (!store.loaded) return;
-    void syncReminders(store.lists, address);
+    // A scroll in the chest keeps its reminders to itself.
+    void syncReminders(store.lists.filter((list) => !list.stored), address);
     // The widget shows the day's scrolls; what is planned for tomorrow stays by the candle.
     void syncWidget(dayView(store.lists, dawnDay(new Date())), colors, address);
   }, [store.loaded, store.lists, address, colors]);
@@ -183,7 +186,12 @@ const Screens: FC<{ settings: Settings; address: Address; night: boolean; onCand
   const today = dawnDay(new Date());
   const dayLists = useMemo(() => dayView(store.lists, today), [store.lists, today]);
   /** The scrolls on the shelf. By day, the day's. By night, all of them, with Tomorrow last. */
-  const shelfLists = night ? store.lists : dayLists;
+  const shelfLists = useMemo(() => (night ? store.lists.filter((list) => !list.stored) : dayLists), [night, store.lists, dayLists]);
+  /** What lies in the chest, most recently put away first. */
+  const storedLists = useMemo(
+    () => store.lists.filter((list) => list.stored).sort((a, b) => (b.storedAt ?? 0) - (a.storedAt ?? 0)),
+    [store.lists],
+  );
   const openList = shelfLists.find((list) => list.id === openListId);
   /** Where a place on the shelf as shown falls among all the scrolls kept, some of which may be hidden. */
   const shelfPosition = (shown: number) => {
@@ -201,16 +209,17 @@ const Screens: FC<{ settings: Settings; address: Address; night: boolean; onCand
   const shelf = useRef<GestureListActions>(null);
 
   useEffect(() => {
-    if (!openList && !searching && !settingsOpen && !chronicleOpen) return;
+    if (!openList && !searching && !settingsOpen && !chronicleOpen && !chestOpen) return;
     const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
       if (settingsOpen) setSettingsOpen(false);
       else if (chronicleOpen) setChronicleOpen(false);
+      else if (chestOpen) setChestOpen(false);
       else if (searching) setSearching(false);
       else setOpenListId(null);
       return true;
     });
     return () => subscription.remove();
-  }, [openList, searching, settingsOpen, chronicleOpen]);
+  }, [openList, searching, settingsOpen, chronicleOpen, chestOpen]);
 
   useEffect(() => {
     if (!freshSeal || openListId) return;
@@ -265,6 +274,28 @@ const Screens: FC<{ settings: Settings; address: Address; night: boolean; onCand
     );
   }
 
+  if (chestOpen) {
+    return (
+      <>
+        <ChestScreen
+          stored={storedLists}
+          address={address}
+          onClose={() => setChestOpen(false)}
+          onReturn={(id) => {
+            say('unstored');
+            play('paper');
+            store.unstoreList(id);
+          }}
+          onCastOut={(id) => {
+            play('seal');
+            store.deleteList(id);
+          }}
+        />
+        <UndoToast undo={store.undo} onUndo={undoLast} onDismiss={store.dismissUndo} offset={44} />
+      </>
+    );
+  }
+
   if (chronicleOpen) {
     return (
       <>
@@ -294,7 +325,9 @@ const Screens: FC<{ settings: Settings; address: Address; night: boolean; onCand
         onClose={() => setSearching(false)}
         onOpen={(listId) => {
           setSearching(false);
-          setOpenListId(listId);
+          // A line found on a scroll in the chest leads to the chest, where the scroll can be taken out.
+          if (store.lists.some((list) => list.id === listId && list.stored)) setChestOpen(true);
+          else setOpenListId(listId);
         }}
       />
     );
@@ -428,12 +461,25 @@ const Screens: FC<{ settings: Settings; address: Address; night: boolean; onCand
                   <Text style={styles.deskLabel}>Unmark all</Text>
                 </Pressable>
               ) : null}
+              <Pressable
+                onPress={() => {
+                  say('stored');
+                  play('paper', 0.78);
+                  store.storeList(openList.id);
+                  setOpenListId(null);
+                }}
+                hitSlop={12}
+                accessibilityRole="button"
+                accessibilityHint="Stores this scroll in the chest"
+              >
+                <Text style={styles.deskLabel}>Put away</Text>
+              </Pressable>
             </>
           ) : null}
         </View>
         <SendSheet
           item={sending?.text ?? null}
-          scrolls={store.lists.filter((list) => list.id !== openList.id)}
+          scrolls={store.lists.filter((list) => list.id !== openList.id && !list.stored)}
           onClose={() => setSending(null)}
           onSend={(scrollId) => {
             if (sending) {
@@ -563,6 +609,9 @@ const Screens: FC<{ settings: Settings; address: Address; night: boolean; onCand
         <Pressable onPress={() => setChronicleOpen(true)} hitSlop={12} accessibilityRole="button">
           <Text style={styles.deskLabel}>Chronicle</Text>
         </Pressable>
+        <Pressable onPress={() => setChestOpen(true)} hitSlop={12} accessibilityRole="button" accessibilityLabel={`Chest, ${storedLists.length} scrolls`}>
+          <Text style={styles.deskLabel}>Chest</Text>
+        </Pressable>
         <Pressable onPress={() => setSettingsOpen(true)} hitSlop={12} accessibilityRole="button">
           <Text style={styles.deskLabel}>Settings</Text>
         </Pressable>
@@ -631,7 +680,8 @@ export const App: FC = () => {
 
 const makeStyles = (colors: Palette) =>
   StyleSheet.create({
-  controls: { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 20, paddingTop: 12 },
+  // Wraps onto a second line when a scroll has more to offer than the screen is wide.
+  controls: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', columnGap: 18, rowGap: 10, paddingHorizontal: 20, paddingTop: 12 },
     // Labels that sit on the desk rather than on paper: the accent is tuned for paper and can be too dark here.
     controlsCentred: { justifyContent: 'center' },
     deskNote: { color: colors.onDeskFaded, fontFamily: fonts.bodyItalic, fontSize: 15, textAlign: 'center' },

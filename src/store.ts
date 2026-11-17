@@ -433,6 +433,28 @@ export const useLists = () => {
     [applyAll],
   );
 
+  /** Puts a scroll away in the chest. It is kept whole, and can be undone at once. */
+  const storeList = useCallback(
+    (id: string) => {
+      const name = current.current.lists.find((l) => l.id === id)?.name ?? 'scroll';
+      apply((all) => all.map((l) => (l.id === id && !l.tomorrow ? { ...l, stored: true, storedAt: Date.now() } : l)), `Put away “${name}”`);
+    },
+    [apply],
+  );
+
+  /** Takes a scroll out of the chest and lays it at the top of the shelf. */
+  const unstoreList = useCallback(
+    (id: string) => {
+      apply((all) => {
+        const found = all.find((l) => l.id === id && l.stored);
+        if (!found) return all;
+        const { stored: _stored, storedAt: _storedAt, ...list } = found;
+        return [{ ...list, touchedAt: Date.now() }, ...all.filter((l) => l.id !== id)];
+      });
+    },
+    [apply],
+  );
+
   /** Breaks a scroll's seal and puts it back at the top of the shelf. */
   const unsealList = useCallback(
     (id: string) => {
@@ -628,6 +650,8 @@ export const useLists = () => {
     dismissUndo,
     renew,
     addLists,
+    storeList,
+    unstoreList,
     ensureTomorrow,
     addListFrom,
     remindLater,

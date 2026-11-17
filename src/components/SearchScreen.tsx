@@ -62,6 +62,7 @@ export const SearchScreen: FC<SearchScreenProps> = ({ lists, onOpen, onClose }) 
             </Text>
             <Text style={styles.source} numberOfLines={1}>
               from {list.name}
+              {list.stored ? ', in the chest' : ''}
             </Text>
           </Pressable>
         ))}

@@ -41,6 +41,8 @@ const remarks = {
   ],
   pattern: ['Kept as a pattern, {t}.', 'I shall remember its shape, {t}.'],
   fromPattern: ['Cut to the pattern, {t}.', 'As before, {t}.'],
+  stored: ['Put away in the chest, {t}.', 'Stored against need, {t}.', 'Out of sight, {t}, not out of mind.'],
+  unstored: ['Back on the shelf, {t}.', 'Dusted off, {t}.', 'I knew thou wouldst want it, {t}.'],
   newScroll: ['A fresh scroll, {t}.', 'I have cut a new sheet, {t}.'],
   bigClear: ['A fine day’s work, {t}.', 'The page breathes again, {t}.'],
   seal: ['Sealed, and set down in the chronicle.', 'I have pressed the wax, {t}.'],

@@ -27,6 +27,10 @@ export type List = {
   daily?: boolean;
   /** The day (YYYY-MM-DD, local) a daily scroll was last renewed. */
   renewedOn?: string;
+  /** Put away in the chest: kept whole, off the shelf, until it is wanted again. */
+  stored?: boolean;
+  /** When it was put away. */
+  storedAt?: number;
   /** The one scroll written by candlelight for the day to come. It is kept off the shelf. */
   tomorrow?: boolean;
   /**
