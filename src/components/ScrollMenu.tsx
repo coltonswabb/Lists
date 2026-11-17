@@ -40,7 +40,7 @@ export const ScrollMenu: FC<ScrollMenuProps> = ({ open, title, choices, kind, on
         <Text style={styles.title} numberOfLines={1}>
           {title}
         </Text>
-        <Text style={styles.heading}>A scroll for {kinds[kind].purpose}</Text>
+        <Text style={styles.heading}>What this scroll is for</Text>
         <View style={styles.kinds} accessibilityRole="radiogroup">
           {kindNames.map((name) => (
             <Pressable
@@ -52,7 +52,14 @@ export const ScrollMenu: FC<ScrollMenuProps> = ({ open, title, choices, kind, on
               accessibilityLabel={`${kinds[name].label}, for ${kinds[name].purpose}`}
             >
               <View style={[styles.ribbon, { backgroundColor: kinds[name].ribbon ?? colors.ink }]} />
-              <Text style={styles.kindLabel}>{kinds[name].label}</Text>
+              <View style={styles.kindWords}>
+                <Text style={styles.kindLabel} numberOfLines={1}>
+                  {kinds[name].label}
+                </Text>
+                <Text style={styles.kindFor} numberOfLines={2}>
+                  {kinds[name].purpose}
+                </Text>
+              </View>
             </Pressable>
           ))}
         </View>
@@ -95,17 +102,21 @@ const makeStyles = (colors: Palette) =>
     heading: { marginBottom: 8, color: colors.inkFaded, fontFamily: fonts.bodyItalic, fontSize: 15 },
     kinds: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, paddingBottom: 12, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.rule },
     kind: {
-      height: 36,
+      width: '48.5%',
+      minHeight: 52,
       paddingHorizontal: 10,
+      paddingVertical: 5,
       flexDirection: 'row',
       alignItems: 'center',
-      gap: 7,
+      gap: 9,
       borderRadius: 3,
       borderWidth: 1.5,
       borderColor: colors.rule,
     },
     kindChosen: { borderColor: colors.accent, backgroundColor: colors.paperTo },
-    ribbon: { width: 7, height: 20, borderRadius: 1 },
+    ribbon: { width: 7, height: 32, borderRadius: 1 },
+    kindWords: { flex: 1 },
+    kindFor: { color: colors.inkFaded, fontFamily: fonts.bodyItalic, fontSize: 13, lineHeight: 15 },
     kindLabel: { color: colors.ink, fontFamily: fonts.body, fontSize: 17 },
     row: {
       minHeight: 64,

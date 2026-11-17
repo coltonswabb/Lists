@@ -47,7 +47,16 @@ export const PatternSheet: FC<PatternSheetProps> = ({ open, patterns, onBlank, o
               accessibilityLabel={`A ${kinds[name].label} scroll, for ${kinds[name].purpose}`}
             >
               <View style={[styles.ribbon, { backgroundColor: kinds[name].ribbon ?? colors.ink }]} />
-              <Text style={styles.kindLabel}>{kinds[name].label}</Text>
+              <View style={styles.kindWords}>
+                <Text style={styles.kindLabel} numberOfLines={1}>
+                  {kinds[name].label}
+                  {kinds[name].emblem ? <Text style={styles.kindEmblem}>  {kinds[name].emblem}</Text> : null}
+                </Text>
+                {/* What it is for, so a kind can be chosen before its name means anything. */}
+                <Text style={styles.kindFor} numberOfLines={2}>
+                  {kinds[name].purpose}
+                </Text>
+              </View>
             </Pressable>
           ))}
         </View>
@@ -98,16 +107,21 @@ const makeStyles = (colors: Palette) =>
     list: { maxHeight: 260 },
     kinds: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 8, marginBottom: 6 },
     kind: {
-      height: 38,
+      width: '48.5%',
+      minHeight: 56,
       paddingHorizontal: 10,
+      paddingVertical: 6,
       flexDirection: 'row',
       alignItems: 'center',
-      gap: 7,
+      gap: 9,
       borderRadius: 3,
       borderWidth: 1.5,
       borderColor: colors.rule,
     },
-    ribbon: { width: 7, height: 21, borderRadius: 1 },
+    ribbon: { width: 7, height: 34, borderRadius: 1 },
+    kindWords: { flex: 1 },
+    kindEmblem: { color: colors.inkFaded, fontFamily: undefined, fontSize: 14 },
+    kindFor: { color: colors.inkFaded, fontFamily: fonts.bodyItalic, fontSize: 13, lineHeight: 15 },
     kindLabel: { color: colors.ink, fontFamily: fonts.body, fontSize: 17 },
     row: {
       height: 52,

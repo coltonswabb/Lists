@@ -116,6 +116,8 @@ export type GestureListRow = {
   planned?: boolean;
   /** Shelf only: a dark kind's own vellum, which its roll is made of, with its name in bright ink. */
   vellum?: Vellum;
+  /** Shelf only: the kind's small sign, set beside the count. */
+  emblem?: string;
   /** Shelf only: the colour of the ribbon tied round the roll, which is also the ground of its painted initial. */
   ribbon?: string;
   /** Shelf only: the share of the scroll's lines already struck, 0 to 1, shown as a line of gold along the roll. */
@@ -700,6 +702,12 @@ export const GestureList: FC<GestureListProps> = ({
             {written(row, index)}
           </Text>
         )}
+        {/* The kind's sign, in its ribbon's colour, so a scroll's kind can be told without reading its name. */}
+        {isShelf && row.emblem && !row.sealed ? (
+          <Text style={[styles.emblem, { color: row.vellum ? row.vellum.foil : row.ribbon && colors.darkPaper ? mixColors(row.ribbon, '#ffffff', 0.45) : (row.ribbon ?? colors.inkFaded) }]} maxFontSizeMultiplier={1.2}>
+            {row.emblem}
+          </Text>
+        ) : null}
         {row.sealed ? (
           <Animated.View
             style={waxSeal ? styles.waxSeal : styles.seal}
@@ -728,7 +736,7 @@ export const GestureList: FC<GestureListProps> = ({
             <View style={styles.collar} />
           </>
         )}
-        <View style={[styles.rolled, row.ribbon !== undefined && styles.ribboned, { backgroundColor: row.vellum ? mixColors(row.vellum.from, row.vellum.to, 0.5) : paperFor(index) }]}>
+        <View style={[styles.rolled, row.ribbon !== undefined && styles.ribboned, { backgroundColor: row.vellum ? mixColors(row.vellum.from, row.vellum.to, 0.5) : row.ribbon ? mixColors(paperFor(index), row.ribbon, 0.17) : paperFor(index) }]}>
           {content}
           {/* The ribbon that marks what the scroll is for, tied round the roll near its end, under the light. */}
           {row.ribbon ? <View style={[styles.ribbon, { backgroundColor: row.ribbon }]} /> : null}
@@ -741,6 +749,13 @@ export const GestureList: FC<GestureListProps> = ({
           {/* Light from above, laid over everything on the roll, so the painted initial curves with the paper it is on. */}
           <LinearGradient colors={ROLL_LIGHT} locations={ROLL_LIGHT_AT} style={styles.rollLight} pointerEvents="none" />
         </View>
+        {/* The ribbon's two ends hang a little below the roll where it is tied. */}
+        {row.ribbon ? (
+          <View pointerEvents="none" style={styles.ribbonEnds}>
+            <View style={[styles.ribbonEnd, { backgroundColor: row.ribbon }]} />
+            <View style={[styles.ribbonEnd, styles.ribbonEndShort, { backgroundColor: row.ribbon }]} />
+          </View>
+        ) : null}
         {hasFinial(colors.name) ? (
           <Finial paper={colors.name} side="right" length={34} tuck={18} />
         ) : (
@@ -1010,6 +1025,11 @@ const makeStyles = (colors: Palette) =>
   column: { position: 'absolute', top: 0, bottom: 0, right: 58, width: StyleSheet.hairlineWidth * 2, backgroundColor: colors.accent, opacity: 0.35 },
   // Room at the roll's end for the ribbon, so the count is not written under it.
   ribboned: { paddingRight: 34 },
+  emblem: { marginLeft: 10, fontSize: 17 },
+  // Below the roll, under the ribbon: two ends of unequal length, the nearer the longer.
+  ribbonEnds: { position: 'absolute', right: 27, flexDirection: 'row', gap: 1, alignItems: 'flex-start', top: ROW_HEIGHT - 8 },
+  ribbonEnd: { width: 4, height: 7, borderBottomLeftRadius: 1, borderBottomRightRadius: 1, opacity: 0.9 },
+  ribbonEndShort: { height: 4 },
   ribbon: { position: 'absolute', right: 13, top: 0, bottom: 0, width: 9 },
   progressTrack: { position: 'absolute', left: 12, right: 12, bottom: 5, height: 2, borderRadius: 1, backgroundColor: colors.rule },
   progressFill: { height: 2, borderRadius: 1, backgroundColor: colors.complete },

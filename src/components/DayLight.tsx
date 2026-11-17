@@ -9,7 +9,7 @@ import Animated, {
   withRepeat,
   withTiming,
 } from 'react-native-reanimated';
-import Svg, { Circle, Defs, FeGaussianBlur, Filter, G, RadialGradient, Rect, Stop } from 'react-native-svg';
+import Svg, { Defs, FeGaussianBlur, Filter, G, LinearGradient, Path, RadialGradient, Rect, Stop } from 'react-native-svg';
 
 /** How long a mote of dust takes to sink through the light. */
 const DRIFT_MS = 26000;
@@ -51,44 +51,28 @@ const Mote: FC<MoteProps> = ({ drift, mote, from, to, spread }) => {
 };
 
 /**
- * Gaps between leaves where the sun gets through. Each throws a small round image of the sun, as a pinhole does,
- * and they crowd and overlap along the branch. In the shade's own units.
+ * Shafts of sun let in between the leaves, in two sets that brighten and dim against each other. Each is where
+ * it enters at the head of the desk, how wide it is there, and how bright, as shares of the screen's width.
  */
-const SHADE = { width: 300, height: 420 };
-const DAPPLES = [
-  { x: 80, y: 161, r: 9, light: 0.31 },
-  { x: 68, y: 119, r: 11, light: 0.17 },
-  { x: 97, y: 120, r: 15, light: 0.17 },
-  { x: 205, y: 241, r: 18, light: 0.33 },
-  { x: 158, y: 293, r: 9, light: 0.26 },
-  { x: 62, y: 81, r: 18, light: 0.22 },
-  { x: 191, y: 319, r: 22, light: 0.19 },
-  { x: 81, y: 72, r: 18, light: 0.2 },
-  { x: 183, y: 235, r: 18, light: 0.33 },
-  { x: 97, y: 108, r: 26, light: 0.2 },
-  { x: 169, y: 278, r: 22, light: 0.24 },
-  { x: 136, y: 239, r: 11, light: 0.3 },
-  { x: 72, y: 17, r: 22, light: 0.17 },
-  { x: 189, y: 264, r: 13, light: 0.29 },
-  { x: 178, y: 226, r: 26, light: 0.18 },
-  { x: 117, y: 61, r: 22, light: 0.29 },
-  { x: 227, y: 295, r: 13, light: 0.29 },
-  { x: 221, y: 393, r: 13, light: 0.19 },
-  { x: 26, y: 107, r: 11, light: 0.29 },
-  { x: 165, y: 165, r: 11, light: 0.24 },
-  { x: 195, y: 262, r: 26, light: 0.26 },
-  { x: 239, y: 296, r: 15, light: 0.33 },
-  { x: 44, y: 44, r: 11, light: 0.16 },
-  { x: 194, y: 282, r: 11, light: 0.24 },
-  { x: 127, y: 219, r: 22, light: 0.31 },
-  { x: 263, y: 387, r: 15, light: 0.32 },
+const BEAMS = [
+  [
+    { at: 0.04, wide: 0.1, light: 0.2 },
+    { at: 0.3, wide: 0.07, light: 0.16 },
+    { at: 0.52, wide: 0.13, light: 0.22 },
+    { at: 0.8, wide: 0.06, light: 0.13 },
+  ],
+  [
+    { at: 0.17, wide: 0.06, light: 0.15 },
+    { at: 0.41, wide: 0.05, light: 0.12 },
+    { at: 0.67, wide: 0.09, light: 0.19 },
+  ],
 ] as const;
 
 /**
  * How the room is lit by day, laid on the desk beneath the scrolls. Nothing like the night: where the moon
  * throws one still, cold window on the desk, the day fills the room with warmth from the head of the desk and
- * lays the shifting shade of leaves across it, the light between them stirring as the branch outside does,
- * with dust hanging in it. Never touchable.
+ * sends shafts of sun down across it between the leaves outside, brightening and dimming as the branch stirs,
+ * with dust hanging in them. Never touchable.
  */
 /**
  * The day's three lights. Morning comes in pale and low from the left; at midday it stands overhead, at its
@@ -118,17 +102,25 @@ export const DayLight: FC<{ hour: number }> = ({ hour }) => {
     stir.value = withRepeat(withTiming(1, { duration: 2300, easing: Easing.inOut(Easing.sin) }), -1, true);
   }, [still, drift, sway, stir]);
 
-  const shadeStyle = useAnimatedStyle(() => ({
-    opacity: 0.85 + stir.value * 0.15,
-    transform: [
-      { translateX: (sway.value - 0.5) * 14 + (stir.value - 0.5) * 4 },
-      { translateY: (sway.value - 0.5) * 6 },
-      { rotate: `${(sway.value - 0.5) * 2.4}deg` },
-    ],
+  // The two sets of shafts trade brightness as the leaves stir, and lean a little with the branch.
+  const nearStyle = useAnimatedStyle(() => ({
+    opacity: 0.55 + stir.value * 0.45,
+    transform: [{ translateX: (sway.value - 0.5) * 16 }],
+  }));
+  const farStyle = useAnimatedStyle(() => ({
+    opacity: 1 - stir.value * 0.5,
+    transform: [{ translateX: (0.5 - sway.value) * 12 }],
   }));
 
-  // The leaf-shade lies across the open middle of the desk, below where the scrolls usually are.
-  const shade = { w: width * 0.92, h: height * 0.5 };
+  // How far a shaft has slid sideways by the time it reaches the desk's foot: the sun's slant for the hour.
+  const lean = width * (light.from === '50%' ? 0.06 : 0.42);
+  const reach = height * 0.92;
+  const shaft = (beam: { at: number; wide: number }) => {
+    const left = width * beam.at;
+    const right = left + width * beam.wide;
+    // Wider at the foot than the head, as light spreads; the far edge leans further than the near one.
+    return `M ${left} -20 L ${right} -20 L ${right + lean + width * beam.wide * 1.4} ${reach} L ${left + lean} ${reach} Z`;
+  };
 
   return (
     <View pointerEvents="none" style={StyleSheet.absoluteFill} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
@@ -143,27 +135,28 @@ export const DayLight: FC<{ hour: number }> = ({ hour }) => {
         {/* The day itself: warmth pouring in from the head of the desk and thinning toward its foot. */}
         <Rect width={width} height={height} fill="url(#morning)" />
       </Svg>
-      <Animated.View style={[styles.shade, { left: width * 0.04, top: height * 0.36, width: shade.w, height: shade.h }, shadeStyle]}>
-        <Svg
-          width={shade.w}
-          height={shade.h}
-          viewBox={`0 0 ${SHADE.width} ${SHADE.height}`}
-          // The shade falls the other way once the sun has gone round.
-          style={light.mirrored ? styles.mirrored : undefined}
-        >
-          <Defs>
-            {/* Light through leaves has no edges by the time it reaches the desk. */}
-            <Filter id="leafsoften" x="-30%" y="-30%" width="160%" height="160%">
-              <FeGaussianBlur stdDeviation={3.5} />
-            </Filter>
-          </Defs>
-          <G filter="url(#leafsoften)">
-            {DAPPLES.map((dapple) => (
-              <Circle key={`${dapple.x}-${dapple.y}`} cx={dapple.x} cy={dapple.y} r={dapple.r} fill={light.dapple} opacity={dapple.light} />
-            ))}
-          </G>
-        </Svg>
-      </Animated.View>
+      {BEAMS.map((set, index) => (
+        <Animated.View key={index === 0 ? 'near' : 'far'} style={[StyleSheet.absoluteFill, light.mirrored && styles.mirrored, index === 0 ? nearStyle : farStyle]}>
+          <Svg width={width} height={height}>
+            <Defs>
+              {/* A shaft is brightest where it comes in and is lost in the room's own light before it reaches the foot. */}
+              <LinearGradient id={`shaft${index}`} x1="0" y1="0" x2="0" y2="1">
+                <Stop offset="0" stopColor={light.dapple} stopOpacity={1} />
+                <Stop offset="0.55" stopColor={light.dapple} stopOpacity={0.45} />
+                <Stop offset="1" stopColor={light.dapple} stopOpacity={0} />
+              </LinearGradient>
+              <Filter id={`haze${index}`} x="-20%" y="-5%" width="140%" height="110%">
+                <FeGaussianBlur stdDeviation={9} />
+              </Filter>
+            </Defs>
+            <G filter={`url(#haze${index})`}>
+              {set.map((beam) => (
+                <Path key={beam.at} d={shaft(beam)} fill={`url(#shaft${index})`} opacity={beam.light} />
+              ))}
+            </G>
+          </Svg>
+        </Animated.View>
+      ))}
       {still
         ? null
         : MOTES.map((mote) => (
@@ -181,7 +174,6 @@ export const DayLight: FC<{ hour: number }> = ({ hour }) => {
 };
 
 const styles = StyleSheet.create({
-  shade: { position: 'absolute' },
   mirrored: { transform: [{ scaleX: -1 }] },
   mote: { position: 'absolute', left: 0, top: 0, backgroundColor: '#ffe9b8' },
 });

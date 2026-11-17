@@ -30,6 +30,8 @@ type KindSpec = {
   label: string;
   /** What it is for, in a few words, shown where a kind is chosen. */
   purpose: string;
+  /** A small sign for the kind, set beside a rolled scroll's count so its kind can be told on the shelf. A plain decree has none. */
+  emblem: string | null;
   /** The ribbon tied round the rolled scroll and the ground of its painted initial. A plain decree has neither. */
   ribbon: string | null;
   trim: ScrollTrim;
@@ -52,10 +54,11 @@ type KindSpec = {
 };
 
 export const kinds: Record<Kind, KindSpec> = {
-  decree: { label: 'Decree', purpose: 'anything at all', ribbon: null, trim: {}, left: ['RES', 'RES'], line: () => '', hints: [], struck: [], finished: '', tally: ['decree sealed', 'decrees sealed'] },
+  decree: { label: 'Decree', purpose: 'anything at all', emblem: null, ribbon: null, trim: {}, left: ['RES', 'RES'], line: () => '', hints: [], struck: [], finished: '', tally: ['decree sealed', 'decrees sealed'] },
   ledger: {
     label: 'Ledger',
     purpose: 'work and business',
+    emblem: '§',
     ribbon: '#3f5576',
     // An account book: cool, sober paper, a column ruled off at the right, and plain dark numerals.
     trim: { wash: 'rgba(60,80,110,0.10)', pigment: '#2f3f5a', columns: true },
@@ -69,6 +72,7 @@ export const kinds: Record<Kind, KindSpec> = {
   market: {
     label: 'Market',
     purpose: 'things to buy',
+    emblem: '❧',
     ribbon: '#5f7d3c',
     // Carried to the stalls and back: paper gone a little green and brown with handling.
     trim: { wash: 'rgba(96,110,40,0.12)', pigment: '#4f6a2f', mark: '❧' },
@@ -82,6 +86,7 @@ export const kinds: Record<Kind, KindSpec> = {
   quest: {
     label: 'Quest',
     purpose: 'goals and ventures',
+    emblem: '✥',
     ribbon: '#b5782c',
     // A map's paper: sun-browned, with its marks in ochre.
     trim: { wash: 'rgba(150,96,30,0.14)', pigment: '#9a601c', trail: true },
@@ -96,6 +101,7 @@ export const kinds: Record<Kind, KindSpec> = {
   spell: {
     label: 'Spell',
     purpose: 'what must not be forgotten',
+    emblem: 'ᛟ',
     ribbon: '#6b4192',
     // Vellum dyed deep violet, written in silver, its numerals and initials in gold foil that gives off its own light.
     trim: { pigment: '#e6c56a', glow: '#e2c064', runes: true },
@@ -111,6 +117,7 @@ export const kinds: Record<Kind, KindSpec> = {
   revel: {
     label: 'Revel',
     purpose: 'play and leisure',
+    emblem: '✦',
     ribbon: '#ae3d5e',
     // Dressed for a feast: a blush on the paper and rose-red marks.
     trim: { wash: 'rgba(200,90,120,0.10)', pigment: '#a23355', mark: '✦', glow: '#ffb3c8' },
@@ -125,6 +132,7 @@ export const kinds: Record<Kind, KindSpec> = {
   missive: {
     label: 'Missive',
     purpose: 'people to write or speak to',
+    emblem: '☙',
     ribbon: '#8f2a2a',
     // A letter: clean paper, marked in the red of sealing wax.
     trim: { wash: 'rgba(255,255,255,0.08)', pigment: '#8f2a2a', names: true, mark: '☙' },
@@ -138,6 +146,7 @@ export const kinds: Record<Kind, KindSpec> = {
   rite: {
     label: 'Rite',
     purpose: 'habits and daily routines',
+    emblem: '☩',
     ribbon: '#2f7f7a',
     // Kept like a book of hours: calm, sea-green paper, turned to every day.
     trim: { wash: 'rgba(40,120,115,0.10)', pigment: '#256660', mark: '☩' },

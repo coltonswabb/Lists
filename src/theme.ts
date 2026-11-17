@@ -99,6 +99,8 @@ export const isThemeName = (value: unknown): value is ThemeName =>
 type Rgb = [number, number, number];
 
 const toRgb = (hex: string): Rgb => {
+  // A colour already mixed is written rgb(r,g,b); it can be mixed again.
+  if (hex.startsWith('rgb')) return hex.slice(hex.indexOf('(') + 1, -1).split(',').slice(0, 3).map(Number) as Rgb;
   const value = Number.parseInt(hex.slice(1), 16);
   return [(value >> 16) & 255, (value >> 8) & 255, value & 255];
 };

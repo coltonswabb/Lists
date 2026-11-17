@@ -746,6 +746,7 @@ const Screens: FC<{ settings: Settings; address: Address; night: boolean; onCand
             note: isTutorial(list) ? 'Tutorial' : undefined,
             ribbon: kinds[kindOf(list)].ribbon ?? undefined,
             vellum: kinds[kindOf(list)].vellum,
+            emblem: kinds[kindOf(list)].emblem ?? undefined,
             progress: shareDone(list, kindOf(list)),
             badge: mark ? `${mark} · ${roman(open)}` : roman(open),
             badgeMarked: mark !== null,
