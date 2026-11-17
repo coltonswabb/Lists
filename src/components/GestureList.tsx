@@ -500,8 +500,9 @@ export const GestureList: FC<GestureListProps> = ({
   const alongsideScroll = useMemo(() => [pan, pullUp, pinch], [pan, pullUp, pinch]);
 
   // Pulling draws fresh paper out from under the rod.
-  // On the shelf nothing moves aside: a rolled scroll is let down from above over it instead.
-  const pullSpaceStyle = useAnimatedStyle(() => ({ height: isShelf ? 0 : pull.value }));
+  // On the shelf a rolled scroll is let down from above instead, and the scrolls beneath shift down one place to make
+  // room for it, no further, however far the pull goes.
+  const pullSpaceStyle = useAnimatedStyle(() => ({ height: isShelf ? Math.min(pull.value, ROW_HEIGHT) : pull.value }));
   const descendingStyle = useAnimatedStyle(() => ({
     // Solid almost at once: it is a scroll lying over the shelf, not a ghost of one.
     opacity: interpolate(pull.value, [0, ROW_HEIGHT * 0.2], [0, 1], 'clamp'),
@@ -511,7 +512,8 @@ export const GestureList: FC<GestureListProps> = ({
     ],
   }));
   const pullRowStyle = useAnimatedStyle(() => ({
-    opacity: interpolate(pull.value, [0, ROW_HEIGHT], [0.4, 1], 'clamp'),
+    // On the shelf the descending scroll fills the space, so the paper's own prompt stays hidden.
+    opacity: isShelf ? 0 : interpolate(pull.value, [0, ROW_HEIGHT], [0.4, 1], 'clamp'),
   }));
 
   // Each finished line becomes a row and the input moves below it, ready for the next one.
