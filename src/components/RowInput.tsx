@@ -1,7 +1,7 @@
 import { type ComponentRef, type FC, useEffect, useRef, useState } from 'react';
 import { LinearGradient } from 'expo-linear-gradient';
 import { StyleSheet, TextInput, View } from 'react-native';
-import Animated, { Easing, FadeIn, StretchInX } from 'react-native-reanimated';
+import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
 
 import { useTheme } from '../ThemeContext';
 import { fonts, MAX_TEXT_SCALE, type Palette, ROW_HEIGHT, TEXT_SCALE } from '../theme';
@@ -97,8 +97,8 @@ export const RowInput: FC<RowInputProps> = ({ leadFor, paper, placeholder, initi
 
   return (
     <Animated.View
-      // A new scroll is unrolled onto the shelf from its middle; a new line is inked onto the page.
-      entering={rolled ? StretchInX.duration(340).easing(Easing.out(Easing.cubic)) : FadeIn.duration(220)}
+      // A new scroll is set down on the shelf from above, with a little settle; a new line is inked onto the page.
+      entering={rolled ? FadeInDown.duration(320).springify().damping(16).stiffness(170) : FadeIn.duration(220)}
       style={[styles.row, rolled ? styles.rolledRow : { backgroundColor: paper }]}
     >
       {/* A scroll being named lies on the shelf like the others: rounded by the light, with its rod's ends showing. */}

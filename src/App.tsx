@@ -508,9 +508,10 @@ const Screens: FC<{ settings: Settings; address: Address; night: boolean; onCand
       <GestureList
         key="shelf"
         actions={shelf}
-        title="Library"
-        // Latin for scrolls; one scroll is a rotulus.
-        readout={`${roman(shelfLists.length)} ${shelfLists.length === 1 ? 'ROTULUS' : 'ROTULI'}`}
+        // By night the shelf is for planning, and says so.
+        title={night ? 'The Morrow' : 'Library'}
+        // Latin for scrolls; one scroll is a rotulus. By night, Latin for "for tomorrow".
+        readout={night ? 'IN CRASTINUM' : `${roman(shelfLists.length)} ${shelfLists.length === 1 ? 'ROTULUS' : 'ROTULI'}`}
         variant="shelf"
         placeholder="New scroll"
         emptyHint="Pull down or tap to add a scroll"
@@ -649,7 +650,7 @@ export const App: FC = () => {
       <SafeAreaProvider>
         <ThemeProvider value={palette}>
           <StatusBar style="light" />
-          <Desk />
+          <Desk night={night} />
           {/* On a wide screen the scrolls keep a page's width, centred on the desk, instead of stretching across it. */}
           <View style={columnStyle}>
             {!fontsLoaded || !settings.loaded ? null : settings.address ? (

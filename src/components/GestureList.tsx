@@ -60,7 +60,8 @@ const PULL_RESISTANCE = 0.6;
 /** How far the sheet must be lifted before letting go clears the finished rows: a deliberate pull, not a stray scroll. */
 const CLEAR_AT = ROW_HEIGHT * 1.8;
 const PRESS_GUARD_MS = 150;
-const BACK_DISTANCE = ROW_HEIGHT * 2.3;
+/** How far past the point of adding a row a pull must go before letting go rolls the scroll up: far enough that no one does it by accident. */
+const BACK_DISTANCE = ROW_HEIGHT * 4.2;
 const PINCH_OPEN_AT = ROW_HEIGHT * 0.6;
 const PINCH_CLOSE_SCALE = 0.7;
 const SPRING = { damping: 24, stiffness: 240 } as const;
@@ -499,7 +500,16 @@ export const GestureList: FC<GestureListProps> = ({
   const alongsideScroll = useMemo(() => [pan, pullUp, pinch], [pan, pullUp, pinch]);
 
   // Pulling draws fresh paper out from under the rod.
-  const pullSpaceStyle = useAnimatedStyle(() => ({ height: pull.value }));
+  // On the shelf nothing moves aside: a rolled scroll is let down from above over it instead.
+  const pullSpaceStyle = useAnimatedStyle(() => ({ height: isShelf ? 0 : pull.value }));
+  const descendingStyle = useAnimatedStyle(() => ({
+    // Solid almost at once: it is a scroll lying over the shelf, not a ghost of one.
+    opacity: interpolate(pull.value, [0, ROW_HEIGHT * 0.2], [0, 1], 'clamp'),
+    transform: [
+      { translateY: Math.min(pull.value - ROW_HEIGHT, 6) },
+      { rotate: `${interpolate(pull.value, [0, ROW_HEIGHT], [-3, 0], 'clamp')}deg` },
+    ],
+  }));
   const pullRowStyle = useAnimatedStyle(() => ({
     opacity: interpolate(pull.value, [0, ROW_HEIGHT], [0.4, 1], 'clamp'),
   }));
@@ -657,6 +667,18 @@ export const GestureList: FC<GestureListProps> = ({
       )}
       <GestureDetector gesture={gesture}>
         <View style={styles.viewport}>
+          {isShelf ? (
+            <Animated.View pointerEvents="none" style={[styles.descending, descendingStyle]}>
+              <View style={styles.rolledScroll}>
+                {hasFinial(colors.name) ? <Finial paper={colors.name} side="left" length={34} tuck={18} /> : null}
+                <View style={[styles.rolled, { backgroundColor: colors.paperFrom }]}>
+                  <Text style={[styles.rowText, styles.descendingText]}>{pullAction === 'create' ? 'Release to add a scroll' : 'Pull to add a scroll'}</Text>
+                  <LinearGradient colors={ROLL_LIGHT} locations={ROLL_LIGHT_AT} style={styles.rollLight} pointerEvents="none" />
+                </View>
+                {hasFinial(colors.name) ? <Finial paper={colors.name} side="right" length={34} tuck={18} /> : null}
+              </View>
+            </Animated.View>
+          ) : null}
           <Animated.Text style={[styles.clearHint, { bottom: insets.bottom + 10 }, clearHintStyle]}>
             {clearArmed ? 'Release to clear the finished' : 'Pull to clear the finished'}
           </Animated.Text>
@@ -815,6 +837,24 @@ const makeStyles = (colors: Palette) =>
   sheet: { marginHorizontal: 20, overflow: 'hidden', backgroundColor: colors.paperTo },
   shelf: { paddingTop: 4 },
   pullSpace: { justifyContent: 'flex-end', overflow: 'hidden' },
+  // The scroll let down over the shelf while pulling, at the first row's place.
+  descending: {
+    position: 'absolute',
+    top: 4,
+    left: 0,
+    right: 0,
+    height: ROW_HEIGHT,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    zIndex: 5,
+    // Raised off the shelf, so it reads as lying on top of the scroll beneath.
+    shadowColor: '#000000',
+    shadowOpacity: 0.55,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 8 },
+  },
+  descendingText: { fontFamily: fonts.bodyItalic, opacity: 0.75 },
   pullRow: { height: ROW_HEIGHT, justifyContent: 'center', paddingHorizontal: 16, backgroundColor: colors.accent },
   pullText: { color: colors.paperFrom, fontFamily: fonts.bodyItalic, fontSize: 19 },
   rolledScroll: { flex: 1, flexDirection: 'row', alignItems: 'center', marginHorizontal: -14 },
