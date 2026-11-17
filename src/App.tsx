@@ -30,7 +30,7 @@ import { type Address, say, standing } from './scribe';
 import { useSettings } from './settings';
 import { ThemeProvider, useTheme } from './ThemeContext';
 import { play, playNote } from './sounds';
-import { useLists } from './store';
+import { dawnDay, plannedDay, useLists } from './store';
 import { fonts, type Palette, paletteOf, roman } from './theme';
 import type { Item, List } from './types';
 import { listenForWidgetStrikes, syncWidget, takeWidgetStrikes } from './widgetSync';
@@ -39,11 +39,23 @@ const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
 /** Clearing at least this many items at once earns a word from the scribe. */
 const BIG_CLEAR = 5;
 
+/** Whether something planned for a day has come due: unplanned things always have. */
+const isDue = (plannedFor: string | undefined, today: string) => plannedFor === undefined || plannedFor <= today;
+
+/**
+ * The scrolls as the day sees them: without Tomorrow, without scrolls begun by candlelight for a day
+ * to come, and without lines added to the others for a day to come.
+ */
+const dayView = (lists: List[], today: string): List[] =>
+  lists
+    .filter((list) => !list.tomorrow && isDue(list.plannedFor, today))
+    .map((list) => (list.items.every((item) => isDue(item.plannedFor, today)) ? list : { ...list, items: list.items.filter((item) => isDue(item.plannedFor, today)) }));
+
 const itemsOf = (list: List) => list.items.filter((item) => !item.section);
 const openCount = (items: Item[]) => items.filter((item) => !item.done).length;
 
 /** The rows of an open scroll: items under a folded section are left out, and each section reports its progress. */
-const scrollRows = (items: Item[]): { rows: GestureListRow[]; visible: Item[] } => {
+const scrollRows = (items: Item[], today: string): { rows: GestureListRow[]; visible: Item[] } => {
   const rows: GestureListRow[] = [];
   const visible: Item[] = [];
   let folded = false;
@@ -52,7 +64,15 @@ const scrollRows = (items: Item[]): { rows: GestureListRow[]; visible: Item[] } 
       if (folded) return;
       // A reminder shows as its time, and reappears in the text when the row is edited so it survives the edit.
       const reminder = item.remindAt && !item.done ? formatReminder(item.remindAt, new Date(), item.repeat) : null;
-      rows.push(reminder ? { ...item, badge: reminder.toUpperCase(), editText: `${item.text} @ ${reminder}` } : item);
+      // Something planned by candlelight for a day to come is marked, where it is shown at all.
+      const morrow = item.plannedFor !== undefined && item.plannedFor > today;
+      rows.push(
+        reminder
+          ? { ...item, badge: reminder.toUpperCase(), editText: `${item.text} @ ${reminder}` }
+          : morrow
+            ? { ...item, badge: 'MORROW' }
+            : item,
+      );
       visible.push(item);
       return;
     }
@@ -142,7 +162,7 @@ const Screens: FC<{ settings: Settings; address: Address; night: boolean; onCand
     if (!store.loaded) return;
     void syncReminders(store.lists, address);
     // The widget shows the day's scrolls; what is planned for tomorrow stays by the candle.
-    void syncWidget(store.lists.filter((list) => !list.tomorrow), colors, address);
+    void syncWidget(dayView(store.lists, dawnDay(new Date())), colors, address);
   }, [store.loaded, store.lists, address, colors]);
   // The scroll whose last item was just finished: its seal is stamped on when the shelf next appears.
   const [freshSeal, setFreshSeal] = useState<string | null>(null);
@@ -158,11 +178,21 @@ const Screens: FC<{ settings: Settings; address: Address; night: boolean; onCand
   };
   const [openListId, setOpenListId] = useState<string | null>(null);
   const [searching, setSearching] = useState(false);
-  /** The scrolls on the shelf: every one but Tomorrow, which is written by candlelight and kept apart. */
-  const shelfLists = store.lists.filter((list) => !list.tomorrow);
-  const tomorrow = store.lists.find((list) => list.tomorrow);
-  // By night there is one scroll, Tomorrow; by day, whichever was opened from the shelf.
-  const openList = night ? tomorrow : store.lists.find((list) => list.id === openListId);
+  // The day it is, counted from dawn. Whatever was planned by candlelight for a later day is kept
+  // out of the day's view until then; by night everything is shown, with what is planned marked.
+  const today = dawnDay(new Date());
+  const dayLists = useMemo(() => dayView(store.lists, today), [store.lists, today]);
+  /** The scrolls on the shelf. By day, the day's. By night, all of them, with Tomorrow last. */
+  const shelfLists = night ? store.lists : dayLists;
+  const openList = shelfLists.find((list) => list.id === openListId);
+  /** Where a place on the shelf as shown falls among all the scrolls kept, some of which may be hidden. */
+  const shelfPosition = (shown: number) => {
+    const at = shelfLists[shown];
+    if (at) return store.lists.findIndex((list) => list.id === at.id);
+    // Past the last one shown: the end of the shelf, which is before Tomorrow.
+    const tomorrowAt = store.lists.findIndex((list) => list.tomorrow);
+    return tomorrowAt < 0 ? store.lists.length : tomorrowAt;
+  };
   const { ensureTomorrow } = store;
   useEffect(() => {
     if (night && store.loaded) ensureTomorrow();
@@ -270,11 +300,11 @@ const Screens: FC<{ settings: Settings; address: Address; night: boolean; onCand
     );
   }
 
-  // The Tomorrow scroll is made the first time night falls; until it is there, nothing is drawn.
-  if (night && !openList) return null;
-
   if (openList) {
-    const { rows, visible } = scrollRows(openList.items);
+    const isTomorrow = openList.tomorrow === true;
+    // The scroll as kept, which may hold lines the day's view leaves out.
+    const kept = store.lists.find((list) => list.id === openList.id) ?? openList;
+    const { rows, visible } = scrollRows(openList.items, today);
     const items = itemsOf(openList);
     const remaining = openCount(items);
     /** The pattern kept under this scroll's name, if there is one. */
@@ -282,7 +312,7 @@ const Screens: FC<{ settings: Settings; address: Address; night: boolean; onCand
     // Rows are shown without folded items, so positions on screen are mapped back to positions in the scroll.
     const positionOf = (visibleIndex: number) => {
       const row = visible[visibleIndex];
-      return row ? openList.items.indexOf(row) : openList.items.length;
+      return row ? kept.items.indexOf(row) : kept.items.length;
     };
     return (
       <>
@@ -299,9 +329,9 @@ const Screens: FC<{ settings: Settings; address: Address; night: boolean; onCand
           subheader={
             <ScribeLine
               standing={spoken(
-                night && remaining > 0
+                isTomorrow && remaining > 0
                   ? ''
-                  : night
+                  : isTomorrow
                     ? standing.morrow(address)
                     : items.length === 0
                       ? standing.blank(address)
@@ -313,7 +343,8 @@ const Screens: FC<{ settings: Settings; address: Address; night: boolean; onCand
           }
           onAdd={(texts, index) => {
             say('add');
-            store.addItems(openList.id, texts, positionOf(index));
+            // A line added to one of the day's scrolls by candlelight is for tomorrow, and waits out of sight until then.
+            store.addItems(openList.id, texts, positionOf(index), night && !isTomorrow ? plannedDay(new Date()) : undefined);
           }}
           onRename={(id, text) => store.renameItem(openList.id, id, text)}
           onDelete={(id) => {
@@ -342,9 +373,9 @@ const Screens: FC<{ settings: Settings; address: Address; night: boolean; onCand
             if (item.section) store.toggleSection(openList.id, id);
             else if (store.lists.length > 1) setSending({ listId: openList.id, itemId: id, text: item.text });
           }}
-          onRenameTitle={night ? undefined : (name) => store.renameList(openList.id, name)}
-          // Tomorrow is the whole of the night's desk: there is no shelf behind it to go back to, and its name is fixed.
-          onBack={night ? undefined : () => setOpenListId(null)}
+          // Tomorrow keeps its name until dawn gives its lines the day's.
+          onRenameTitle={isTomorrow ? undefined : (name) => store.renameList(openList.id, name)}
+          onBack={() => setOpenListId(null)}
           onPullUp={
             items.some((item) => item.done)
               ? () => {
@@ -357,24 +388,8 @@ const Screens: FC<{ settings: Settings; address: Address; night: boolean; onCand
           finisArt={<Marginalia seed={openList.id} ink={colors.ink} accent={colors.accent} />}
         />
         {/* What can be done to the whole scroll stands at the foot of the desk, as the Library's own labels do. */}
-        {night ? (
-          <>
-            {/* Room on the desk for the candle that brings the day back, and the inkwell. */}
-            <View style={styles.nightDesk} />
-            <DeskThings
-              scrolls={0}
-              onCandle={onCandle}
-              night
-              onPen={() => {
-                tick();
-                say('penning');
-                shelf.current?.add();
-              }}
-            />
-          </>
-        ) : null}
-        <View style={[styles.controls, night && styles.controlsCentred, { paddingBottom: insets.bottom + 12 }]}>
-          {night ? (
+        <View style={[styles.controls, isTomorrow && styles.controlsCentred, { paddingBottom: insets.bottom + 12 }]}>
+          {isTomorrow ? (
             <Text style={styles.deskNote}>At dawn this is laid on the shelf as the day’s scroll.</Text>
           ) : items.length > 0 ? (
             <>
@@ -437,7 +452,8 @@ const Screens: FC<{ settings: Settings; address: Address; night: boolean; onCand
   if (!store.loaded) return null;
 
   // A scroll with work left on it that nobody has touched for a week.
-  const dusty = shelfLists.find(
+  const isTomorrowScroll = (id: string) => store.lists.some((list) => list.id === id && list.tomorrow);
+  const dusty = dayLists.find(
     (list) => openCount(itemsOf(list)) > 0 && list.touchedAt !== undefined && openedAt - list.touchedAt > WEEK_MS,
   );
 
@@ -456,29 +472,43 @@ const Screens: FC<{ settings: Settings; address: Address; night: boolean; onCand
           const items = itemsOf(list);
           const open = openCount(items);
           const sealed = items.length > 0 && open === 0;
-          return { id: list.id, text: list.name, badge: roman(open), sealed, stamp: sealed && list.id === freshSeal };
+          // A scroll made by candlelight for a day to come is marked so on the night's shelf.
+          const morrow = !list.tomorrow && list.plannedFor !== undefined && list.plannedFor > today;
+          return { id: list.id, text: list.name, badge: morrow ? 'MORROW' : roman(open), sealed, stamp: sealed && list.id === freshSeal };
         })}
         subheader={
           <ScribeLine
             standing={spoken(
-              !greeted ? standing.welcome(address) : dusty ? standing.dust(dusty.name, address) : standing.decree(address),
+              night
+                ? standing.morrow(address)
+                : !greeted
+                  ? standing.welcome(address)
+                  : dusty
+                    ? standing.dust(dusty.name, address)
+                    : standing.decree(address),
             )}
             onPress={() => settings.chooseAddress(null)}
           />
         }
         onAdd={(names, index) => {
           say('newScroll');
-          store.addLists(names, index);
+          // A scroll begun by candlelight is for tomorrow: it joins the day's shelf at dawn.
+          store.addLists(names, shelfPosition(index), night ? plannedDay(new Date()) : undefined);
         }}
-        onRename={store.renameList}
+        // Tomorrow is the scribe's own: it cannot be renamed, cast out or sealed.
+        onRename={(id, name) => {
+          if (!isTomorrowScroll(id)) store.renameList(id, name);
+        }}
         onDelete={(id) => {
+          if (isTomorrowScroll(id)) return;
           play('seal');
           say('strike');
           store.deleteList(id);
         }}
-        onMove={store.moveList}
+        onMove={(from, to) => store.moveList(shelfPosition(from), shelfPosition(to))}
         onOpen={setOpenListId}
         onComplete={(id) => {
+          if (isTomorrowScroll(id)) return;
           say('seal');
           pressSeal();
           store.sealList(id);
@@ -487,11 +517,11 @@ const Screens: FC<{ settings: Settings; address: Address; night: boolean; onCand
       <DeskThings
         scrolls={shelfLists.length}
         onCandle={onCandle}
-        night={false}
+        night={night}
         onPen={() => {
           tick();
-          // With patterns kept, the scribe first asks which sheet to cut.
-          if (patterns.length > 0) {
+          // With patterns kept, the scribe first asks which sheet to cut. By night a blank one is simply begun.
+          if (patterns.length > 0 && !night) {
             setChoosing(true);
             return;
           }
@@ -594,7 +624,6 @@ const makeStyles = (colors: Palette) =>
   controls: { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 20, paddingTop: 12 },
     // Labels that sit on the desk rather than on paper: the accent is tuned for paper and can be too dark here.
     controlsCentred: { justifyContent: 'center' },
-    nightDesk: { height: 108 },
     deskNote: { color: colors.onDeskFaded, fontFamily: fonts.bodyItalic, fontSize: 15, textAlign: 'center' },
     deskLabel: { color: colors.onDesk, fontFamily: fonts.bodyItalic, fontSize: 18, opacity: 0.85 },
     // A label whose setting is on, in gold leaf.

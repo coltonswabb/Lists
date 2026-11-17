@@ -47,8 +47,8 @@ export const syncWidget = async (lists: List[], palette: Palette, address: Addre
     try {
       const { default: LockWidget } = await import('./widgets/LockWidget');
       LockWidget.updateTimeline([{ date: new Date(), props: { title: props.title, items: props.items.slice(0, 2), remaining: props.remaining } }]);
-    } catch (error) {
-      console.warn('Lock Screen widget sync failed:', error);
+    } catch {
+      // Expected in a build made before the Lock Screen widget existed; nothing to report.
     }
   } catch (error) {
     // The widget is a convenience; it must never take the app down.
@@ -68,8 +68,8 @@ export const takeWidgetStrikes = async (): Promise<string[]> => {
     const struck = timeline[timeline.length - 1]?.props.struck ?? [];
     if (struck.length > 0) lastPayload = null;
     return struck.filter((id): id is string => typeof id === 'string');
-  } catch (error) {
-    console.warn('Reading the widget failed:', error);
+  } catch {
+    // The widget cannot be read in some builds; then nothing was struck on it.
     return [];
   }
 };

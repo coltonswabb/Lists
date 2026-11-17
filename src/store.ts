@@ -128,7 +128,10 @@ const dayAfter = (day: string) => {
 };
 
 /** The day now being planned for by candlelight: the one that begins at the next dawn. */
-const plannedDay = (now: Date) => dayAfter(renewalDay(now));
+export const plannedDay = (now: Date) => dayAfter(renewalDay(now));
+
+/** The day it is, counted from dawn rather than midnight: before dawn it is still yesterday. */
+export const dawnDay = (now: Date) => renewalDay(now);
 
 /**
  * What dawn does. Every daily scroll whose day has turned is renewed: all its items are unmarked.
@@ -369,8 +372,14 @@ export const useLists = () => {
   }, [apply]);
 
   const addLists = useCallback(
-    (names: string[], index: number) => {
-      apply((all) => insertAt(all, index, names.map((name) => ({ id: newId(), name, items: [], touchedAt: Date.now() }))));
+    (names: string[], index: number, plannedFor?: string) => {
+      apply((all) =>
+        insertAt(
+          all,
+          index,
+          names.map((name) => ({ id: newId(), name, items: [], touchedAt: Date.now(), ...(plannedFor ? { plannedFor } : {}) })),
+        ),
+      );
     },
     [apply],
   );
@@ -445,8 +454,8 @@ export const useLists = () => {
   );
 
   const addItems = useCallback(
-    (listId: string, texts: string[], index: number) => {
-      const added = texts.map(newItem);
+    (listId: string, texts: string[], index: number, plannedFor?: string) => {
+      const added = texts.map(newItem).map((item) => (plannedFor && !item.section ? { ...item, plannedFor } : item));
       const first = added[0];
       if (!first) return;
       applyToItems(listId, (items) => sinkDone(reveal(insertAt(items, index, added), first.id)));

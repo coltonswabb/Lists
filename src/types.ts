@@ -8,6 +8,8 @@ export type Item = {
   collapsed?: boolean;
   /** When the scribe should remind the user of this item, as a timestamp. */
   remindAt?: number;
+  /** Written by candlelight for a day to come (YYYY-MM-DD, local): kept out of the day's view until that day dawns. */
+  plannedFor?: string;
   /** The reminder comes round again: every day at this time, or every week on this weekday (0 = Sunday). */
   repeat?: Repeat;
 };
@@ -27,7 +29,10 @@ export type List = {
   renewedOn?: string;
   /** The one scroll written by candlelight for the day to come. It is kept off the shelf. */
   tomorrow?: boolean;
-  /** On the Tomorrow scroll: the day (YYYY-MM-DD, local) it is being planned for. */
+  /**
+   * The day (YYYY-MM-DD, local) this is planned for. On the Tomorrow scroll, the day its lines will be
+   * laid out. On any other scroll made by candlelight, the day it first appears on the shelf.
+   */
   plannedFor?: string;
 };
 
