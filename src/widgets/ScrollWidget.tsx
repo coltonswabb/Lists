@@ -5,8 +5,19 @@
 // async work and nothing from module scope: everything it needs arrives in `props`, pushed from the
 // app by src/widgetSync.ts.
 
-import { Button, HStack, Spacer, Text, VStack } from '@expo/ui/swift-ui';
-import { buttonStyle, containerBackground, font, foregroundStyle, lineLimit, padding, widgetURL } from '@expo/ui/swift-ui/modifiers';
+import { Button, Circle, HStack, Rectangle, RoundedRectangle, Spacer, Text, VStack, ZStack } from '@expo/ui/swift-ui';
+import {
+  buttonStyle,
+  containerBackground,
+  font,
+  foregroundStyle,
+  frame,
+  italic,
+  kerning,
+  lineLimit,
+  opacity,
+  widgetURL,
+} from '@expo/ui/swift-ui/modifiers';
 import { createWidget } from 'expo-widgets';
 
 export type ScrollWidgetProps = {
@@ -23,6 +34,8 @@ export type ScrollWidgetProps = {
   /** What the scribe says when the scroll is finished or absent. */
   note: string;
   paper: string;
+  /** The paper's deeper tone, which the sheet runs to at its foot and which shades its rod. Absent from older data. */
+  paperTo?: string;
   ink: string;
   faded: string;
   accent: string;
@@ -39,7 +52,7 @@ const ScrollWidget = (props: ScrollWidgetProps, environment: { widgetFamily?: st
   const ids = props.ids ?? [];
   // The small widget is one tap target that opens the app; the larger ones have room for a button per line.
   const canStrike = family !== 'systemSmall' && ids.length === items.length;
-  const shown = items.slice(0, family === 'systemLarge' ? 9 : family === 'systemMedium' ? 3 : 4);
+  const shown = items.slice(0, family === 'systemLarge' ? 9 : 3);
   const numerals = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX'];
   const more = (props.remaining ?? 0) - shown.length;
   // Counted in numerals, as in the app. Defined here because a widget may use nothing from module scope.
@@ -57,23 +70,53 @@ const ScrollWidget = (props: ScrollWidgetProps, environment: { widgetFamily?: st
     return out;
   };
 
+  // Drawn as the app draws a scroll: paper that deepens toward its foot, hung from a rod with gilt ends,
+  // a painted initial beside its name, and a rule under the heading.
+  const paperTo = props.paperTo ?? props.paper;
+  const title = props.title && props.title.length > 0 ? props.title : 'Library';
+  const gilt = '#c9a44e';
+  const small = family === 'systemSmall';
+  const lineStyle = font({ size: small ? 13 : 14, design: 'serif' });
+  const numeralStyle = font({ size: 10, weight: 'medium', design: 'serif' });
+
   return (
     <VStack
       alignment="leading"
-      spacing={5}
-      modifiers={[containerBackground(props.paper, 'widget'), widgetURL(link), padding({ all: 2 })]}
+      spacing={small ? 4 : 5}
+      modifiers={[
+        containerBackground({ type: 'linearGradient', colors: [props.paper, paperTo], startPoint: { x: 0.5, y: 0 }, endPoint: { x: 0.5, y: 1 } }, 'widget'),
+        widgetURL(link),
+      ]}
     >
-      <HStack spacing={6}>
-        <Text modifiers={[font({ size: 16, weight: 'bold', design: 'serif' }), foregroundStyle(props.ink), lineLimit(1)]}>
-          {props.title && props.title.length > 0 ? props.title : 'Library'}
+      <HStack spacing={2}>
+        <Circle modifiers={[foregroundStyle(gilt), frame({ width: 6, height: 6 })]} />
+        <RoundedRectangle
+          cornerRadius={3}
+          modifiers={[
+            foregroundStyle({ type: 'linearGradient', colors: [props.paper, paperTo, props.faded], startPoint: { x: 0.5, y: 0 }, endPoint: { x: 0.5, y: 1.6 } }),
+            frame({ height: 7 }),
+          ]}
+        />
+        <Circle modifiers={[foregroundStyle(gilt), frame({ width: 6, height: 6 })]} />
+      </HStack>
+      <HStack spacing={7}>
+        <ZStack>
+          <RoundedRectangle cornerRadius={2} modifiers={[foregroundStyle(props.accent), frame({ width: 22, height: 22 })]} />
+          <Text modifiers={[font({ size: 15, weight: 'bold', design: 'serif' }), foregroundStyle(props.paper)]}>
+            {title.trim().charAt(0).toUpperCase()}
+          </Text>
+        </ZStack>
+        <Text modifiers={[font({ size: small ? 15 : 17, weight: 'bold', design: 'serif' }), foregroundStyle(props.ink), lineLimit(1)]}>
+          {title}
         </Text>
         <Spacer />
-        <Text modifiers={[font({ size: 11, weight: 'medium', design: 'serif' }), foregroundStyle(props.faded)]}>
-          {roman(props.remaining ?? 0)}
+        <Text modifiers={[font({ size: 10, weight: 'medium', design: 'serif' }), kerning(1), foregroundStyle(props.faded), lineLimit(1)]}>
+          {small ? roman(props.remaining ?? 0) : `${roman(props.remaining ?? 0)} RES`}
         </Text>
       </HStack>
+      <Rectangle modifiers={[foregroundStyle(props.accent), opacity(0.4), frame({ height: 1 })]} />
       {shown.length === 0 ? (
-        <Text modifiers={[font({ size: 14, design: 'serif' }), foregroundStyle(props.faded)]}>{props.note}</Text>
+        <Text modifiers={[font({ size: 14, design: 'serif' }), italic(), foregroundStyle(props.faded)]}>{props.note}</Text>
       ) : (
         shown.map((text, index) => (
           <HStack key={`${index}-${text}`} spacing={8}>
@@ -91,22 +134,24 @@ const ScrollWidget = (props: ScrollWidgetProps, environment: { widgetFamily?: st
                   struck: [...(props.struck ?? []), ids[index]],
                 })}
               >
-                <Text modifiers={[font({ size: 10, weight: 'medium', design: 'serif' }), foregroundStyle(props.accent)]}>
+                <Text modifiers={[numeralStyle, kerning(0.6), foregroundStyle(props.accent), frame({ width: 22, alignment: 'leading' })]}>
                   {numerals[index] ?? ''}
                 </Text>
               </Button>
             ) : (
-              <Text modifiers={[font({ size: 10, weight: 'medium', design: 'serif' }), foregroundStyle(props.accent)]}>
+              <Text modifiers={[numeralStyle, kerning(0.6), foregroundStyle(props.accent), frame({ width: 22, alignment: 'leading' })]}>
                 {numerals[index] ?? ''}
               </Text>
             )}
-            <Text modifiers={[font({ size: 14, design: 'serif' }), foregroundStyle(props.ink), lineLimit(1)]}>{text}</Text>
+            <Text modifiers={[lineStyle, foregroundStyle(props.ink), lineLimit(1)]}>{text}</Text>
             <Spacer />
           </HStack>
         ))
       )}
       {more > 0 ? (
-        <Text modifiers={[font({ size: 11, design: 'serif' }), foregroundStyle(props.faded)]}>{`and ${roman(more)} more`}</Text>
+        <Text modifiers={[font({ size: 11, design: 'serif' }), italic(), foregroundStyle(props.faded)]}>{`and ${roman(more)} more`}</Text>
+      ) : shown.length === 0 ? (
+        <Text modifiers={[font({ size: 12, design: 'serif' }), foregroundStyle(props.accent)]}>❦  Finis  ❦</Text>
       ) : null}
       <Spacer />
     </VStack>
@@ -119,6 +164,7 @@ const initialProps: ScrollWidgetProps = {
   remaining: 0,
   note: 'Open the app to begin a scroll.',
   paper: '#f5e9c9',
+  paperTo: '#e8c98c',
   ink: '#23201c',
   faded: '#8a8172',
   accent: '#bf3418',

@@ -10,6 +10,7 @@ import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-cont
 import { pickBackup, shareBackup } from './backup';
 import { ChestScreen } from './components/ChestScreen';
 import { ChronicleScreen } from './components/ChronicleScreen';
+import { DayLight } from './components/DayLight';
 import { DayNightVeil } from './components/DayNightVeil';
 import { DeskThings } from './components/DeskThings';
 import { NightLight } from './components/NightLight';
@@ -687,8 +688,8 @@ export const App: FC = () => {
         <ThemeProvider value={palette}>
           <StatusBar style="light" />
           <Desk night={night} />
-          {/* The night's light falls on the desk, beneath the scrolls lying on it. */}
-          {night ? <NightLight /> : null}
+          {/* The room's light falls on the desk, beneath the scrolls lying on it: the moon and the candle by night, the sun by day. */}
+          {night ? <NightLight /> : <DayLight />}
           {/* On a wide screen the scrolls keep a page's width, centred on the desk, instead of stretching across it. */}
           <View style={columnStyle}>
             {!fontsLoaded || !settings.loaded ? null : settings.address ? (

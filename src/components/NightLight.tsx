@@ -12,7 +12,7 @@ import Animated, {
 import Svg, { Defs, FeGaussianBlur, Filter, G, LinearGradient, Path, RadialGradient, Rect, Stop } from 'react-native-svg';
 
 /** The window's lights, as drawn before they are thrown across the room: two pointed lancets and an oculus. */
-const WINDOW = { width: 220, height: 380 };
+export const WINDOW = { width: 220, height: 380 };
 /** The lead and stone between panes, in the window's own units. */
 const BAR = 5;
 
@@ -43,7 +43,7 @@ const oculus = (cx: number, cy: number, r: number) => {
   return `${ring} ${across} ${down}`;
 };
 
-const PANES = [lancet(14, 100, 88, 372), lancet(118, 100, 88, 372), oculus(WINDOW.width / 2, 52, 32)].join(' ');
+export const PANES = [lancet(14, 100, 88, 372), lancet(118, 100, 88, 372), oculus(WINDOW.width / 2, 52, 32)].join(' ');
 
 /**
  * How the room is lit by night, laid on the desk beneath the scrolls: moonlight through a high gothic window, falling

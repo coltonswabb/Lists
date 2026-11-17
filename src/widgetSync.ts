@@ -23,6 +23,7 @@ export const widgetProps = (lists: List[], palette: Palette, address: Address): 
     remaining: items.length,
     note: list ? standing.done(address) : standing.blank(address),
     paper: palette.paperFrom,
+    paperTo: palette.paperTo,
     ink: palette.ink,
     faded: palette.inkFaded,
     accent: palette.accent,
