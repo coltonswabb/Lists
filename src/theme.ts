@@ -120,6 +120,8 @@ export const paletteOf = (name: ThemeName) => {
   return {
     ...spec,
     name,
+    /** The paper is dark and written on in pale ink, so colours meant for pale paper must be lightened to be read. */
+    darkPaper,
     parchment: spec.paperFrom,
     inkFaded: alpha(spec.ink, darkPaper ? 0.62 : 0.45),
     rule: alpha(spec.ink, 0.14),

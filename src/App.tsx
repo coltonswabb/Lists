@@ -8,6 +8,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { pickBackup, shareBackup } from './backup';
+import { kindOf, kinds } from './kinds';
 import { PaneWidth } from './PaneWidth';
 import { ChestScreen } from './components/ChestScreen';
 import { ChronicleScreen } from './components/ChronicleScreen';
@@ -362,6 +363,7 @@ const Screens: FC<{ settings: Settings; address: Address; night: boolean; onCand
     ? null
     : (() => {
     const isTomorrow = openList.tomorrow === true;
+    const kind = kindOf(openList);
     // The scroll as kept, which may hold lines the day's view leaves out.
     const kept = store.lists.find((list) => list.id === openList.id) ?? openList;
     const { rows, visible } = scrollRows(openList.items, today);
@@ -381,8 +383,10 @@ const Screens: FC<{ settings: Settings; address: Address; night: boolean; onCand
           actions={scrollActions}
           title={openList.name}
           // Latin in the readout only, as on an instrument's faceplate: "things" left, or "the end".
-          readout={items.length > 0 && remaining === 0 ? 'FINIS' : `${roman(remaining)} RES`}
+          // What is left is named for the kind of scroll it is: things, purchases, labours, words.
+          readout={items.length > 0 && remaining === 0 ? 'FINIS' : `${roman(remaining)} ${kinds[kind].left[remaining === 1 ? 0 : 1]}`}
           variant="scroll"
+          trim={kinds[kind].trim}
           placeholder="New item"
           emptyHint="Pull down or tap to add"
           rows={rows}
@@ -397,7 +401,7 @@ const Screens: FC<{ settings: Settings; address: Address; night: boolean; onCand
                       ? standing.blank(address)
                       : remaining === 0
                         ? standing.done(address)
-                        : '',
+                        : kinds[kind].line(address),
               )}
             />
           }
@@ -487,7 +491,22 @@ const Screens: FC<{ settings: Settings; address: Address; night: boolean; onCand
           ) : items.length > 0 ? (
             <>
               {/* Only what is wanted often stands here: clearing what is struck, when something is. The rest is behind More. */}
-              {items.some((item) => item.done) ? (
+              {remaining === 0 ? (
+                // Every line struck: the scroll is finished, and the next thing to do with it is seal it into the chronicle.
+                <Pressable
+                  onPress={() => {
+                    say('seal');
+                    pressSeal();
+                    store.sealList(openList.id);
+                    setOpenListId(null);
+                  }}
+                  hitSlop={12}
+                  accessibilityRole="button"
+                  accessibilityHint="Seals this finished scroll into the chronicle"
+                >
+                  <Text style={[styles.deskLabel, styles.deskLabelOn]}>Seal it</Text>
+                </Pressable>
+              ) : items.some((item) => item.done) ? (
                 <Pressable
                   onPress={() => scrollActions.current?.clear()}
                   hitSlop={12}
@@ -508,6 +527,8 @@ const Screens: FC<{ settings: Settings; address: Address; night: boolean; onCand
         <ScrollMenu
           open={menuOpen}
           title={openList.name}
+          kind={kind}
+          onKind={(chosen) => store.setKind(openList.id, chosen)}
           onClose={() => setMenuOpen(false)}
           choices={[
             {
@@ -610,6 +631,7 @@ const Screens: FC<{ settings: Settings; address: Address; night: boolean; onCand
             id: list.id,
             text: list.name,
             note: isTutorial(list) ? 'Tutorial' : undefined,
+            ribbon: kinds[kindOf(list)].ribbon ?? undefined,
             progress: lines.length > 0 ? lines.filter((item) => item.done).length / lines.length : undefined,
             badge: mark ? `${mark} · ${roman(open)}` : roman(open),
             badgeMarked: mark !== null,

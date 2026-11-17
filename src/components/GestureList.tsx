@@ -46,9 +46,10 @@ import { scheduleOnRN } from 'react-native-worklets';
 import { drawings, waxSeal } from '../art';
 import { success, thud, tick } from '../haptics';
 import { play } from '../sounds';
+import type { ScrollTrim } from '../kinds';
 import { usePaneWidth } from '../PaneWidth';
 import { useTheme } from '../ThemeContext';
-import { accentAt, fonts, MAX_TEXT_SCALE, type Palette, paperAt, roman, ROW_HEIGHT, TEXT_SCALE } from '../theme';
+import { accentAt, fonts, mixColors, MAX_TEXT_SCALE, type Palette, paperAt, roman, ROW_HEIGHT, TEXT_SCALE } from '../theme';
 import { DeckleEdge } from './DeckleEdge';
 import { Finial, hasFinial } from './Finial';
 import { PaperOverlay } from './PaperOverlay';
@@ -61,7 +62,10 @@ import { WaxSeal } from './WaxSeal';
 
 const PULL_RESISTANCE = 0.6;
 /** How far the sheet must be lifted before letting go clears the finished rows: a deliberate pull, not a stray scroll. */
-const ROLL_UP_AT = ROW_HEIGHT * 1.8;
+// A short push is enough: about a row and a half of the finger's travel, or less if it is flicked.
+const ROLL_UP_AT = ROW_HEIGHT * 0.9;
+/** A push released faster than this, in points a second, rolls the scroll up however short it was. */
+const FLICK_UP = 900;
 /** A finger that has travelled further than this was dragging, not tapping. */
 const TAP_SLOP = 10;
 const PRESS_GUARD_MS = 150;
@@ -108,6 +112,8 @@ export type GestureListRow = {
   badge?: string;
   /** Shelf only: a few small words written under the scroll's name, saying what kind of scroll it is. */
   note?: string;
+  /** Shelf only: the colour of the ribbon tied round the roll, which is also the ground of its painted initial. */
+  ribbon?: string;
   /** Shelf only: the share of the scroll's lines already struck, 0 to 1, shown as a line of gold along the roll. */
   progress?: number;
   /** What the row's text becomes when opened for editing, if that differs from what is shown. */
@@ -154,6 +160,8 @@ type GestureListProps = {
   onClear?: () => void;
   /** Filled with the things a parent may ask of the list. */
   actions?: RefObject<GestureListActions | null>;
+  /** Scroll only: how the sheet is dressed for the kind of scroll it is. */
+  trim?: ScrollTrim;
   /** Drawn in the margin beside "Finis" once every item is done. */
   finisArt?: ReactNode;
 };
@@ -177,6 +185,7 @@ export const GestureList: FC<GestureListProps> = ({
   onRenameTitle,
   onBack,
   onClear,
+  trim,
   finisArt,
   leadActionLabel,
   actions,
@@ -290,10 +299,12 @@ export const GestureList: FC<GestureListProps> = ({
   };
 
   const leadFor = (row: GestureListRow, index: number): Lead => {
-    if (isShelf) return { kind: 'initial', text: row.text, pigment: colors.ink, letter: colors.paperFrom };
-    if (row.section) return { kind: 'initial', text: row.text, pigment: colors.accent, letter: colors.paperFrom, flourish: colors.accent };
+    if (isShelf) return { kind: 'initial', text: row.text, pigment: row.ribbon ?? colors.ink, letter: colors.paperFrom };
+    // A kind's pigment is mixed for pale paper; on a dark one it is lightened so it can still be read.
+    const pigment = trim?.pigment && colors.darkPaper ? mixColors(trim.pigment, '#ffffff', 0.5) : trim?.pigment;
+    if (row.section) return { kind: 'initial', text: row.text, pigment: pigment ?? colors.accent, letter: colors.paperFrom, flourish: pigment ?? colors.accent };
     if (row.done) return { kind: 'done', color: colors.inkFaded };
-    return { kind: 'label', label: roman(numbers[index] ?? 0), color: accentAt(colors, index, rowCount) };
+    return { kind: 'label', label: roman(numbers[index] ?? 0), color: pigment ?? accentAt(colors, index, rowCount), glow: trim?.glow };
   };
 
   // While typing, a trailing colon previews the row as a section.
@@ -497,7 +508,7 @@ export const GestureList: FC<GestureListProps> = ({
     },
     onDeactivate: (event) => {
       'worklet';
-      const rollUp = !event.canceled && raiseArmed.value;
+      const rollUp = !event.canceled && (raiseArmed.value || (event.velocityY < -FLICK_UP && raise.value > 12));
       raiseArmed.value = false;
       raise.value = withSpring(0, SPRING);
       scheduleOnRN(endPushUp, rollUp);
@@ -675,8 +686,10 @@ export const GestureList: FC<GestureListProps> = ({
             <View style={styles.collar} />
           </>
         )}
-        <View style={[styles.rolled, { backgroundColor: paperFor(index) }]}>
+        <View style={[styles.rolled, row.ribbon !== undefined && styles.ribboned, { backgroundColor: paperFor(index) }]}>
           {content}
+          {/* The ribbon that marks what the scroll is for, tied round the roll near its end, under the light. */}
+          {row.ribbon ? <View style={[styles.ribbon, { backgroundColor: row.ribbon }]} /> : null}
           {/* How far along the scroll is: a line of gold leaf along the foot of the roll, as long as the share struck. */}
           {row.progress !== undefined && row.progress > 0 && !row.sealed ? (
             <View style={styles.progressTrack}>
@@ -870,6 +883,9 @@ export const GestureList: FC<GestureListProps> = ({
                 {finished && !busy ? finisArt : null}
                 {finished && !busy ? <Text style={styles.finis}>❦  Finis  ❦</Text> : null}
               </Pressable>
+              {/* What kind of scroll it is, laid over its paper: a wash of colour, and an account book's second rule. */}
+              {trim?.wash ? <View pointerEvents="none" style={[StyleSheet.absoluteFill, { backgroundColor: trim.wash }]} /> : null}
+              {trim?.columns ? <View pointerEvents="none" style={styles.column} /> : null}
               {isShelf ? null : <PaperOverlay />}
               {isShelf ? null : <DeckleEdge side="left" />}
               {isShelf ? null : <DeckleEdge side="right" />}
@@ -939,6 +955,10 @@ const makeStyles = (colors: Palette) =>
     zIndex: 1,
   },
   rollLight: { ...StyleSheet.absoluteFill, borderRadius: 3 },
+  column: { position: 'absolute', top: 0, bottom: 0, right: 58, width: StyleSheet.hairlineWidth * 2, backgroundColor: colors.accent, opacity: 0.35 },
+  // Room at the roll's end for the ribbon, so the count is not written under it.
+  ribboned: { paddingRight: 34 },
+  ribbon: { position: 'absolute', right: 13, top: 0, bottom: 0, width: 9 },
   progressTrack: { position: 'absolute', left: 12, right: 12, bottom: 5, height: 2, borderRadius: 1, backgroundColor: colors.rule },
   progressFill: { height: 2, borderRadius: 1, backgroundColor: colors.complete },
   rowText: { color: colors.ink, fontFamily: fonts.body, fontSize: 21 },

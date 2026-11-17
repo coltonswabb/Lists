@@ -411,6 +411,11 @@ export const useLists = () => {
     [apply],
   );
 
+  const setKind = useCallback(
+    (id: string, kind: string) => apply((all) => all.map((l) => (l.id === id ? { ...l, kind } : l))),
+    [apply],
+  );
+
   const deleteList = useCallback(
     (id: string) => {
       const name = current.current.lists.find((l) => l.id === id)?.name ?? 'list';
@@ -664,6 +669,7 @@ export const useLists = () => {
     addListFrom,
     remindLater,
     renameList,
+    setKind,
     deleteList,
     moveList,
     sealList,

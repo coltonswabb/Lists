@@ -2,6 +2,7 @@ import type { FC } from 'react';
 import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { type Kind, kindNames, kinds } from '../kinds';
 import { useTheme } from '../ThemeContext';
 import { fonts, type Palette } from '../theme';
 
@@ -19,6 +20,9 @@ type ScrollMenuProps = {
   /** The scroll's name, which heads the sheet. */
   title: string;
   choices: ScrollChoice[];
+  /** What the scroll is for now, and a way to change it. */
+  kind: Kind;
+  onKind: (kind: Kind) => void;
   onClose: () => void;
 };
 
@@ -26,8 +30,8 @@ type ScrollMenuProps = {
  * A sheet over an open scroll holding what can be done to the whole of it. These are wanted seldom, so they
  * are kept here, each with a line saying what it does, and not stood in a row at the scroll's foot.
  */
-export const ScrollMenu: FC<ScrollMenuProps> = ({ open, title, choices, onClose }) => {
-  const { styles } = useTheme(makeStyles);
+export const ScrollMenu: FC<ScrollMenuProps> = ({ open, title, choices, kind, onKind, onClose }) => {
+  const { colors, styles } = useTheme(makeStyles);
   const insets = useSafeAreaInsets();
   return (
     <Modal visible={open} transparent animationType="fade" onRequestClose={onClose}>
@@ -36,6 +40,22 @@ export const ScrollMenu: FC<ScrollMenuProps> = ({ open, title, choices, onClose 
         <Text style={styles.title} numberOfLines={1}>
           {title}
         </Text>
+        <Text style={styles.heading}>A scroll for {kinds[kind].purpose}</Text>
+        <View style={styles.kinds} accessibilityRole="radiogroup">
+          {kindNames.map((name) => (
+            <Pressable
+              key={name}
+              onPress={() => onKind(name)}
+              style={[styles.kind, name === kind && styles.kindChosen]}
+              accessibilityRole="radio"
+              accessibilityState={{ selected: name === kind }}
+              accessibilityLabel={`${kinds[name].label}, for ${kinds[name].purpose}`}
+            >
+              <View style={[styles.ribbon, { backgroundColor: kinds[name].ribbon ?? colors.ink }]} />
+              <Text style={styles.kindLabel}>{kinds[name].label}</Text>
+            </Pressable>
+          ))}
+        </View>
         {choices.map((choice) => (
           <Pressable
             key={choice.label}
@@ -72,6 +92,21 @@ const makeStyles = (colors: Palette) =>
       backgroundColor: colors.paperFrom,
     },
     title: { color: colors.ink, fontFamily: fonts.display, fontSize: 26, marginBottom: 8 },
+    heading: { marginBottom: 8, color: colors.inkFaded, fontFamily: fonts.bodyItalic, fontSize: 15 },
+    kinds: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, paddingBottom: 12, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.rule },
+    kind: {
+      height: 36,
+      paddingHorizontal: 10,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 7,
+      borderRadius: 3,
+      borderWidth: 1.5,
+      borderColor: colors.rule,
+    },
+    kindChosen: { borderColor: colors.accent, backgroundColor: colors.paperTo },
+    ribbon: { width: 7, height: 20, borderRadius: 1 },
+    kindLabel: { color: colors.ink, fontFamily: fonts.body, fontSize: 17 },
     row: {
       minHeight: 64,
       paddingVertical: 10,

@@ -10,7 +10,7 @@ export type Lead =
   /** A painted first letter, for things that have a name: scrolls and sections. */
   | { kind: 'initial'; text: string; pigment: string; letter: string; flourish?: string }
   /** A small margin label, for ordinary items: their number, or a mark once finished. */
-  | { kind: 'label'; label: string; color: string }
+  | { kind: 'label'; label: string; color: string; glow?: string }
   /** A drawn tick, for a finished item. */
   | { kind: 'done'; color: string };
 
@@ -36,7 +36,8 @@ export const RowLead: FC<{ lead: Lead }> = ({ lead }) => {
   if (lead.kind === 'label') {
     return (
       <View style={styles.cell}>
-        <Text style={[styles.label, { color: lead.color }]} numberOfLines={1} maxFontSizeMultiplier={MAX_TEXT_SCALE}>
+        <Text
+          style={[styles.label, { color: lead.color }, lead.glow ? { textShadowColor: lead.glow, textShadowRadius: 6, textShadowOffset: { width: 0, height: 0 } } : null]} numberOfLines={1} maxFontSizeMultiplier={MAX_TEXT_SCALE}>
           {lead.label}
         </Text>
       </View>
