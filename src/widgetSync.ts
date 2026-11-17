@@ -24,6 +24,7 @@ export const widgetProps = (lists: List[], palette: Palette, address: Address): 
     note: list ? standing.done(address) : standing.blank(address),
     paper: palette.paperFrom,
     paperTo: palette.paperTo,
+    desk: palette.desk,
     ink: palette.ink,
     faded: palette.inkFaded,
     accent: palette.accent,
