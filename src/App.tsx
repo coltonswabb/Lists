@@ -65,7 +65,8 @@ const dayView = (lists: List[], today: string): List[] =>
  */
 const nightView = (lists: List[], today: string): List[] =>
   lists
-    .filter((list) => !list.stored)
+    // A Tomorrow scroll left from before is shown only while it still holds something.
+    .filter((list) => !list.stored && !(list.tomorrow && list.items.length === 0))
     .map((list) =>
       list.tomorrow || !isDue(list.plannedFor, today) ? list : { ...list, items: list.items.filter((item) => !item.section && !isDue(item.plannedFor, today)) },
     );
@@ -304,10 +305,6 @@ const Screens: FC<{ settings: Settings; address: Address; night: boolean; onCand
     const tomorrowAt = store.lists.findIndex((list) => list.tomorrow);
     return tomorrowAt < 0 ? store.lists.length : tomorrowAt;
   };
-  const { ensureTomorrow } = store;
-  useEffect(() => {
-    if (night && store.loaded) ensureTomorrow();
-  }, [night, store.loaded, ensureTomorrow]);
 
   const shelf = useRef<GestureListActions>(null);
   /** The open scroll's own, kept apart from the shelf's: on a wide screen both are on the desk at once. */
@@ -565,7 +562,7 @@ const Screens: FC<{ settings: Settings; address: Address; night: boolean; onCand
         <View style={[styles.controls, isTomorrow && styles.controlsCentred, { paddingBottom: insets.bottom + 12 }]}>
           {isTomorrow ? (
             <>
-              <Text style={styles.deskNote}>At dawn this is laid on the shelf as the day’s scroll.</Text>
+              <Text style={styles.deskNote}>At midnight this is laid on the shelf as the day’s scroll.</Text>
               {/* Lines struck here before dawn can still be cleared away, as on any other scroll. */}
               {items.some((item) => item.done) ? (
                 <Pressable
@@ -583,7 +580,7 @@ const Screens: FC<{ settings: Settings; address: Address; night: boolean; onCand
               {/* Only what is wanted often stands here: clearing what is struck, when something is. The rest is behind More. */}
               {night ? (
                 // By candlelight the scroll shows only what is written for tomorrow; sealing and clearing are the day's work.
-                <Text style={styles.deskNote}>Lines written by candlelight join this scroll at dawn.</Text>
+                <Text style={styles.deskNote}>Lines written by candlelight join this scroll at midnight.</Text>
               ) : remaining === 0 && kind === 'market' ? (
                 // A market scroll is for the same errand again: once the basket is full, every line is put back for next time.
                 <Pressable
@@ -645,8 +642,8 @@ const Screens: FC<{ settings: Settings; address: Address; night: boolean; onCand
           onClose={() => setMenuOpen(false)}
           choices={[
             {
-              label: 'Renew at dawn',
-              note: 'Every line is unmarked each morning, for a list done daily.',
+              label: 'Renew each day',
+              note: 'Every line is unmarked at midnight, for a list done daily.',
               on: openList.daily === true,
               onPress: () => {
                 say(openList.daily ? 'renewOff' : 'renew');

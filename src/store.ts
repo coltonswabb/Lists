@@ -11,7 +11,8 @@ const CHRONICLE_KEY = 'decree/chronicle/v1';
 /** The chronicle keeps this many entries; older ones fall away. */
 const CHRONICLE_LENGTH = 1000;
 /** Daily scrolls are renewed from this hour, so a late night still counts as the day before. */
-export const DAWN_HOUR = 4;
+// The day turns at midnight: what was planned by candlelight joins the day's shelf then, and daily scrolls are renewed.
+export const DAWN_HOUR = 0;
 
 const newId = () => `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
 
@@ -151,9 +152,12 @@ export const dawnDay = (now: Date) => renewalDay(now);
 const renewDue = (lists: List[], now = new Date()): List[] => {
   const day = renewalDay(now);
   let laid: List | undefined;
-  const kept = lists.map((list) => {
+  const kept = lists.flatMap((list): List[] => {
     if (list.tomorrow) {
-      if (list.plannedFor && list.plannedFor > day) return list;
+      // There is no standing Tomorrow scroll any more: what is planned by candlelight is written on the day's own
+      // scrolls, or on new ones. One left from before is kept only while it still holds lines for a day to come.
+      if (list.items.length === 0) return [];
+      if (list.plannedFor && list.plannedFor > day) return [list];
       if (list.items.length > 0) {
         laid = {
           id: newId(),
@@ -164,11 +168,13 @@ const renewDue = (lists: List[], now = new Date()): List[] => {
           plannedFor: day,
         };
       }
-      return { ...list, items: [], plannedFor: dayAfter(day) };
+      return [];
     }
-    return list.daily && list.renewedOn !== day
-      ? { ...list, renewedOn: day, items: list.items.map((item) => (item.done ? { ...item, done: false } : item)) }
-      : list;
+    return [
+      list.daily && list.renewedOn !== day
+        ? { ...list, renewedOn: day, items: list.items.map((item) => (item.done ? { ...item, done: false } : item)) }
+        : list,
+    ];
   });
   return laid ? [laid, ...kept] : kept;
 };
