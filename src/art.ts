@@ -70,14 +70,14 @@ export const initialFrames: Partial<Record<ThemeName, Drawing>> = {
 
 /** A small emblem for each kind of scroll. */
 export const kindEmblems: Partial<Record<'decree' | 'ledger' | 'market' | 'quest' | 'spell' | 'revel' | 'missive' | 'rite', Drawing>> = {
-  decree: { source: require('../assets/art/kind-decree.png'), width: 900, height: 464 },
-  ledger: { source: require('../assets/art/kind-ledger.png'), width: 898, height: 755 },
-  market: { source: require('../assets/art/kind-market.png'), width: 761, height: 798 },
-  missive: { source: require('../assets/art/kind-missive.png'), width: 898, height: 488 },
-  quest: { source: require('../assets/art/kind-quest.png'), width: 765, height: 1044 },
-  revel: { source: require('../assets/art/kind-revel.png'), width: 822, height: 810 },
-  rite: { source: require('../assets/art/kind-rite.png'), width: 900, height: 703 },
-  spell: { source: require('../assets/art/kind-spell.png'), width: 769, height: 805 },
+  decree: { source: require('../assets/art/kind-decree.png'), width: 900, height: 468 },
+  ledger: { source: require('../assets/art/kind-ledger.png'), width: 900, height: 758 },
+  market: { source: require('../assets/art/kind-market.png'), width: 771, height: 808 },
+  missive: { source: require('../assets/art/kind-missive.png'), width: 900, height: 493 },
+  quest: { source: require('../assets/art/kind-quest.png'), width: 775, height: 1054 },
+  revel: { source: require('../assets/art/kind-revel.png'), width: 832, height: 820 },
+  rite: { source: require('../assets/art/kind-rite.png'), width: 900, height: 705 },
+  spell: { source: require('../assets/art/kind-spell.png'), width: 779, height: 815 },
 };
 
 /** Single line drawings by name, when they have been made. */

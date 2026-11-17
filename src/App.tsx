@@ -748,7 +748,8 @@ const Screens: FC<{ settings: Settings; address: Address; night: boolean; onCand
           // So is one of the day's own scrolls that has had lines written on it for tomorrow.
           const morrow = !list.tomorrow && ((list.plannedFor !== undefined && list.plannedFor > today) || (night && items.length > 0));
           // And one that arrived this morning, or that holds lines which did, is marked NEW for the day.
-          const fresh = !list.tomorrow && (list.plannedFor === today || items.some((item) => !item.done && item.plannedFor === today));
+          // By night the shelf counts what is planned for tomorrow, so the day's NEW is not shown there.
+          const fresh = !night && !list.tomorrow && (list.plannedFor === today || items.some((item) => !item.done && item.plannedFor === today));
           const mark = morrow ? 'MORROW' : fresh ? 'NEW' : null;
           return {
             id: list.id,

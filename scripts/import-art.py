@@ -51,6 +51,8 @@ BORDER = re.compile(rf"^border-({PAPERS})$")
 FRAME = re.compile(rf"^initial-({PAPERS})$")
 BOOK_MARGIN = re.compile(rf"^margin-({PAPERS})-\d+$")
 MARGIN = re.compile(r"^margin-\d+$")
+# How many pixels of the source each side of an emblem's strokes is widened by.
+EMBLEM_THICKEN = 5
 LINE_ART = re.compile(rf"^(margin-\d+|kind-({'|'.join(KINDS)})|border-({PAPERS})|initial-({PAPERS})|margin-({PAPERS})-\d+|" + "|".join(SINGLES) + r")$")
 # Painted objects cut out of a white ground, and the longest side each is scaled to.
 OBJECTS = {"wax-seal": 192, "wax-seal-blank": 300, "finial-brass": 200, "finial-iron": 200, "desk-inkwell": 480, "desk-candle": 420, "sky-sun": 640, "sky-moon": 560}
@@ -245,7 +247,22 @@ def desk_tile(source, target):
     subprocess.run(["sips", "-s", "format", "png", "-z", str(TILE_SIZE), str(TILE_SIZE), str(source), "--out", str(target)], check=True, capture_output=True)
 
 
-def key_line_art(source, target, trimmed=True, max_width=MAX_WIDTH):
+def thickened(alpha, width, radius):
+    """Every stroke widened by `radius` pixels on each side: each pixel takes the strongest ink within that reach."""
+    across = []
+    for row in alpha:
+        out = bytearray(width)
+        for x in range(width):
+            out[x] = max(row[max(0, x - radius) : x + radius + 1])
+        across.append(out)
+    down = []
+    for y in range(len(across)):
+        band = across[max(0, y - radius) : y + radius + 1]
+        down.append(bytearray(map(max, zip(*band))))
+    return down
+
+
+def key_line_art(source, target, trimmed=True, max_width=MAX_WIDTH, thicken=0):
     width, height, channels, rows = load(source)
     alpha = []
     for row in rows:
@@ -254,6 +271,8 @@ def key_line_art(source, target, trimmed=True, max_width=MAX_WIDTH):
             value = lightness(row, x, channels)
             out[x] = 0 if value >= PAPER else 255 if value <= INK else round(255 * (PAPER - value) / (PAPER - INK))
         alpha.append(out)
+    if thicken:
+        alpha = thickened(alpha, width, thicken)
     # Trim to the ink, keeping a little air around it.
     inked_rows = [y for y, row in enumerate(alpha) if any(row)]
     inked_cols = [x for x in range(width) if any(alpha[y][x] for y in inked_rows)]
@@ -384,7 +403,10 @@ def main():
             continue
         if target.exists() and target.stat().st_mtime > source.stat().st_mtime:
             continue  # already imported, and the source hasn't changed since
-        if LINE_ART.match(name):
+        if KIND.match(name):
+            # Emblems are shown at the size of a fingernail, where a pen's line all but vanishes: their strokes are widened.
+            key_line_art(source, target, thicken=EMBLEM_THICKEN)
+        elif LINE_ART.match(name):
             key_line_art(source, target)
         elif name == SCATTER:
             key_line_art(source, target, trimmed=False, max_width=SCATTER_SIZE)

@@ -319,6 +319,9 @@ export const GestureList: FC<GestureListProps> = ({
   const strikeFor = (row: GestureListRow) =>
     isShelf || row.section || row.done ? 0 : Math.min(textRoom, row.text.length * CHAR_WIDTH);
 
+  /** Too long for two lines at the usual size: such a line is written smaller, on three, so more of it can be read. */
+  const isLong = (row: GestureListRow) => !isShelf && !row.section && row.text.length * CHAR_WIDTH > textRoom * 2;
+
   const nudgeScroll = (direction: -1 | 1) => {
     scrollView.current?.scrollTo({ y: Math.max(0, scrollOffset.current + direction * ROW_HEIGHT * 1.5), animated: true });
   };
@@ -754,9 +757,16 @@ export const GestureList: FC<GestureListProps> = ({
           </View>
         ) : (
           <Text
-            style={[styles.rowText, styles.fill, row.section ? styles.sectionText : !isShelf && styles.itemText, row.done && styles.doneText, row.vellum && isShelf ? { color: row.vellum.ink } : null]}
-            // A long item runs onto a second line before it is cut short.
-            numberOfLines={isShelf || row.section ? 1 : 2}
+            style={[
+              styles.rowText,
+              styles.fill,
+              row.section ? styles.sectionText : !isShelf && styles.itemText,
+              isLong(row) && styles.longText,
+              row.done && styles.doneText,
+              row.vellum && isShelf ? { color: row.vellum.ink } : null,
+            ]}
+            // A long item runs onto a second line; a longer one is written smaller and given a third before it is cut short.
+            numberOfLines={isShelf || row.section ? 1 : isLong(row) ? 3 : 2}
             maxFontSizeMultiplier={MAX_TEXT_SCALE}
           >
             {written(row, index)}
@@ -835,7 +845,14 @@ export const GestureList: FC<GestureListProps> = ({
 
   return (
     <Animated.View entering={FadeIn.duration(180)} style={[styles.screen, { paddingTop: insets.top }]}>
-      <View style={styles.header}>
+      <View
+        style={styles.header}
+        // A touch on the header while a row is being written finishes it, like a touch anywhere else. The title's own
+        // editing is left alone: its field is in the header.
+        onTouchStart={() => {
+          if (busy && titleDraft === null) doneWriting();
+        }}
+      >
         {canGoBack ? (
           <Pressable onPress={leave} hitSlop={14} accessibilityRole="button" accessibilityLabel="Close scroll">
             <Text style={styles.back}>‹</Text>
@@ -1115,6 +1132,8 @@ const makeStyles = (colors: Palette) =>
   sectionText: { fontFamily: fonts.display, fontSize: 26, marginLeft: 3 },
   // Close enough set that two lines sit inside one row with air above and below.
   itemText: { lineHeight: Math.round(25 * TEXT_SCALE) },
+  // Three lines in the height two usually take: rows keep one height, which reordering by hand depends on.
+  longText: { fontSize: 16.5, lineHeight: Math.round(18.5 * TEXT_SCALE) },
   rubric: { color: colors.accent },
   doneText: { color: colors.inkFaded, textDecorationLine: 'line-through', textDecorationColor: colors.accent },
   badge: { color: colors.inkFaded, fontFamily: fonts.label, fontSize: 14, letterSpacing: 1, marginLeft: 12 },
