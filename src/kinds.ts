@@ -1,5 +1,5 @@
 import { type Address, addresses } from './scribe';
-import type { Vellum } from './theme';
+import { colorGap, type Palette, type Vellum } from './theme';
 import type { List } from './types';
 
 /** What a scroll is for. It changes the scroll's trim and what the scribe calls the things on it, not how it works. */
@@ -169,6 +169,22 @@ export const runeOf = (value: number): string => {
   const at = value - 1;
   const last = RUNES[at % RUNES.length] ?? '';
   return at < RUNES.length ? last : `${RUNES[Math.floor(at / RUNES.length) - 1] ?? ''}${last}`;
+};
+
+/** What a dark kind is written on where its own vellum would be lost against the paper: black, with the same bright ink and foil. */
+const BLACK_VELLUM = { from: '#221d28', to: '#0d0b11' };
+/** Closer than this to the paper, a vellum no longer stands out from it. */
+const TOO_LIKE = 60;
+
+/**
+ * The vellum a kind of scroll is written on, on this paper. A dark kind must stand out from the scrolls round
+ * it, so on a paper of nearly its own colour, as a spell's violet is on a purple paper, it is black instead.
+ */
+export const vellumOf = (kind: Kind, palette: Palette): Vellum | undefined => {
+  const vellum = kinds[kind].vellum;
+  if (!vellum) return undefined;
+  const lost = colorGap(vellum.from, palette.paperFrom) < TOO_LIKE || colorGap(vellum.to, palette.paperTo) < TOO_LIKE || colorGap(vellum.from, palette.paperTo) < TOO_LIKE;
+  return lost ? { ...vellum, ...BLACK_VELLUM } : vellum;
 };
 
 export const isKind = (value: unknown): value is Kind => typeof value === 'string' && (kindNames as readonly string[]).includes(value);

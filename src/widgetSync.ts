@@ -1,7 +1,7 @@
 import { Platform } from 'react-native';
 
 import { type Address, standing } from './scribe';
-import { kindOf, kinds } from './kinds';
+import { kindOf, kinds, vellumOf } from './kinds';
 import { onVellum, type Palette } from './theme';
 import type { List } from './types';
 import type { ScrollWidgetProps } from './widgets/ScrollWidget';
@@ -18,7 +18,8 @@ export const widgetProps = (lists: List[], palette: Palette, address: Address): 
   const list = pressing ?? lists.find((candidate) => open(candidate).length > 0) ?? lists[0];
   // The widget wears the scroll's kind: its ribbon's colour on the painted initial, and a dark kind's own vellum.
   const kind = list ? kinds[kindOf(list)] : kinds.decree;
-  const dressed = onVellum(palette, kind.vellum);
+  const vellum = list ? vellumOf(kindOf(list), palette) : undefined;
+  const dressed = onVellum(palette, vellum);
   const items = list ? open(list) : [];
   const shown = items.slice(0, MAX_ITEMS);
   return {
@@ -34,7 +35,7 @@ export const widgetProps = (lists: List[], palette: Palette, address: Address): 
     ink: dressed.ink,
     faded: dressed.inkFaded,
     accent: dressed.accent,
-    initial: kind.vellum ? dressed.accent : (kind.ribbon ?? dressed.accent),
+    initial: vellum ? dressed.accent : (kind.ribbon ?? dressed.accent),
   };
 };
 

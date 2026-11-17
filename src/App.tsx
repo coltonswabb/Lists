@@ -8,7 +8,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { pickBackup, shareBackup } from './backup';
-import { guessKind, type Kind, kindNames, kindOf, kinds } from './kinds';
+import { guessKind, type Kind, kindNames, kindOf, kinds, vellumOf } from './kinds';
 import { PaneWidth } from './PaneWidth';
 import { ChestScreen } from './components/ChestScreen';
 import { ChronicleScreen } from './components/ChronicleScreen';
@@ -294,8 +294,8 @@ const Screens: FC<{ settings: Settings; address: Address; night: boolean; onCand
   );
   const openList = allShelf.find((list) => list.id === openListId);
   // A dark kind of scroll is written on vellum of its own, bright on dark, whatever the paper.
-  const openVellum = openList ? kinds[kindOf(openList)].vellum : undefined;
-  const scrollColors = useMemo(() => onVellum(colors, openVellum), [colors, openVellum]);
+  const openKind = openList ? kindOf(openList) : null;
+  const scrollColors = onVellum(colors, openKind ? vellumOf(openKind, colors) : undefined);
   /** Where a place on the shelf as shown falls among all the scrolls kept, some of which may be hidden. */
   const shelfPosition = (shown: number) => {
     const at = shelfLists[shown];
@@ -747,7 +747,7 @@ const Screens: FC<{ settings: Settings; address: Address; night: boolean; onCand
             // Tomorrow is the scribe's own and cannot be cast out or sealed: a swipe on it springs back.
             fixed: list.tomorrow === true,
             ribbon: kinds[kindOf(list)].ribbon ?? undefined,
-            vellum: kinds[kindOf(list)].vellum,
+            vellum: vellumOf(kindOf(list), colors),
             emblem: kinds[kindOf(list)].emblem ?? undefined,
             progress: shareDone(list, kindOf(list)),
             // A marked scroll with nothing on it yet wears its mark alone: "MORROW", not "MORROW · NIL".
@@ -798,7 +798,7 @@ const Screens: FC<{ settings: Settings; address: Address; night: boolean; onCand
         // A scroll being named wears the kind chosen for it, or failing that the kind its name so far suggests.
         dressFor={(name) => {
           const kind = kinds[namingAs ?? guessKind(name)];
-          return { ribbon: kind.ribbon ?? undefined, vellum: kind.vellum };
+          return { ribbon: kind.ribbon ?? undefined, vellum: vellumOf(namingAs ?? guessKind(name), colors) };
         }}
         onMove={(from, to) => store.moveList(shelfPosition(from), shelfPosition(to))}
         onOpen={setOpenListId}

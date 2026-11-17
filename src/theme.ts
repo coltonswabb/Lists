@@ -107,6 +107,13 @@ const toRgb = (hex: string): Rgb => {
 
 const alpha = (hex: string, opacity: number) => `rgba(${toRgb(hex).join(',')},${opacity})`;
 
+/** How far apart two colours are, as a distance between them in red, green and blue: 0 the same, about 440 black from white. */
+export const colorGap = (one: string, other: string): number => {
+  const a = toRgb(one);
+  const b = toRgb(other);
+  return Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
+};
+
 export const mixColors = (from: string, to: string, t: number): string => {
   const a = toRgb(from);
   const b = toRgb(to);
@@ -143,21 +150,31 @@ export type Palette = ReturnType<typeof paletteOf>;
 /** A dark skin a scroll is written on in place of the paper: its two tones, the bright ink of its words, and the foil of its marks. */
 export type Vellum = { from: string; to: string; ink: string; foil: string };
 
+/** Palettes already dressed in a vellum, so the same one is handed back each time and nothing drawn from it is redone. */
+const dressed = new WeakMap<Palette, Map<string, Palette>>();
+
 /** A palette with a scroll's own dark vellum in place of the paper, so everything drawn on it is drawn bright. */
-export const onVellum = (palette: Palette, vellum: Vellum | undefined): Palette =>
-  vellum === undefined
-    ? palette
-    : {
-        ...palette,
-        paperFrom: vellum.from,
-        paperTo: vellum.to,
-        parchment: vellum.from,
-        ink: vellum.ink,
-        inkFaded: alpha(vellum.ink, 0.62),
-        rule: alpha(vellum.ink, 0.16),
-        accent: vellum.foil,
-        darkPaper: true,
-      };
+export const onVellum = (palette: Palette, vellum: Vellum | undefined): Palette => {
+  if (vellum === undefined) return palette;
+  const key = `${vellum.from}${vellum.to}${vellum.ink}${vellum.foil}`;
+  const made = dressed.get(palette) ?? new Map<string, Palette>();
+  dressed.set(palette, made);
+  const kept = made.get(key);
+  if (kept) return kept;
+  const fresh: Palette = {
+    ...palette,
+    paperFrom: vellum.from,
+    paperTo: vellum.to,
+    parchment: vellum.from,
+    ink: vellum.ink,
+    inkFaded: alpha(vellum.ink, 0.62),
+    rule: alpha(vellum.ink, 0.16),
+    accent: vellum.foil,
+    darkPaper: true,
+  };
+  made.set(key, fresh);
+  return fresh;
+};
 
 /** Paper for a row's position: the scroll shades smoothly from `paperFrom` at the top to `paperTo` at the bottom. */
 export const paperAt = (palette: Palette, index: number, total: number, done = false): string => {
