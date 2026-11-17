@@ -1,6 +1,7 @@
 import { type ComponentRef, type FC, useEffect, useRef, useState } from 'react';
 import { LinearGradient } from 'expo-linear-gradient';
 import { StyleSheet, TextInput, View } from 'react-native';
+import Animated, { Easing, FadeIn, StretchInX } from 'react-native-reanimated';
 
 import { useTheme } from '../ThemeContext';
 import { fonts, MAX_TEXT_SCALE, type Palette, ROW_HEIGHT, TEXT_SCALE } from '../theme';
@@ -42,7 +43,7 @@ export const RowInput: FC<RowInputProps> = ({ leadFor, paper, placeholder, initi
 
   // autoFocus alone does not take when the row is opened from outside the list (the inkwell), so ask again.
   useEffect(() => {
-    const timers = [60, 250, 600].map((delay) =>
+    const timers = [60, 250, 600, 1100, 1800].map((delay) =>
       setTimeout(() => {
         if (!input.current?.isFocused()) input.current?.focus();
       }, delay),
@@ -95,7 +96,11 @@ export const RowInput: FC<RowInputProps> = ({ leadFor, paper, placeholder, initi
   };
 
   return (
-    <View style={[styles.row, rolled ? styles.rolledRow : { backgroundColor: paper }]}>
+    <Animated.View
+      // A new scroll is unrolled onto the shelf from its middle; a new line is inked onto the page.
+      entering={rolled ? StretchInX.duration(340).easing(Easing.out(Easing.cubic)) : FadeIn.duration(220)}
+      style={[styles.row, rolled ? styles.rolledRow : { backgroundColor: paper }]}
+    >
       {/* A scroll being named lies on the shelf like the others: rounded by the light, with its rod's ends showing. */}
       {rolled && hasFinial(colors.name) ? <Finial paper={colors.name} side="left" length={34} tuck={18} /> : null}
       <View style={[styles.inner, rolled && styles.rolledInner, rolled && { backgroundColor: paper }]}>
@@ -119,7 +124,7 @@ export const RowInput: FC<RowInputProps> = ({ leadFor, paper, placeholder, initi
         {rolled ? <LinearGradient colors={ROLL_LIGHT} locations={ROLL_LIGHT_AT} style={styles.rollLight} pointerEvents="none" /> : null}
       </View>
       {rolled && hasFinial(colors.name) ? <Finial paper={colors.name} side="right" length={34} tuck={18} /> : null}
-    </View>
+    </Animated.View>
   );
 };
 
