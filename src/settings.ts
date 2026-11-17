@@ -1,5 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 import {
   type Address,
@@ -11,6 +11,7 @@ import {
   setScribeMode,
 } from './scribe';
 import { setSoundEnabled } from './sounds';
+import { readKept } from './storage';
 import { matchIconTo } from './appIcon';
 import { isThemeName, type ThemeName } from './theme';
 
@@ -31,11 +32,17 @@ export const useSettings = () => {
   /** Whether the home screen icon follows the paper. Off by default: iOS interrupts with an alert on every change. */
   const [matchIcon, setMatchIcon] = useState(false);
   const [loaded, setLoaded] = useState(false);
+  /** The kept settings could not be read this launch, so nothing is saved over them. */
+  const unread = useRef(false);
 
   useEffect(() => {
-    AsyncStorage.getItem(STORAGE_KEY)
-      .then((raw) => {
-        const stored: unknown = raw ? JSON.parse(raw) : null;
+    readKept(STORAGE_KEY)
+      .then((kept) => {
+        if (kept.failed) {
+          unread.current = true;
+          return;
+        }
+        const stored: unknown = kept.raw ? JSON.parse(kept.raw) : null;
         const on = !(typeof stored === 'object' && stored !== null && 'sound' in stored && stored.sound === false);
         setSound(on);
         setSoundEnabled(on);
@@ -68,7 +75,8 @@ export const useSettings = () => {
   }, []);
 
   useEffect(() => {
-    if (!loaded) return;
+    // Settings that could not be read are still there: saving now would put these defaults over them.
+    if (!loaded || unread.current) return;
     AsyncStorage.setItem(STORAGE_KEY, JSON.stringify({ sound, theme, address, scribe, matchIcon, seal })).catch(() => undefined);
   }, [loaded, sound, theme, address, scribe, matchIcon, seal]);
 

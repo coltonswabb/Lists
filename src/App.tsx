@@ -91,6 +91,9 @@ const scrollRows = (items: Item[], today: string): { rows: GestureListRow[]; vis
   return { rows, visible };
 };
 
+/** Long enough for the seal to come down and be taken away before the scribe asks about the tutorial. */
+const TUTORIAL_OFFER_MS = 1900;
+
 type Settings = ReturnType<typeof useSettings>;
 
 const Screens: FC<{ settings: Settings; address: Address; night: boolean; onCandle: () => void }> = ({ settings, address, night, onCandle }) => {
@@ -398,6 +401,24 @@ const Screens: FC<{ settings: Settings; address: Address; night: boolean; onCand
             if (finishing && remaining === 1) {
               setFreshSeal(openList.id);
               pressSeal();
+              // The teaching scroll has done its work once every line on it is struck: offer to put it away.
+              if (isTutorial(openList)) {
+                const tutorialId = openList.id;
+                setTimeout(() => {
+                  Alert.alert('Thy lessons are learned', 'Shall I put the tutorial away in the chest? It can be taken out again whenever it is wanted.', [
+                    { text: 'Leave it out', style: 'cancel' },
+                    {
+                      text: 'To the chest',
+                      onPress: () => {
+                        say('stored');
+                        play('paper', 0.78);
+                        store.storeList(tutorialId);
+                        setOpenListId(null);
+                      },
+                    },
+                  ]);
+                }, TUTORIAL_OFFER_MS);
+              }
             }
             store.toggleItem(openList.id, id);
           }}

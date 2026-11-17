@@ -1,6 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
+import { readKept } from './storage';
 import type { List } from './types';
 
 const STORAGE_KEY = 'decree/patterns/v1';
@@ -47,16 +48,20 @@ const parse = (raw: string | null): Pattern[] => {
 export const usePatterns = () => {
   const [patterns, setPatterns] = useState<Pattern[]>([]);
   const [loaded, setLoaded] = useState(false);
+  const unread = useRef(false);
 
   useEffect(() => {
-    AsyncStorage.getItem(STORAGE_KEY)
-      .then((raw) => setPatterns(parse(raw)))
-      .catch(() => undefined)
+    readKept(STORAGE_KEY)
+      .then((kept) => {
+        if (kept.failed) unread.current = true;
+        else setPatterns(parse(kept.raw));
+      })
       .finally(() => setLoaded(true));
   }, []);
 
   useEffect(() => {
-    if (!loaded) return;
+    // Patterns that could not be read are still there: saving now would put nothing over them.
+    if (!loaded || unread.current) return;
     AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(patterns)).catch(() => undefined);
   }, [loaded, patterns]);
 

@@ -11,6 +11,7 @@ import {
   useState,
 } from 'react';
 import {
+  Keyboard,
   Pressable,
   ScrollView as NativeScrollView,
   StyleSheet,
@@ -50,7 +51,7 @@ import { DeckleEdge } from './DeckleEdge';
 import { Finial, hasFinial } from './Finial';
 import { PaperOverlay } from './PaperOverlay';
 import { ROLL_LIGHT, ROLL_LIGHT_AT, Roller, ROLLER_HEIGHT } from './Roller';
-import { RowInput } from './RowInput';
+import { RowInput, type RowInputHandle } from './RowInput';
 import { LineArt } from './LineArt';
 import { LEAD_WIDTH, type Lead, RowLead } from './RowLead';
 import { SWEEP_MS, SwipeRow } from './SwipeRow';
@@ -79,14 +80,6 @@ export const STAMP_DELAY_MS = 350;
 const CHAR_WIDTH = 9.2;
 
 type PullAction = 'none' | 'create' | 'back';
-
-/**
- * A heading's painted initial is its first letter, so the word beside it carries on from the second:
- * "S" then "triking", as an illuminated initial works. A heading that does not open with a letter,
- * or is a single character, is written out whole.
- */
-const headingAfterInitial = (row: { text: string; section?: boolean }, isShelf: boolean) =>
-  !isShelf && row.section && row.text.length > 1 && /^\p{L}/u.test(row.text) ? row.text.slice(1) : row.text;
 
 const pullLabels = {
   none: 'Pull to add',
@@ -572,6 +565,17 @@ export const GestureList: FC<GestureListProps> = ({
   const paperFor = (index: number, done = false) =>
     paperAt(colors, index + (addIndex !== null && index >= addIndex ? 1 : 0), paperTotal, done);
 
+  const inputHandle = useRef<RowInputHandle | null>(null);
+  // A touch on bare desk or paper while a row is being written finishes it: what was written is kept, a blank is put away.
+  const touchBare = () => {
+    if (addIndex !== null) {
+      inputHandle.current?.finish();
+      Keyboard.dismiss();
+      return;
+    }
+    if (!deskIsQuiet) press(() => setAddIndex(endIndex));
+  };
+
   // On a shelf with scrolls on it the bare desk does nothing when touched: a scroll is added with the quill or by
   // pulling down. An empty shelf still takes a touch, and so does the paper below a scroll's last line.
   const deskIsQuiet = isShelf && rowCount > 0;
@@ -585,6 +589,7 @@ export const GestureList: FC<GestureListProps> = ({
         placeholder={placeholder}
         rolled={isShelf}
         laid={pulledIn}
+        handleRef={inputHandle}
         onLines={addLines}
         onEnd={endAdd}
       />
@@ -611,7 +616,7 @@ export const GestureList: FC<GestureListProps> = ({
             maxFontSizeMultiplier={MAX_TEXT_SCALE}
           >
             {rubricated[index] ? <Text style={styles.rubric}>{row.text.charAt(0)}</Text> : null}
-            {rubricated[index] ? row.text.slice(1) : headingAfterInitial(row, isShelf)}
+            {rubricated[index] ? row.text.slice(1) : row.text}
           </Text>
         )}
         {row.sealed ? (
@@ -815,8 +820,8 @@ export const GestureList: FC<GestureListProps> = ({
                 accessibilityRole={deskIsQuiet ? undefined : 'button'}
                 accessibilityLabel={deskIsQuiet ? undefined : isShelf ? 'Add a scroll' : 'Add a row'}
                 accessible={!deskIsQuiet}
-                disabled={busy || deskIsQuiet}
-                onPress={() => press(() => setAddIndex(endIndex))}
+                disabled={addIndex === null && (busy || deskIsQuiet)}
+                onPress={touchBare}
               >
                 {rowCount === 0 && !busy && drawings['empty-shelf'] ? (
                   <LineArt
@@ -840,7 +845,7 @@ export const GestureList: FC<GestureListProps> = ({
                 <Roller paper={colors.paperTo} />
               </View>
             )}
-            <Pressable style={styles.tapZone} accessible={false} disabled={busy || deskIsQuiet} onPress={() => press(() => setAddIndex(endIndex))} />
+            <Pressable style={styles.tapZone} accessible={false} disabled={addIndex === null && (busy || deskIsQuiet)} onPress={touchBare} />
           </ScrollView>
           </Animated.View>
         </View>

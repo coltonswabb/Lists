@@ -1,4 +1,4 @@
-import { type ComponentRef, type FC, useEffect, useRef, useState } from 'react';
+import { type ComponentRef, type FC, type RefObject, useEffect, useRef, useState } from 'react';
 import { LinearGradient } from 'expo-linear-gradient';
 import { StyleSheet, TextInput, View } from 'react-native';
 import Animated, { Easing, FadeIn, FadeInDown } from 'react-native-reanimated';
@@ -9,6 +9,8 @@ import { Finial, hasFinial } from './Finial';
 import { ROLL_LIGHT, ROLL_LIGHT_AT } from './Roller';
 import { type Lead, RowLead } from './RowLead';
 
+export type RowInputHandle = { finish: () => void };
+
 type RowInputProps = {
   /** What to show in the margin for the text typed so far. */
   leadFor: (text: string) => Lead;
@@ -18,6 +20,8 @@ type RowInputProps = {
   initialText?: string;
   /** Drawn as a rolled scroll on the shelf rather than as a line on a sheet. */
   rolled?: boolean;
+  /** Filled in while the input is open with a way to finish it from outside, as a touch elsewhere on the desk does. */
+  handleRef?: RefObject<RowInputHandle | null>;
   /** Already lying in its place, as a scroll pulled down by hand is: it only needs to appear, not to be set down again. */
   laid?: boolean;
   /**
@@ -29,7 +33,7 @@ type RowInputProps = {
   onEnd: (remaining: string) => void;
 };
 
-export const RowInput: FC<RowInputProps> = ({ leadFor, paper, placeholder, initialText = '', rolled = false, laid = false, onLines, onEnd }) => {
+export const RowInput: FC<RowInputProps> = ({ leadFor, paper, placeholder, initialText = '', rolled = false, laid = false, handleRef, onLines, onEnd }) => {
   const { colors, styles } = useTheme(makeStyles);
   const [text, setText] = useState(initialText);
   // What the input holds right now. On iOS a second Return can arrive before a re-render has cleared
@@ -63,6 +67,17 @@ export const RowInput: FC<RowInputProps> = ({ leadFor, paper, placeholder, initi
     ended.current = true;
     onEnd(remaining.trim());
   };
+
+  // Finishing from outside keeps what was written and puts a blank row away, focused or not.
+  useEffect(() => {
+    if (!handleRef) return;
+    handleRef.current = { finish: () => end(latest.current) };
+    return () => {
+      handleRef.current = null;
+    };
+    // `end` reads only refs and the latest onEnd is wanted at the moment of finishing.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [handleRef, onEnd]);
 
   // Return submits rather than inserting a line break; finished lines leave the input at once.
   const submit = () => {

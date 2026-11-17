@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { capitalize, describeDay } from './calendar';
 import { parseReminder } from './reminder';
+import { readKept } from './storage';
 import type { ChronicleEntry, Item, List, SealedList } from './types';
 
 const STORAGE_KEY = 'lists/v1';
@@ -290,16 +291,14 @@ export const useLists = () => {
   const [loaded, setLoaded] = useState(false);
   const [undo, setUndo] = useState<Undo | null>(null);
   const current = useRef<Kept>(kept);
+  const unread = useRef({ lists: false, chronicle: false });
 
   useEffect(() => {
-    Promise.all([
-      AsyncStorage.getItem(STORAGE_KEY)
-        .then(parseLists)
-        .catch((): List[] => []),
-      AsyncStorage.getItem(CHRONICLE_KEY)
-        .then(parseChronicle)
-        .catch((): Chronicle => ({ entries: [], sealed: [] })),
-    ]).then(([lists, chronicle]) => {
+    Promise.all([readKept(STORAGE_KEY), readKept(CHRONICLE_KEY)]).then(([keptLists, keptChronicle]) => {
+      // Whatever could not be read is still there, and is not saved over this launch.
+      unread.current = { lists: keptLists.failed, chronicle: keptChronicle.failed };
+      const lists = keptLists.failed ? [] : parseLists(keptLists.raw);
+      const chronicle = keptChronicle.failed ? { entries: [], sealed: [] } : parseChronicle(keptChronicle.raw);
       const stored = { lists: renewDue(lists), ...chronicle };
       current.current = stored;
       setKept(stored);
@@ -308,12 +307,12 @@ export const useLists = () => {
   }, []);
 
   useEffect(() => {
-    if (!loaded) return;
+    if (!loaded || unread.current.lists) return;
     AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(kept.lists)).catch(() => undefined);
   }, [kept.lists, loaded]);
 
   useEffect(() => {
-    if (!loaded) return;
+    if (!loaded || unread.current.chronicle) return;
     AsyncStorage.setItem(CHRONICLE_KEY, JSON.stringify({ entries: kept.entries, sealed: kept.sealed })).catch(
       () => undefined,
     );
