@@ -234,6 +234,8 @@ export const GestureList: FC<GestureListProps> = ({
   const [addIndex, setAddIndex] = useState<number | null>(null);
   // The row being added was pulled down by hand, so it is already lying where it belongs.
   const [pulledIn, setPulledIn] = useState(false);
+  /** The pulled-down row has become the row being written: its own space is no longer drawn. */
+  const handedOver = pulledIn && addIndex !== null;
   const [editingId, setEditingId] = useState<string | null>(null);
   const [titleDraft, setTitleDraft] = useState<string | null>(null);
   const [pullAction, setPullAction] = useState<PullAction>('none');
@@ -491,9 +493,17 @@ export const GestureList: FC<GestureListProps> = ({
       'worklet';
       const action = event.canceled ? 'none' : armed.value;
       armed.value = 'none';
-      // The input row takes the pulled row's place, so snap instead of springing back.
+      if (action === 'create') {
+        // The pulled space settles to exactly one row's height and stays open. Only then is the row to write in
+        // put in its place, in the same stroke as the space is taken away, so nothing beneath it moves and it is
+        // never seen sliding under the rows it was pulled down over.
+        pull.value = withTiming(ROW_HEIGHT, { duration: 110, easing: Easing.out(Easing.cubic) }, () => {
+          scheduleOnRN(release, action);
+        });
+        return;
+      }
       // Let go early, the paper is drawn back without a bounce.
-      pull.value = action === 'create' ? 0 : withTiming(0, { duration: 240, easing: Easing.out(Easing.cubic) });
+      pull.value = withTiming(0, { duration: 240, easing: Easing.out(Easing.cubic) });
       scheduleOnRN(release, action);
     },
   });
@@ -615,6 +625,8 @@ export const GestureList: FC<GestureListProps> = ({
       play('quill');
       onAdd([remaining], addIndex);
     }
+    // The pull is spent: put back to nothing while its space is still not drawn, before that space returns.
+    pull.set(0);
     setAddIndex(null);
     setPulledIn(false);
   };
@@ -857,7 +869,7 @@ export const GestureList: FC<GestureListProps> = ({
       )}
       <GestureDetector gesture={gesture}>
         <View style={[styles.viewport, footRoom > 0 && { marginBottom: footRoom }]}>
-          {isShelf ? (
+          {isShelf && !handedOver ? (
             <Animated.View pointerEvents="none" style={[styles.descending, descendingStyle]}>
               <View style={styles.rolledScroll}>
                 {hasFinial(colors.name) ? <Finial paper={colors.name} side="left" length={34} tuck={18} /> : null}
@@ -878,9 +890,9 @@ export const GestureList: FC<GestureListProps> = ({
             simultaneousWith={alongsideScroll}
             bounces={false}
             overScrollMode="never"
-            // While something is being written, a touch anywhere else on the list only puts the keyboard away,
-            // which finishes the row: what was written is kept, a blank is dropped. Otherwise touches go where they land.
-            keyboardShouldPersistTaps={busy ? 'never' : 'handled'}
+            // A touch that lands on nothing puts the keyboard away, which finishes the row being written. A touch on a
+            // row, on bare paper or on the desk is taken by that thing, which finishes the row itself: one touch either way.
+            keyboardShouldPersistTaps="handled"
             automaticallyAdjustKeyboardInsets
             scrollEnabled={!dragging}
             scrollEventThrottle={16}
@@ -911,11 +923,14 @@ export const GestureList: FC<GestureListProps> = ({
                 if (!isShelf && Math.abs(tall - sheetTall) > 2) setSheetTall(tall);
               }}
             >
-              <Animated.View style={[styles.pullSpace, pullSpaceStyle]}>
-                <Animated.View style={[styles.pullRow, pullRowStyle]}>
-                  <Text style={styles.pullText}>{pullLabels[pullAction]}</Text>
+              {/* Once the pulled row has been handed over to the row being written, its space is gone with it. */}
+              {handedOver ? null : (
+                <Animated.View style={[styles.pullSpace, pullSpaceStyle]}>
+                  <Animated.View style={[styles.pullRow, pullRowStyle]}>
+                    <Text style={styles.pullText}>{pullLabels[pullAction]}</Text>
+                  </Animated.View>
                 </Animated.View>
-              </Animated.View>
+              )}
 
               {rows.flatMap((row, index) => [
                 addIndex === index ? input : null,
