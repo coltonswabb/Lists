@@ -941,7 +941,7 @@ export const GestureList: FC<GestureListProps> = ({
         ) : null}
         {titleDraft === null ? (
           <Pressable style={styles.fill} disabled={!onRenameTitle || busy} onPress={() => setTitleDraft(title)}>
-            <Text style={styles.title} numberOfLines={1} maxFontSizeMultiplier={MAX_TEXT_SCALE}>
+            <Text style={styles.title} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75} maxFontSizeMultiplier={MAX_TEXT_SCALE}>
               {title}
             </Text>
           </Pressable>

@@ -92,7 +92,7 @@ export const standing = {
   },
   dust: (scroll: string, to: Address) => `“${scroll}” gathers dust, ${addresses[to]}.`,
   decree: (to: Address) => `What is thy decree, ${addresses[to]}?`,
-  morrow: (to: Address) => `What of the morrow, ${addresses[to]}?`,
+  morrow: (to: Address) => `What shall be done tomorrow, ${addresses[to]}?`,
   blank: (to: Address) => `The page awaits, ${addresses[to]}.`,
   done: (to: Address) => `All is done, ${addresses[to]}.`,
 } as const;

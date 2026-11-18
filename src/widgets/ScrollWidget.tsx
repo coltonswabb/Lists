@@ -80,7 +80,7 @@ const ScrollWidget = (props: ScrollWidgetProps, environment: { widgetFamily?: st
   // narrower than the rod that deepens toward its foot, a red rule down its margin, and a second rod at the foot.
   const paperTo = props.paperTo ?? props.paper;
   const desk = props.desk ?? '#181614';
-  const title = props.title && props.title.length > 0 ? props.title : 'Library';
+  const title = props.title && props.title.length > 0 ? props.title : 'Today’s Decree';
   const gilt = '#c9a44e';
   const small = family === 'systemSmall';
   const lineStyle = font({ size: small ? 13 : 14, design: 'serif' });

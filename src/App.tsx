@@ -734,7 +734,8 @@ const Screens: FC<{ settings: Settings; address: Address; night: boolean; onCand
         key="shelf"
         actions={shelf}
         // By night the shelf is for planning, and says so.
-        title={night ? 'The Morrow' : 'Library'}
+        // What the shelf is for: the day's work by day, and by candlelight the planning of the next.
+        title={night ? 'Plan the Morrow' : 'Today’s Decree'}
         // Latin for scrolls; one scroll is a rotulus. By night, Latin for "for tomorrow".
         readout={night ? 'IN CRASTINUM' : `${roman(shelfLists.length)} ${shelfLists.length === 1 ? 'ROTULUS' : 'ROTULI'}`}
         variant="shelf"
