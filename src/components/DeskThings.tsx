@@ -14,40 +14,39 @@ import Animated, {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Defs, Ellipse, Path, RadialGradient, Stop } from 'react-native-svg';
 
-import { deskProps } from '../art';
+import { nearProps } from '../art';
 import { usePaneWidth } from '../PaneWidth';
 import { ROW_HEIGHT } from '../theme';
 
 /**
- * The things stand close, on the near edge of the desk: large, and running off the sides of the screen, as
- * things nearest the eye do. Their widths, and how far each is let run off its side.
+ * The things stand close, at the foot of the screen: large, and running off its corners, as things nearest
+ * the eye do. Their sizes, and how far each is let run off its side.
  */
-const CANDLE = 112;
-const INKWELL = 176;
-const CANDLE_OFF = 22;
-const INKWELL_OFF = 36;
-/** How much of each is let sink below the foot of the screen: the candlestick's feet, and the lower part of the pot. */
-const CANDLE_SINK = 0.2;
-const INKWELL_SINK = 0.08;
-/** How much larger than they were first drawn, which the flame, its glow and its smoke follow. */
-const GROWN = CANDLE / 58;
+const CANDLE = 118;
+const INKPOT = 138;
+const QUILL = 168;
+const CANDLE_OFF = 18;
+const INKWELL_OFF = 30;
+/** How much of each is let sink below the foot of the screen: the candlestick's pan, and the belly of the pot. */
+const CANDLE_SINK = 0.12;
+const INKPOT_SINK = 0.3;
 /** How far the things rise above the labels at the desk's foot, and what stands over the first scroll. */
-const HEIGHT = 96;
+const HEIGHT = 150;
 const HEADER = 110;
 /** The height the labels take at the foot of the shelf, above the bottom inset: two short rows. */
 export const FOOT = 76;
 
-/** Where the wick ends on the candle's painting, as fractions of its width and height. */
-const WICK = { x: 0.575, y: 0.11 };
-const FLAME = { width: 15 * GROWN, height: 30 * GROWN };
-const GLOW = 120 * GROWN;
-const SMOKE = { width: 14 * GROWN, height: 42 * GROWN };
+/** On the candle's painting: where its wick stands, as fractions of its width and height. */
+const WICK = { x: 0.405, y: 0.165 };
+/** The flame is painted with its own wick at its foot, which is set over the candle's. Its size, and its glow. */
+const FLAME = { width: 21, height: 21 * (480 / 146) };
+const GLOW = 210;
+const SMOKE = { width: 22, height: 66 };
 
-/** On the inkwell's painting: the line above which there is only feather, and where the quill meets the ink. */
-const FEATHER_ABOVE = 0.545;
-const NIB = { x: 0.295, y: 0.625 };
-/** Space round the feather so it is not cut off as it swings. */
-const SWING = 16 * (INKWELL / 92);
+/** On the inkpot's painting: the middle of its mouth, where the quill stands in the ink. */
+const MOUTH = { x: 0.47, y: 0.14 };
+/** On the quill's painting, as painted (leaning right): where its nib is. It is turned over about this point. */
+const NIB = { x: 0.05, y: 0.99 };
 
 /** Whether the shelf holds too many scrolls for the things to stand below them at their full size. */
 export const isCrowded = (screen: number, top: number, bottom: number, scrolls: number) =>
@@ -81,7 +80,7 @@ export const DeskThings: FC<DeskThingsProps> = ({ onPen, onCandle, night }) => {
   // whole at that edge, and only runs off a real edge of the screen.
   const { width: windowWidth } = useWindowDimensions();
   const atScreenEdge = usePaneWidth() >= windowWidth - 1;
-  const { inkwell, candle } = deskProps;
+  const { candle, flame, inkpot, quill } = nearProps;
 
   // Two slow waves of different lengths never quite line up, so the flame doesn't visibly loop.
   const waver = useSharedValue(0);
@@ -132,8 +131,10 @@ export const DeskThings: FC<DeskThingsProps> = ({ onPen, onCandle, night }) => {
     transform: [{ translateY: -smoke.value * 12 }, { translateX: smoke.value * 3 }, { scale: 0.8 + smoke.value * 0.45 }],
   }));
   const featherStyle = useAnimatedStyle(() => ({
-    transform: [{ translateY: dip.value * 3 }, { rotate: `${dip.value * -9}deg` }],
+    // Turned over so it leans in from the corner, and dipped into the ink and out again when touched.
+    transform: [{ scaleX: -1 }, { translateY: dip.value * 5 }, { rotate: `${dip.value * 9}deg` }],
   }));
+  const warmthStyle = useAnimatedStyle(() => ({ opacity: lit.value * (0.22 + flutter.value * 0.05 + waver.value * 0.04) }));
 
 
   const pen = () => {
@@ -151,8 +152,12 @@ export const DeskThings: FC<DeskThingsProps> = ({ onPen, onCandle, night }) => {
   };
 
   const candleHeight = candle ? (CANDLE * candle.height) / candle.width : 0;
-  const inkHeight = inkwell ? (INKWELL * inkwell.height) / inkwell.width : 0;
-  const split = inkHeight * FEATHER_ABOVE;
+  const potHeight = inkpot ? (INKPOT * inkpot.height) / inkpot.width : 0;
+  const quillWidth = quill ? (QUILL * quill.width) / quill.height : 0;
+  // The quill's nib rests in the pot's mouth; the pot is drawn over it, so only what rises above the rim is seen.
+  const nib = { x: INKPOT * MOUTH.x, y: QUILL * NIB.y };
+  const potTop = nib.y - potHeight * MOUTH.y;
+  const inkwellHeight = potTop + potHeight;
 
   return (
     <View pointerEvents="box-none" style={StyleSheet.absoluteFill}>
@@ -173,15 +178,15 @@ export const DeskThings: FC<DeskThingsProps> = ({ onPen, onCandle, night }) => {
           accessibilityState={{ checked: night }}
           style={{ width: CANDLE, height: candleHeight, marginBottom: -candleHeight * CANDLE_SINK }}
         >
-          <GroundShadow width={CANDLE * 1.7} left={-CANDLE * 0.35} top={candleHeight - 13} />
           <Animated.View
-            style={[styles.glow, { left: CANDLE * WICK.x - GLOW / 2, top: candleHeight * WICK.y - GLOW / 2 - FLAME.height / 2 }, glowStyle]}
+            pointerEvents="none"
+            style={[styles.glow, { left: CANDLE * WICK.x - GLOW / 2, top: candleHeight * WICK.y - GLOW / 2 - FLAME.height * 0.45 }, glowStyle]}
           >
             <Svg width={GLOW} height={GLOW}>
               <Defs>
                 <RadialGradient id="glow" cx="50%" cy="50%" r="50%">
-                  <Stop offset="0" stopColor="#ffb648" stopOpacity={0.42} />
-                  <Stop offset="0.45" stopColor="#ff9a2e" stopOpacity={0.14} />
+                  <Stop offset="0" stopColor="#ffb648" stopOpacity={0.4} />
+                  <Stop offset="0.45" stopColor="#ff9a2e" stopOpacity={0.12} />
                   <Stop offset="1" stopColor="#ff8a1e" stopOpacity={0} />
                 </RadialGradient>
               </Defs>
@@ -189,30 +194,30 @@ export const DeskThings: FC<DeskThingsProps> = ({ onPen, onCandle, night }) => {
             </Svg>
           </Animated.View>
           <Image source={candle.source} style={{ width: CANDLE, height: candleHeight }} />
-          <Animated.View
-            style={[
-              styles.flame,
-              { left: CANDLE * WICK.x - FLAME.width / 2, top: candleHeight * WICK.y - FLAME.height + 3, transformOrigin: [FLAME.width / 2, FLAME.height, 0] },
-              flameStyle,
-            ]}
-          >
-            <Svg width={FLAME.width} height={FLAME.height} viewBox="0 0 30 60">
-              <Defs>
-                <RadialGradient id="flame" cx="50%" cy="72%" r="60%">
-                  <Stop offset="0" stopColor="#fff6d6" />
-                  <Stop offset="0.35" stopColor="#ffd45e" />
-                  <Stop offset="0.8" stopColor="#ff9320" />
-                  <Stop offset="1" stopColor="#e2570f" stopOpacity={0.85} />
-                </RadialGradient>
-              </Defs>
-              {/* A teardrop leaning a little, as a flame does: full at the foot, drawn to a point. */}
-              <Path d="M15 1 C 17 15, 28 26, 27 41 C 26 52, 21 59, 15 59 C 9 59, 4 52, 3 41 C 2 28, 12 17, 15 1 Z" fill="url(#flame)" />
-              <Path d="M15 34 C 17 40, 21 44, 20 50 C 19 55, 17 57, 15 57 C 13 57, 11 55, 10 50 C 9 45, 13 40, 15 34 Z" fill="#5a78c8" opacity={0.35} />
-            </Svg>
-          </Animated.View>
+          {/* By night the candle's light falls warm across its own wax and iron. */}
+          <Animated.Image
+            source={candle.source}
+            style={[styles.warmth, { width: CANDLE, height: candleHeight, tintColor: '#ffa04a' }, warmthStyle]}
+          />
+          {flame ? (
+            <Animated.Image
+              source={flame.source}
+              style={[
+                styles.flame,
+                {
+                  width: FLAME.width,
+                  height: FLAME.height,
+                  left: CANDLE * WICK.x - FLAME.width / 2,
+                  top: candleHeight * WICK.y - FLAME.height * 0.97,
+                  transformOrigin: [FLAME.width / 2, FLAME.height * 0.97, 0],
+                },
+                flameStyle,
+              ]}
+            />
+          ) : null}
           <Animated.View
             pointerEvents="none"
-            style={[styles.smoke, { left: CANDLE * WICK.x - SMOKE.width / 2 - 2, top: candleHeight * WICK.y - SMOKE.height + 3 }, smokeStyle]}
+            style={[styles.smoke, { left: CANDLE * WICK.x - SMOKE.width / 2, top: candleHeight * WICK.y - SMOKE.height }, smokeStyle]}
           >
             <Svg width={SMOKE.width} height={SMOKE.height} viewBox="0 0 20 60">
               {/* A broad faint haze about a thin bright thread, so it reads as smoke and not a drawn line. */}
@@ -224,28 +229,30 @@ export const DeskThings: FC<DeskThingsProps> = ({ onPen, onCandle, night }) => {
       ) : (
         <View />
       )}
-      {inkwell ? (
+      {inkpot && quill ? (
         <Pressable
           onPress={pen}
           hitSlop={10}
           accessibilityRole="button"
           accessibilityLabel="Pen a new scroll"
-          style={{ width: INKWELL, height: inkHeight, marginBottom: -inkHeight * INKWELL_SINK }}
+          style={{ width: INKPOT, height: inkwellHeight, marginBottom: -potHeight * INKPOT_SINK }}
         >
-          <GroundShadow width={INKWELL * 0.95} left={-INKWELL * 0.12} top={inkHeight - 14} />
-          {/* The pot stays put; only the feather above its rim moves, hinged where the quill meets the ink. */}
-          <View style={[styles.clip, { top: split, height: inkHeight - split, width: INKWELL }]}>
-            <Image source={inkwell.source} style={{ width: INKWELL, height: inkHeight, marginTop: -split }} />
-          </View>
-          <View style={[styles.clip, { top: -SWING, left: -SWING, height: split + SWING, width: INKWELL + SWING * 2 }]}>
-            <Animated.Image
-              source={inkwell.source}
-              style={[
-                { width: INKWELL, height: inkHeight, marginTop: SWING, marginLeft: SWING, transformOrigin: [INKWELL * NIB.x, inkHeight * NIB.y, 0] },
-                featherStyle,
-              ]}
-            />
-          </View>
+          {/* The quill stands in the ink, turned to lean toward the middle of the screen, hinged at its nib. */}
+          <Animated.Image
+            source={quill.source}
+            style={[
+              styles.quill,
+              {
+                width: quillWidth,
+                height: QUILL,
+                left: nib.x - quillWidth * NIB.x,
+                top: nib.y - QUILL * NIB.y,
+                transformOrigin: [quillWidth * NIB.x, QUILL * NIB.y, 0],
+              },
+              featherStyle,
+            ]}
+          />
+          <Image source={inkpot.source} style={[styles.pot, { top: potTop, width: INKPOT, height: potHeight }]} />
         </Pressable>
       ) : null}
     </View>
@@ -256,30 +263,7 @@ export const DeskThings: FC<DeskThingsProps> = ({ onPen, onCandle, night }) => {
   );
 };
 
-/**
- * The shadow a thing standing on the desk throws round its foot: darkest where it touches the wood and gone
- * within a hand's breadth. Without it, a thing lit from above looks as if it hangs over the desk.
- */
-const GroundShadow: FC<{ width: number; left: number; top: number }> = ({ width, left, top }) => {
-  const height = Math.round(width * 0.3);
-  return (
-    <View pointerEvents="none" style={[styles.shadow, { width, height, left, top }]}>
-      <Svg width={width} height={height}>
-        <Defs>
-          <RadialGradient id="ground" cx="50%" cy="50%" r="50%">
-            <Stop offset="0" stopColor="#000000" stopOpacity={0.62} />
-            <Stop offset="0.55" stopColor="#000000" stopOpacity={0.3} />
-            <Stop offset="1" stopColor="#000000" stopOpacity={0} />
-          </RadialGradient>
-        </Defs>
-        <Ellipse cx={width / 2} cy={height / 2} rx={width / 2} ry={height / 2} fill="url(#ground)" />
-      </Svg>
-    </View>
-  );
-};
-
 const styles = StyleSheet.create({
-  shadow: { position: 'absolute' },
   footShade: { position: 'absolute', left: 0, right: 0, bottom: 0 },
   things: {
     position: 'absolute',
@@ -289,6 +273,9 @@ const styles = StyleSheet.create({
   },
   glow: { position: 'absolute', width: GLOW, height: GLOW },
   smoke: { position: 'absolute', width: SMOKE.width, height: SMOKE.height },
-  flame: { position: 'absolute', width: FLAME.width, height: FLAME.height },
-  clip: { position: 'absolute', overflow: 'hidden' },
+  flame: { position: 'absolute' },
+  quill: { position: 'absolute' },
+  pot: { position: 'absolute', left: 0 },
+  // Lit only where there is wax and iron: the painting itself, coloured, laid over the painting.
+  warmth: { position: 'absolute', left: 0, top: 0 },
 });

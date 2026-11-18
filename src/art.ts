@@ -124,6 +124,14 @@ export const deskProps: Partial<Record<'inkwell' | 'candle', Drawing>> = {
   candle: { source: require('../assets/art/desk-candle.png'), width: 251, height: 420 },
 };
 
+/** The scribe's things painted close, as they stand at the foot of the screen: the flame and quill apart, to move. */
+export const nearProps: Partial<Record<'candle' | 'flame' | 'inkpot' | 'quill', Drawing>> = {
+  candle: { source: require('../assets/art/near-candle.png'), width: 600, height: 900 },
+  flame: { source: require('../assets/art/near-flame.png'), width: 146, height: 480 },
+  inkpot: { source: require('../assets/art/near-inkpot.png'), width: 900, height: 793 },
+  quill: { source: require('../assets/art/near-quill.png'), width: 365, height: 1100 },
+};
+
 /** The sun and the moon, in their own colours, for the turn of day and night. */
 export const celestial: Partial<Record<'sun' | 'moon', Drawing>> = {
   sun: { source: require('../assets/art/sky-sun.png'), width: 634, height: 640 },

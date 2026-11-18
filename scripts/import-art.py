@@ -55,7 +55,7 @@ MARGIN = re.compile(r"^margin-\d+$")
 EMBLEM_THICKEN = 5
 LINE_ART = re.compile(rf"^(margin-\d+|kind-({'|'.join(KINDS)})|border-({PAPERS})|initial-({PAPERS})|margin-({PAPERS})-\d+|" + "|".join(SINGLES) + r")$")
 # Painted objects cut out of a white ground, and the longest side each is scaled to.
-OBJECTS = {"wax-seal": 192, "wax-seal-blank": 300, "finial-brass": 200, "finial-iron": 200, "desk-inkwell": 480, "desk-candle": 420, "sky-sun": 640, "sky-moon": 560}
+OBJECTS = {"near-quill": 1100, "wax-seal": 192, "wax-seal-blank": 300, "finial-brass": 200, "finial-iron": 200, "desk-inkwell": 480, "desk-candle": 420, "sky-sun": 640, "sky-moon": 560}
 # Full-bleed paintings behind the turn of day and night, kept as JPEGs: they have no transparency and are large.
 SKIES = ("sky-night", "sky-dawn")
 SKY_HEIGHT = 1280
@@ -191,6 +191,63 @@ def key_object(source, target, size):
         for x, y in rim:
             cleared[y * width + x] = 1
             pixels[y][x * 4 + 3] = 0
+    w, h, cropped = trim(width, height, pixels)
+    write_png(target, w, h, cropped)
+    subprocess.run(["sips", "-Z", str(size), str(target)], check=True, capture_output=True)
+
+
+# Painted objects that arrive already cut out on transparency, and the longest side each is scaled to.
+CUTOUTS = {"near-candle": 900, "near-flame": 480, "near-inkpot": 900}
+# Below this alpha a pixel is not counted as part of the object when finding it.
+CUTOUT_SOLID = 40
+# How far beyond the object's solid body its soft edge is kept, in source pixels.
+CUTOUT_EDGE = 8
+
+
+def clean_cutout(source, target, size):
+    """Keeps only the object in an image already cut out on transparency.
+
+    Image generators leave specks of colour scattered over the transparent ground. The object is the largest
+    solid region; everything further than a few pixels from it is cleared, which keeps its soft edges.
+    """
+    width, height, channels, rows = load(source)
+    assert channels == 4, f"{source.name} has no transparency to clean"
+    solid = bytearray(width * height)
+    for y, row in enumerate(rows):
+        for x in range(width):
+            if row[x * 4 + 3] > CUTOUT_SOLID:
+                solid[y * width + x] = 1
+    # The largest region of solid pixels, joined edge to edge.
+    seen = bytearray(width * height)
+    best = []
+    for start in range(width * height):
+        if not solid[start] or seen[start]:
+            continue
+        region, stack = [], [start]
+        seen[start] = 1
+        while stack:
+            at = stack.pop()
+            region.append(at)
+            x, y = at % width, at // width
+            for nx, ny in ((x + 1, y), (x - 1, y), (x, y + 1), (x, y - 1)):
+                if 0 <= nx < width and 0 <= ny < height:
+                    near = ny * width + nx
+                    if solid[near] and not seen[near]:
+                        seen[near] = 1
+                        stack.append(near)
+        if len(region) > len(best):
+            best = region
+    body = [bytearray(width) for _ in range(height)]
+    for at in best:
+        body[at // width][at % width] = 255
+    kept = thickened(body, width, CUTOUT_EDGE)
+    pixels = []
+    for y, row in enumerate(rows):
+        out = bytearray(width * 4)
+        for x in range(width):
+            if kept[y][x]:
+                out[x * 4 : x * 4 + 4] = row[x * 4 : x * 4 + 4]
+        pixels.append(out)
     w, h, cropped = trim(width, height, pixels)
     write_png(target, w, h, cropped)
     subprocess.run(["sips", "-Z", str(size), str(target)], check=True, capture_output=True)
@@ -368,6 +425,11 @@ def write_module(drawings):
         if name in drawings:
             lines.append(f"  {name[5:]}: {entry(name, *drawings[name])},")
     lines.append("};")
+    lines += ["", "/** The scribe's things painted close, as they stand at the foot of the screen: the flame and quill apart, to move. */", "export const nearProps: Partial<Record<'candle' | 'flame' | 'inkpot' | 'quill', Drawing>> = {"]
+    for name in ("near-candle", "near-flame", "near-inkpot", "near-quill"):
+        if name in drawings:
+            lines.append(f"  {name[5:]}: {entry(name, *drawings[name])},")
+    lines.append("};")
     lines += ["", "/** The sun and the moon, in their own colours, for the turn of day and night. */", "export const celestial: Partial<Record<'sun' | 'moon', Drawing>> = {"]
     for name in ("sky-sun", "sky-moon"):
         if name in drawings:
@@ -418,6 +480,8 @@ def main():
             continue
         elif name in OBJECTS:
             key_object(source, target, OBJECTS[name])
+        elif name in CUTOUTS:
+            clean_cutout(source, target, CUTOUTS[name])
         elif name == "deckle-edge":
             deckle_strip(source, target)
         elif name == "parchment":
