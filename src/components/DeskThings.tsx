@@ -27,7 +27,7 @@ const CANDLE = 118;
 const INKPOT = 112;
 const QUILL = 262;
 const CANDLE_OFF = 18;
-const INKWELL_OFF = 34;
+const INKWELL_OFF = 0;
 /** How much of each is let sink below the foot of the screen: the candlestick's pan, and the belly of the pot. */
 const CANDLE_SINK = 0.12;
 const INKPOT_SINK = 0.34;
@@ -50,9 +50,9 @@ const SMOKE = { width: 22, height: 66 };
  */
 const MOUTH = { x: 0.5, y: 0.27 };
 const INK_LINE = 0.2;
-/** How much further it leans than it was painted, so it reaches in over the desk rather than standing up the screen. */
-const QUILL_LEAN = 14;
-/** On the quill's painting, as painted (leaning right): where its nib is. It is turned over about this point. */
+/** How much further it leans than it was painted: outward, toward the corner and off the side of the screen. */
+const QUILL_LEAN = 2;
+/** On the quill's painting, as painted (leaning right): where its nib is, which it turns about. */
 const NIB = { x: 0.05, y: 0.99 };
 
 /** Whether the shelf holds too many scrolls for the things to stand below them at their full size. */
@@ -138,8 +138,8 @@ export const DeskThings: FC<DeskThingsProps> = ({ onPen, onCandle, night }) => {
     transform: [{ translateY: -smoke.value * 12 }, { translateX: smoke.value * 3 }, { scale: 0.8 + smoke.value * 0.45 }],
   }));
   const featherStyle = useAnimatedStyle(() => ({
-    // Turned over so it leans in from the corner, and dipped into the ink and out again when touched.
-    transform: [{ scaleX: -1 }, { translateY: dip.value * 5 }, { rotate: `${QUILL_LEAN + dip.value * 9}deg` }],
+    // Leaning out toward the corner, and dipped into the ink and out again when touched.
+    transform: [{ translateY: dip.value * 5 }, { rotate: `${QUILL_LEAN - dip.value * 9}deg` }],
   }));
   const warmthStyle = useAnimatedStyle(() => ({ opacity: lit.value * (0.22 + flutter.value * 0.05 + waver.value * 0.04) }));
 
@@ -245,7 +245,7 @@ export const DeskThings: FC<DeskThingsProps> = ({ onPen, onCandle, night }) => {
           style={{ width: INKPOT, height: inkwellHeight, marginBottom: -potHeight * INKPOT_SINK }}
         >
           <Image source={inkpot.source} style={[styles.pot, { top: potTop, width: INKPOT, height: potHeight }]} />
-          {/* The quill stands in the ink, turned to lean toward the middle of the screen, hinged at its nib. */}
+          {/* The quill stands in the ink, leaning out toward the corner, hinged at its nib. */}
           <Animated.Image
             source={quill.source}
             style={[
