@@ -23,15 +23,16 @@ import { ROW_HEIGHT } from '../theme';
  * the eye do. Their sizes, and how far each is let run off its side.
  */
 const CANDLE = 118;
-const INKPOT = 138;
-const QUILL = 168;
+// A goose quill is three or four times the height of a small inkpot.
+const INKPOT = 112;
+const QUILL = 262;
 const CANDLE_OFF = 18;
-const INKWELL_OFF = 30;
+const INKWELL_OFF = 34;
 /** How much of each is let sink below the foot of the screen: the candlestick's pan, and the belly of the pot. */
 const CANDLE_SINK = 0.12;
-const INKPOT_SINK = 0.3;
+const INKPOT_SINK = 0.34;
 /** How far the things rise above the labels at the desk's foot, and what stands over the first scroll. */
-const HEIGHT = 150;
+const HEIGHT = 165;
 const HEADER = 110;
 /** The height the labels take at the foot of the shelf, above the bottom inset: two short rows. */
 export const FOOT = 76;
@@ -49,6 +50,8 @@ const SMOKE = { width: 22, height: 66 };
  */
 const MOUTH = { x: 0.5, y: 0.27 };
 const INK_LINE = 0.2;
+/** How much further it leans than it was painted, so it reaches in over the desk rather than standing up the screen. */
+const QUILL_LEAN = 14;
 /** On the quill's painting, as painted (leaning right): where its nib is. It is turned over about this point. */
 const NIB = { x: 0.05, y: 0.99 };
 
@@ -136,7 +139,7 @@ export const DeskThings: FC<DeskThingsProps> = ({ onPen, onCandle, night }) => {
   }));
   const featherStyle = useAnimatedStyle(() => ({
     // Turned over so it leans in from the corner, and dipped into the ink and out again when touched.
-    transform: [{ scaleX: -1 }, { translateY: dip.value * 5 }, { rotate: `${dip.value * 9}deg` }],
+    transform: [{ scaleX: -1 }, { translateY: dip.value * 5 }, { rotate: `${QUILL_LEAN + dip.value * 9}deg` }],
   }));
   const warmthStyle = useAnimatedStyle(() => ({ opacity: lit.value * (0.22 + flutter.value * 0.05 + waver.value * 0.04) }));
 
