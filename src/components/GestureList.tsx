@@ -62,7 +62,7 @@ import { LEAD_WIDTH, type Lead, RowLead } from './RowLead';
 import { SWEEP_MS, SwipeRow } from './SwipeRow';
 import { WaxSeal } from './WaxSeal';
 
-const PULL_RESISTANCE = 0.6;
+const PULL_RESISTANCE = 0.75;
 /** How long after writing is finished by a touch that the same touch is kept from also opening or striking what it landed on. */
 const FINISH_SWALLOW_MS = 450;
 /** How far the sheet must be lifted before letting go clears the finished rows: a deliberate pull, not a stray scroll. */
@@ -418,6 +418,15 @@ export const GestureList: FC<GestureListProps> = ({
   const beginPull = () => {
     pulling.current = true;
   };
+  /**
+   * A row is being pulled down at the head of a scroll. From the moment the pull starts the rows below take the
+   * tones they will have once the new row is in, so nothing changes colour when it is let go.
+   */
+  const [pullOpen, setPullOpen] = useState(false);
+  const beginPullDown = () => {
+    beginPull();
+    if (!isShelf) setPullOpen(true);
+  };
   const inputHandle = useRef<RowInputHandle | null>(null);
   /** Finishes whatever is being written, a new row or one being amended, and puts the keyboard away. */
   /** When writing was last finished by a touch: the rest of that touch, landing on a row or the paper, does no more. */
@@ -453,6 +462,7 @@ export const GestureList: FC<GestureListProps> = ({
       pulling.current = false;
     }, PRESS_GUARD_MS);
     setPullAction('none');
+    setPullOpen(false);
     if (action === 'create') {
       setPulledIn(true);
       setAddIndex(0);
@@ -490,7 +500,7 @@ export const GestureList: FC<GestureListProps> = ({
     failOffsetX: [-14, 14],
     onActivate: () => {
       'worklet';
-      scheduleOnRN(beginPull);
+      scheduleOnRN(beginPullDown);
     },
     onUpdate: (event) => {
       'worklet';
@@ -623,8 +633,9 @@ export const GestureList: FC<GestureListProps> = ({
     ],
   }));
   const pullRowStyle = useAnimatedStyle(() => ({
-    // On the shelf the descending scroll fills the space, so the paper's own prompt stays hidden.
-    opacity: isShelf ? 0 : interpolate(pull.value, [0, ROW_HEIGHT], [0.4, 1], 'clamp'),
+    // On the shelf the descending scroll fills the space, so the paper's own prompt stays hidden. On a scroll the
+    // pulled row is solid paper from the start: it is the row about to be written, not a ghost of one.
+    opacity: isShelf ? 0 : 1,
   }));
 
   // Each finished line becomes a row and the input moves below it, ready for the next one.
@@ -672,9 +683,11 @@ export const GestureList: FC<GestureListProps> = ({
   };
 
   // The paper shades down the scroll; a row being written takes its place in that run like any other.
-  const paperTotal = rowCount + (addIndex === null ? 0 : 1);
+  /** Where a new row is, or is about to be: the one being written, or the one being pulled down at the head. */
+  const openAt = addIndex ?? (pullOpen ? 0 : null);
+  const paperTotal = rowCount + (openAt === null ? 0 : 1);
   const paperFor = (index: number, done = false) =>
-    paperAt(colors, index + (addIndex !== null && index >= addIndex ? 1 : 0), paperTotal, done);
+    paperAt(colors, index + (openAt !== null && index >= openAt ? 1 : 0), paperTotal, done);
 
   // A touch on bare desk or paper while a row is being written finishes it: what was written is kept, a blank is put away.
   // Where a touch on bare desk or paper began, so that a drag across it is not taken for a tap.
@@ -952,8 +965,12 @@ export const GestureList: FC<GestureListProps> = ({
               {/* Once the pulled row has been handed over to the row being written, its space is gone with it. */}
               {handedOver ? null : (
                 <Animated.View style={[styles.pullSpace, pullSpaceStyle]}>
-                  <Animated.View style={[styles.pullRow, pullRowStyle]}>
-                    <Text style={styles.pullText}>{pullLabels[pullAction]}</Text>
+                  {/* Drawn as the row it becomes, on the same paper with the same mark, so letting go changes only its words. */}
+                  <Animated.View style={[styles.pullRow, { backgroundColor: paperAt(colors, 0, rowCount + 1) }, pullRowStyle]}>
+                    <RowLead lead={{ kind: 'label', label: '+', color: colors.accent }} />
+                    <Text style={styles.pullText} numberOfLines={1} maxFontSizeMultiplier={MAX_TEXT_SCALE}>
+                      {pullLabels[pullAction]}
+                    </Text>
                   </Animated.View>
                 </Animated.View>
               )}
@@ -1105,8 +1122,16 @@ const makeStyles = (colors: Palette) =>
     shadowOffset: { width: 0, height: 8 },
   },
   descendingText: { fontFamily: fonts.bodyItalic, opacity: 0.75 },
-  pullRow: { height: ROW_HEIGHT, justifyContent: 'center', paddingHorizontal: 16, backgroundColor: colors.accent },
-  pullText: { color: colors.paperFrom, fontFamily: fonts.bodyItalic, fontSize: 19 },
+  pullRow: {
+    height: ROW_HEIGHT,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.rule,
+  },
+  // As the empty row's own placeholder is written, so the words are all that change when it is let go.
+  pullText: { flex: 1, color: colors.inkFaded, fontFamily: fonts.body, fontSize: 21 },
   rolledScroll: { flex: 1, flexDirection: 'row', alignItems: 'center', marginHorizontal: -14 },
   collar: { width: 4, height: 54, borderRadius: 1, backgroundColor: colors.gold },
   knob: { width: 8, height: 8, borderRadius: 4, backgroundColor: colors.accent },

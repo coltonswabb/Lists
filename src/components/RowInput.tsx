@@ -11,7 +11,6 @@ import { type Lead, RowLead } from './RowLead';
 
 // One of each, made once: an entrance built afresh on every render can be taken for a new one and played again.
 const LAID_DOWN = FadeInDown.duration(300).easing(Easing.out(Easing.cubic));
-const APPEAR = FadeIn.duration(120);
 const INKED = FadeIn.duration(220);
 
 /**
@@ -149,7 +148,8 @@ export const RowInput: FC<RowInputProps> = ({ leadFor, paper, placeholder, initi
     <Animated.View
       // A new scroll is laid on the shelf from above and comes to rest without a bounce, as paper does; a new line is
       // inked onto the page.
-      entering={rolled && !laid ? LAID_DOWN : laid ? APPEAR : INKED}
+      // One pulled down is already lying in its place, drawn as itself: it needs no entrance at all.
+      entering={laid ? undefined : rolled ? LAID_DOWN : INKED}
       style={[styles.row, rolled ? styles.rolledRow : [styles.sheetRow, { backgroundColor: paper }]]}
     >
       {/* A scroll being named lies on the shelf like the others: rounded by the light, with its rod's ends showing. */}
