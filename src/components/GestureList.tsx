@@ -177,6 +177,8 @@ type GestureListProps = {
   onOpen?: (id: string) => void;
   onRenameTitle?: (title: string) => void;
   onBack?: () => void;
+  /** The scroll has begun to roll up, and will be gone after this many milliseconds: time to bring the shelf back. */
+  onLeaving?: (duration: number) => void;
   /** Clears the finished rows, once they have been swept away. Absent when there are none. */
   onClear?: () => void;
   /** Filled with the things a parent may ask of the list. */
@@ -209,6 +211,7 @@ export const GestureList: FC<GestureListProps> = ({
   onOpen,
   onRenameTitle,
   onBack,
+  onLeaving,
   onClear,
   trim,
   footRoom = 0,
@@ -411,6 +414,7 @@ export const GestureList: FC<GestureListProps> = ({
     // From wherever the sheet now is: rolled part way up by hand, or not at all.
     const from = sheetHeight.value >= UNCLIPPED ? measuredHeight.current : sheetHeight.value;
     const duration = Math.min(480, 220 + from * 0.2);
+    onLeaving?.(duration);
     rolledUp.set(withTiming(1, { duration }));
     sheetHeight.set(from);
     sheetHeight.set(

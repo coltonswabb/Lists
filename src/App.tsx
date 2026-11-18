@@ -5,6 +5,7 @@ import { StatusBar } from 'expo-status-bar';
 import { type FC, type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, AppState, BackHandler, Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import Animated, { Easing, useAnimatedStyle, useSharedValue, withDelay, withTiming } from 'react-native-reanimated';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { pickBackup, shareBackup } from './backup';
@@ -150,6 +151,9 @@ const scrollRows = (items: Item[], today: string): { rows: GestureListRow[]; vis
 
 /** How long a kind picked from the quill's sheet waits for its scroll to be named before it is forgotten. */
 const PENDING_KIND_MS = 2 * 60 * 1000;
+
+/** How quickly the shelf goes into the dark behind a scroll as it opens. */
+const SHELF_FADE_MS = 220;
 
 /** Long enough for the seal to come down and be taken away before the scribe asks about the tutorial. */
 const TUTORIAL_OFFER_MS = 1900;
@@ -297,6 +301,28 @@ const Screens: FC<{ settings: Settings; address: Address; night: boolean; onCand
   // A dark kind of scroll is written on vellum of its own, bright on dark, whatever the paper.
   const openKind = openList ? kindOf(openList) : null;
   const scrollColors = onVellum(colors, openKind ? vellumOf(openKind, colors) : undefined);
+  // How much of the shelf shows behind an open scroll, and how much of the scroll is left as it closes.
+  const shelfShown = useSharedValue(openListId ? 0 : 1);
+  const scrollShown = useSharedValue(1);
+  useEffect(() => {
+    if (!openListId) {
+      shelfShown.set(1);
+      return;
+    }
+    // A scroll opens over the shelf, which goes into the dark behind it as it unrolls.
+    scrollShown.set(1);
+    shelfShown.set(withTiming(0, { duration: SHELF_FADE_MS, easing: Easing.out(Easing.quad) }));
+  }, [openListId, shelfShown, scrollShown]);
+  const leaving = (duration: number) => {
+    // One after the other, overlapping only a little, so the scroll's title and the shelf's are never seen through each
+    // other: the scroll winds up and fades as it nears the top rod, then the shelf settles into the light.
+    scrollShown.set(withDelay(duration * 0.3, withTiming(0, { duration: duration * 0.45, easing: Easing.in(Easing.quad) })));
+    shelfShown.set(withDelay(duration * 0.55, withTiming(1, { duration: duration * 0.45 + 120, easing: Easing.out(Easing.cubic) })));
+  };
+  // The shelf settles up a little as it comes back, rather than simply appearing.
+  const shelfStyle = useAnimatedStyle(() => ({ opacity: shelfShown.value, transform: [{ translateY: (1 - shelfShown.value) * 12 }] }));
+  const scrollStyle = useAnimatedStyle(() => ({ opacity: scrollShown.value }));
+
   /** Where a place on the shelf as shown falls among all the scrolls kept, some of which may be hidden. */
   const shelfPosition = (shown: number) => {
     const at = shelfLists[shown];
@@ -546,6 +572,7 @@ const Screens: FC<{ settings: Settings; address: Address; night: boolean; onCand
           // Tomorrow keeps its name until dawn gives its lines the day's.
           onRenameTitle={isTomorrow ? undefined : (name) => store.renameList(openList.id, name)}
           onBack={() => setOpenListId(null)}
+          onLeaving={leaving}
           onClear={
             items.some((item) => item.done)
               ? () => {
@@ -718,7 +745,6 @@ const Screens: FC<{ settings: Settings; address: Address; night: boolean; onCand
     );
       })();
   // On a phone the open scroll takes the whole desk; on a wide screen it lies beside the shelf.
-  if (scrollPane && !wide) return scrollPane;
 
   if (!store.loaded) return null;
 
@@ -884,7 +910,18 @@ const Screens: FC<{ settings: Settings; address: Address; night: boolean; onCand
       {sealing !== null && !scrollPane ? <SealPress key={sealing} flare={sealFlare} onDone={() => setSealing(null)} /> : null}
     </>
   );
-  if (!wide) return library;
+  // On a phone the shelf stays where it lies under an open scroll, hidden, so closing the scroll uncovers it as it
+  // was: it comes back into the light while the scroll rolls up, and the scroll fades as it winds onto its rod.
+  if (!wide) {
+    return (
+      <View style={styles.stage}>
+        <Animated.View style={[StyleSheet.absoluteFill, shelfStyle]} pointerEvents={scrollPane ? 'none' : 'auto'}>
+          {library}
+        </Animated.View>
+        {scrollPane ? <Animated.View style={[StyleSheet.absoluteFill, scrollStyle]}>{scrollPane}</Animated.View> : null}
+      </View>
+    );
+  }
 
   return (
     <View style={styles.panes}>
@@ -1017,6 +1054,7 @@ const makeStyles = (colors: Palette) =>
   controls: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', columnGap: 18, rowGap: 10, paddingHorizontal: 20, paddingTop: 12 },
     // Labels that sit on the desk rather than on paper: the accent is tuned for paper and can be too dark here.
     controlsCentred: { justifyContent: 'center' },
+    stage: { flex: 1 },
     libraryControls: { alignItems: 'center', justifyContent: 'flex-end', rowGap: 6 },
     labelRow: { flexDirection: 'row', alignItems: 'center', columnGap: 12 },
     labelDot: { color: colors.onDeskFaded, fontSize: 16 },
