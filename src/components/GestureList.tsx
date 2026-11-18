@@ -231,7 +231,8 @@ export const GestureList: FC<GestureListProps> = ({
   const extent = useRef({ content: 0, viewport: 0 });
   const updateEdges = (y: number) => {
     setAtTop(y <= 0);
-    setAtBottom(y >= extent.current.content - extent.current.viewport - 2);
+    // Within a few points of the end counts as the end, as a long scroll seldom comes to rest exactly on it.
+    setAtBottom(y >= extent.current.content - extent.current.viewport - 12);
   };
   const [addIndex, setAddIndex] = useState<number | null>(null);
   // The row being added was pulled down by hand, so it is already lying where it belongs.
@@ -585,7 +586,8 @@ export const GestureList: FC<GestureListProps> = ({
     maxPointers: 1,
     // Upward travel only: a pair leaves the downward side open-ended so a pull down never activates this.
     activeOffsetY: [-14, FAR],
-    failOffsetX: [-14, 14],
+    // A push that wanders sideways as it goes is still a push: only a plain sideways drag is left to the rows.
+    failOffsetX: [-30, 30],
     onActivate: () => {
       'worklet';
       scheduleOnRN(beginPull);
