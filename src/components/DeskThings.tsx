@@ -43,8 +43,12 @@ const FLAME = { width: 21, height: 21 * (480 / 146) };
 const GLOW = 210;
 const SMOKE = { width: 22, height: 66 };
 
-/** On the inkpot's painting: the middle of its mouth, where the quill stands in the ink. */
-const MOUTH = { x: 0.47, y: 0.14 };
+/**
+ * On the inkpot's painting: where the quill's nib rests, below the ink in the middle of the mouth, and the line of
+ * the ink's surface there. The pot below that line is drawn again over the quill, so the shaft goes down into the ink.
+ */
+const MOUTH = { x: 0.5, y: 0.27 };
+const INK_LINE = 0.2;
 /** On the quill's painting, as painted (leaning right): where its nib is. It is turned over about this point. */
 const NIB = { x: 0.05, y: 0.99 };
 
@@ -154,7 +158,7 @@ export const DeskThings: FC<DeskThingsProps> = ({ onPen, onCandle, night }) => {
   const candleHeight = candle ? (CANDLE * candle.height) / candle.width : 0;
   const potHeight = inkpot ? (INKPOT * inkpot.height) / inkpot.width : 0;
   const quillWidth = quill ? (QUILL * quill.width) / quill.height : 0;
-  // The quill's nib rests in the pot's mouth; the pot is drawn over it, so only what rises above the rim is seen.
+  // The quill's nib rests in the ink in the pot's mouth; what lies below the ink's surface is hidden by the pot.
   const nib = { x: INKPOT * MOUTH.x, y: QUILL * NIB.y };
   const potTop = nib.y - potHeight * MOUTH.y;
   const inkwellHeight = potTop + potHeight;
@@ -237,6 +241,7 @@ export const DeskThings: FC<DeskThingsProps> = ({ onPen, onCandle, night }) => {
           accessibilityLabel="Pen a new scroll"
           style={{ width: INKPOT, height: inkwellHeight, marginBottom: -potHeight * INKPOT_SINK }}
         >
+          <Image source={inkpot.source} style={[styles.pot, { top: potTop, width: INKPOT, height: potHeight }]} />
           {/* The quill stands in the ink, turned to lean toward the middle of the screen, hinged at its nib. */}
           <Animated.Image
             source={quill.source}
@@ -252,7 +257,10 @@ export const DeskThings: FC<DeskThingsProps> = ({ onPen, onCandle, night }) => {
               featherStyle,
             ]}
           />
-          <Image source={inkpot.source} style={[styles.pot, { top: potTop, width: INKPOT, height: potHeight }]} />
+          {/* The ink and the near side of the pot, from the ink's surface down, over the quill's shaft. */}
+          <View pointerEvents="none" style={[styles.clip, { top: potTop + potHeight * INK_LINE, width: INKPOT, height: potHeight * (1 - INK_LINE) }]}>
+            <Image source={inkpot.source} style={{ width: INKPOT, height: potHeight, marginTop: -potHeight * INK_LINE }} />
+          </View>
         </Pressable>
       ) : null}
     </View>
@@ -276,6 +284,7 @@ const styles = StyleSheet.create({
   flame: { position: 'absolute' },
   quill: { position: 'absolute' },
   pot: { position: 'absolute', left: 0 },
+  clip: { position: 'absolute', left: 0, overflow: 'hidden' },
   // Lit only where there is wax and iron: the painting itself, coloured, laid over the painting.
   warmth: { position: 'absolute', left: 0, top: 0 },
 });
