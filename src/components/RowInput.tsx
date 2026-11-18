@@ -14,6 +14,12 @@ const LAID_DOWN = FadeInDown.duration(300).easing(Easing.out(Easing.cubic));
 const APPEAR = FadeIn.duration(120);
 const INKED = FadeIn.duration(220);
 
+/**
+ * When the last touch on a row being written began, as the touch event stamps it. A touch on the field itself
+ * moves the caret and must not be taken for a touch elsewhere, which finishes the writing.
+ */
+export const touchOnInput = { at: -1 };
+
 export type RowInputHandle = {
   finish: () => void;
   /** Nothing has been written in it yet. */
@@ -87,7 +93,10 @@ export const RowInput: FC<RowInputProps> = ({ leadFor, paper, placeholder, initi
   useEffect(() => {
     if (!handleRef) return;
     handleRef.current = {
-      finish: () => end(latest.current),
+      finish: () => {
+        input.current?.blur();
+        end(latest.current);
+      },
       isBlank: () => latest.current.trim() === '',
       focus: () => input.current?.focus(),
     };
@@ -148,6 +157,9 @@ export const RowInput: FC<RowInputProps> = ({ leadFor, paper, placeholder, initi
       <View style={[styles.inner, rolled && styles.rolledInner, rolled && { backgroundColor: sheet }, dress?.ribbon !== undefined && styles.ribboned]}>
         <RowLead lead={leadFor(text)} />
         <TextInput
+          onTouchStart={(event) => {
+            touchOnInput.at = event.nativeEvent.timestamp;
+          }}
           ref={input}
           autoFocus
           maxFontSizeMultiplier={MAX_TEXT_SCALE}

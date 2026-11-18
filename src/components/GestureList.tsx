@@ -54,7 +54,7 @@ import { DeckleEdge } from './DeckleEdge';
 import { Finial, hasFinial } from './Finial';
 import { PaperOverlay } from './PaperOverlay';
 import { ROLL_LIGHT, ROLL_LIGHT_AT, Roller, ROLLER_HEIGHT } from './Roller';
-import { RowInput, type RowInputHandle } from './RowInput';
+import { RowInput, type RowInputHandle, touchOnInput } from './RowInput';
 import { KindEmblem } from './KindEmblem';
 import { LineArt } from './LineArt';
 import { MarginVine } from './MarginVine';
@@ -63,6 +63,8 @@ import { SWEEP_MS, SwipeRow } from './SwipeRow';
 import { WaxSeal } from './WaxSeal';
 
 const PULL_RESISTANCE = 0.6;
+/** How long after writing is finished by a touch that the same touch is kept from also opening or striking what it landed on. */
+const FINISH_SWALLOW_MS = 450;
 /** How far the sheet must be lifted before letting go clears the finished rows: a deliberate pull, not a stray scroll. */
 // A short push is enough: about a row and a half of the finger's travel, or less if it is flicked.
 const ROLL_UP_AT = ROW_HEIGHT * 0.9;
@@ -418,12 +420,21 @@ export const GestureList: FC<GestureListProps> = ({
   };
   const inputHandle = useRef<RowInputHandle | null>(null);
   /** Finishes whatever is being written, a new row or one being amended, and puts the keyboard away. */
+  /** When writing was last finished by a touch: the rest of that touch, landing on a row or the paper, does no more. */
+  const finishedAt = useRef(0);
   const doneWriting = () => {
+    finishedAt.current = Date.now();
     inputHandle.current?.finish();
     Keyboard.dismiss();
   };
+  // The first touch anywhere on the screen while something is being written finishes it and puts the keyboard
+  // away, whatever the touch lands on, before that thing can take it. A touch on the field itself is left alone.
+  const touchWhileWriting = (event: GestureResponderEvent) => {
+    if (!busy || titleDraft !== null || event.nativeEvent.timestamp === touchOnInput.at) return;
+    doneWriting();
+  };
   const press = (action: () => void) => {
-    if (pulling.current) return;
+    if (pulling.current || Date.now() - finishedAt.current < FINISH_SWALLOW_MS) return;
     // With something being written, a touch on anything else finishes it and puts the keyboard away, and does no more.
     if (busy) {
       doneWriting();
@@ -474,7 +485,8 @@ export const GestureList: FC<GestureListProps> = ({
   const pan = usePanGesture({
     enabled: atTop && !busy && !dragging,
     maxPointers: 1,
-    activeOffsetY: [-FAR, 14],
+    // Taken up early, so the paper starts coming down with the finger rather than after it.
+    activeOffsetY: [-FAR, 7],
     failOffsetX: [-14, 14],
     onActivate: () => {
       'worklet';
@@ -483,7 +495,9 @@ export const GestureList: FC<GestureListProps> = ({
     onUpdate: (event) => {
       'worklet';
       if (dragFrom.value >= 0) return;
-      const distance = Math.max(0, event.translationY) * PULL_RESISTANCE;
+      // The first row's worth follows the finger exactly; beyond it the paper resists, as it does when pulled further.
+      const travel = Math.max(0, event.translationY);
+      const distance = travel <= ROW_HEIGHT ? travel : ROW_HEIGHT + (travel - ROW_HEIGHT) * PULL_RESISTANCE;
       pull.value = distance;
       const next: PullAction =
         canGoBack && distance > BACK_DISTANCE ? 'back' : distance > ROW_HEIGHT ? 'create' : 'none';
@@ -844,14 +858,9 @@ export const GestureList: FC<GestureListProps> = ({
   };
 
   return (
-    <Animated.View entering={FadeIn.duration(180)} style={[styles.screen, { paddingTop: insets.top }]}>
+    <Animated.View entering={FadeIn.duration(180)} style={[styles.screen, { paddingTop: insets.top }]} onTouchStart={touchWhileWriting}>
       <View
         style={styles.header}
-        // A touch on the header while a row is being written finishes it, like a touch anywhere else. The title's own
-        // editing is left alone: its field is in the header.
-        onTouchStart={() => {
-          if (busy && titleDraft === null) doneWriting();
-        }}
       >
         {canGoBack ? (
           <Pressable onPress={leave} hitSlop={14} accessibilityRole="button" accessibilityLabel="Close scroll">
