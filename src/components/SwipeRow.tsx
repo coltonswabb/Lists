@@ -90,6 +90,11 @@ type SwipeRowProps = {
   strikeWidth?: number;
   /** The list's scroll offset, so a dragged row stays under the finger while the list scrolls. */
   scrollY: SharedValue<number>;
+  /**
+   * A row this far from the foot of the list fades out as it nears it, so the list dissolves into the desk rather
+   * than ending at a hard line: the list's height on screen, and how deep the fading band is. Absent, it does not fade.
+   */
+  fadeFoot?: { viewport: SharedValue<number>; zone: number };
   /** Asked to scroll one step up (-1) or down (1) while a row is held at the edge of the screen. */
   onEdge: (direction: -1 | 1) => void;
   onDragStart: () => void;
@@ -121,6 +126,7 @@ export const SwipeRow: FC<SwipeRowProps> = ({
   onPressLead,
   strikeWidth = 0,
   scrollY,
+  fadeFoot,
   onEdge,
   onDragStart,
   onDrop,
@@ -283,6 +289,13 @@ export const SwipeRow: FC<SwipeRowProps> = ({
   const gesture = useCompetingGestures(swipe, drag, tap);
 
   const containerStyle = useAnimatedStyle(() => {
+    // How visible the row is for its place on screen: whole above the fading band, gone by the list's foot.
+    const footFade = () => {
+      if (!fadeFoot || fadeFoot.viewport.value <= 0) return 1;
+      const middle = index * ROW_HEIGHT + ROW_HEIGHT / 2 - scrollY.value;
+      const foot = fadeFoot.viewport.value;
+      return interpolate(middle, [foot - fadeFoot.zone, foot - ROW_HEIGHT * 0.15], [1, 0], 'clamp');
+    };
     const from = reorder.from.value;
     const to = reorder.to.value;
     const span = reorder.span.value;
@@ -296,7 +309,7 @@ export const SwipeRow: FC<SwipeRowProps> = ({
       zIndex: isDragged ? 10 : 0,
       transform: [{ translateX: sweep.value * width }, { translateY: gapShift }, { translateY: dragShift }, { scale: 1 + (from === index ? lift.value * 0.03 : 0) }],
       shadowOpacity: lift.value * 0.35,
-      opacity: 1 - sweep.value * 0.6,
+      opacity: (1 - sweep.value * 0.6) * footFade(),
     };
   });
   const rowStyle = useAnimatedStyle(() => ({ transform: [{ translateX: offsetX.value }] }));

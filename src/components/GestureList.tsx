@@ -63,16 +63,6 @@ import { SWEEP_MS, SwipeRow } from './SwipeRow';
 import { WaxSeal } from './WaxSeal';
 
 const PULL_RESISTANCE = 0.75;
-/** A rolled scroll lying in the heap at the desk's foot: much smaller than one on the shelf, being further off. */
-const HEAP_ROLL = { width: 74, height: 15 };
-/** How the heap is built up from its foot: as many rolls as there are, up to six, three then two then one. */
-const heapRows = (count: number): number[] =>
-  [[1], [2], [2, 1], [3, 1], [3, 2], [3, 2, 1]][Math.min(6, count) - 1] ?? [];
-/** A little turn for each roll in the heap, so it lies as if dropped there and not laid in a row. */
-const HEAP_TURN = [-2.5, 1.5, -1, 3, -3, 2];
-
-/** The desk, seen through: the start of the fade where the shelf runs on below the screen. */
-const CLEAR_DESK = 'rgba(0,0,0,0)';
 /** How long after writing is finished by a touch that the same touch is kept from also opening or striking what it landed on. */
 const FINISH_SWALLOW_MS = 450;
 /** How far the sheet must be lifted before letting go clears the finished rows: a deliberate pull, not a stray scroll. */
@@ -199,59 +189,6 @@ type GestureListProps = {
   finisArt?: ReactNode;
 };
 
-type ScrollHeapProps = {
-  /** The rows not in view, from the first hidden on. */
-  rows: GestureListRow[];
-  /** The room at the foot of the desk the heap lies in. */
-  height: number;
-  /** The paper of the hidden row at this place among them. */
-  paper: (index: number) => string;
-  onPress: () => void;
-};
-
-/** The scrolls that do not fit on the shelf, lying in a heap at the desk's foot. */
-const ScrollHeap: FC<ScrollHeapProps> = ({ rows, height, paper, onPress }) => {
-  const { colors, styles } = useTheme(makeStyles);
-  const layers = heapRows(rows.length);
-  return (
-    <Pressable
-      onPress={onPress}
-      style={[styles.heap, { height }]}
-      accessibilityRole="button"
-      accessibilityLabel={`${rows.length} more ${rows.length === 1 ? 'scroll' : 'scrolls'} below`}
-      accessibilityHint="Scrolls to the end of the shelf"
-    >
-      <View style={[styles.heapShadow, { width: HEAP_ROLL.width * (layers[0] ?? 1) + 24 }]} />
-      {/* Built from the top down, each layer resting in the grooves of the one beneath. */}
-      {[...layers].reverse().map((count, layer) => {
-        const fromFoot = layers.length - 1 - layer;
-        const start = layers.slice(0, fromFoot).reduce((sum, n) => sum + n, 0);
-        return (
-          <View key={fromFoot} style={[styles.heapRow, { marginBottom: fromFoot === 0 ? 8 : -4 }]}>
-            {Array.from({ length: count }, (_, at) => {
-              const row = rows[start + at];
-              const tone = row?.vellum ? row.vellum.from : paper(start + at);
-              return (
-                <Animated.View
-                  key={row?.id ?? at}
-                  entering={FadeIn.duration(220)}
-                  style={[styles.heapRoll, { backgroundColor: tone, transform: [{ rotate: `${HEAP_TURN[(start + at) % HEAP_TURN.length]}deg` }] }]}
-                >
-                  <View style={[styles.heapEnd, { backgroundColor: colors.gold }]} />
-                  <View style={styles.fill} />
-                  {row?.ribbon ? <View style={[styles.heapRibbon, { backgroundColor: row.ribbon }]} /> : null}
-                  <View style={[styles.heapEnd, { backgroundColor: colors.gold }]} />
-                  <LinearGradient colors={ROLL_LIGHT} locations={ROLL_LIGHT_AT} style={StyleSheet.absoluteFill} pointerEvents="none" />
-                </Animated.View>
-              );
-            })}
-          </View>
-        );
-      })}
-    </Pressable>
-  );
-};
-
 export const GestureList: FC<GestureListProps> = ({
   title,
   readout,
@@ -288,7 +225,6 @@ export const GestureList: FC<GestureListProps> = ({
   const scrollOffset = useRef(0);
   const [atTop, setAtTop] = useState(true);
   const [atBottom, setAtBottom] = useState(true);
-  const [firstHidden, setFirstHidden] = useState(Number.POSITIVE_INFINITY);
   const [rollArmed, setRollArmed] = useState(false);
   // While true, finished rows are primed to sweep off the sheet one after another as they are removed.
   const [sweeping, setSweeping] = useState(false);
@@ -296,8 +232,6 @@ export const GestureList: FC<GestureListProps> = ({
   const updateEdges = (y: number) => {
     setAtTop(y <= 0);
     setAtBottom(y >= extent.current.content - extent.current.viewport - 2);
-    // On the shelf, the first scroll not wholly in view: it and every one after it lie in the pile at the desk's foot.
-    if (isShelf) setFirstHidden(Math.floor((y + extent.current.viewport - 4) / ROW_HEIGHT));
   };
   const [addIndex, setAddIndex] = useState<number | null>(null);
   // The row being added was pulled down by hand, so it is already lying where it belongs.
@@ -973,7 +907,7 @@ export const GestureList: FC<GestureListProps> = ({
         </View>
       )}
       <GestureDetector gesture={gesture}>
-        <View style={[styles.viewport, footRoom > 0 && { marginBottom: footRoom }]}>
+        <View style={styles.viewport}>
           {isShelf && !handedOver ? (
             <Animated.View pointerEvents="none" style={[styles.descending, descendingStyle]}>
               <View style={styles.rolledScroll}>
@@ -1017,7 +951,8 @@ export const GestureList: FC<GestureListProps> = ({
               scrollOffset.current = y;
               updateEdges(y);
             }}
-            contentContainerStyle={[styles.content, { paddingBottom: insets.bottom }]}
+            // On a crowded shelf the last scrolls can be brought up clear of the fading band at the foot.
+            contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + footRoom }]}
           >
             <Animated.View
               style={[isShelf ? styles.shelf : styles.sheet, sheetStyle]}
@@ -1092,6 +1027,7 @@ export const GestureList: FC<GestureListProps> = ({
                     completeActionLabel={isShelf ? 'Seal into the chronicle' : 'Strike done'}
                     leadActionLabel={row.section ? (row.badge?.includes('···') ? 'Unfold' : 'Fold') : leadActionLabel}
                     scrollY={scrollY}
+                    fadeFoot={isShelf && footRoom > 0 ? { viewport: viewportHeight, zone: footRoom } : undefined}
                     onEdge={nudgeScroll}
                     onDragStart={startDrag}
                     onDrop={drop}
@@ -1146,23 +1082,8 @@ export const GestureList: FC<GestureListProps> = ({
             <Pressable style={styles.tapZone} accessible={false} disabled={addIndex === null && (busy || deskIsQuiet)} onPressIn={touchBareBegan} onPress={touchBare} />
           </ScrollView>
           </Animated.View>
-          {/* Where the shelf runs on below what is shown, the scrolls fall away into the shadow at the desk's foot rather
-              than stopping at a hard line. Gone once the last scroll is in view. */}
-          {isShelf && !atBottom ? (
-            <LinearGradient pointerEvents="none" colors={[CLEAR_DESK, colors.desk]} style={styles.shelfFade} />
-          ) : null}
         </View>
       </GestureDetector>
-      {/* The scrolls that do not fit lie in a heap at the foot of the desk, behind the candle and the inkwell, as many
-          as there are, up to six, each in its own ribbon. Touching the heap brings the last of them into view. */}
-      {isShelf && footRoom > 0 && !atBottom && rows.length > firstHidden ? (
-        <ScrollHeap
-          rows={rows.slice(firstHidden)}
-          height={footRoom}
-          paper={(index) => paperFor(firstHidden + index)}
-          onPress={() => scrollView.current?.scrollToEnd({ animated: true })}
-        />
-      ) : null}
     </Animated.View>
   );
 };
@@ -1174,13 +1095,6 @@ const makeStyles = (colors: Palette) =>
   fill: { flex: 1 },
   // Clipped, so rows lifted by a pull-up slide under the top roll instead of over the title.
   viewport: { flex: 1, overflow: 'hidden' },
-  heap: { position: 'absolute', left: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'flex-end' },
-  heapRow: { flexDirection: 'row', justifyContent: 'center' },
-  heapRoll: { width: HEAP_ROLL.width, height: HEAP_ROLL.height, marginHorizontal: -3, borderRadius: HEAP_ROLL.height / 2, overflow: 'hidden', flexDirection: 'row', alignItems: 'center' },
-  heapEnd: { width: 7, height: 7, borderRadius: 3.5, marginHorizontal: -1 },
-  heapRibbon: { position: 'absolute', top: 0, bottom: 0, right: 12, width: 5 },
-  heapShadow: { position: 'absolute', bottom: 2, height: 14, borderRadius: 40, backgroundColor: 'rgba(0,0,0,0.45)' },
-  shelfFade: { position: 'absolute', left: 0, right: 0, bottom: 0, height: Math.round(ROW_HEIGHT * 0.9) },
   header: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 20, height: 56 },
   back: { color: colors.onDesk, fontSize: 34, lineHeight: 36 },
   title: { color: colors.onDesk, fontFamily: fonts.display, fontSize: 30 },
