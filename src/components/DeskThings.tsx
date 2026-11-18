@@ -22,17 +22,17 @@ import { ROW_HEIGHT } from '../theme';
  * The things stand close, at the foot of the screen: large, and running off its corners, as things nearest
  * the eye do. Their sizes, and how far each is let run off its side.
  */
-const CANDLE = 118;
+const CANDLE = 100;
 // A goose quill is three or four times the height of a small inkpot.
-const INKPOT = 112;
-const QUILL = 262;
-const CANDLE_OFF = 18;
-const INKWELL_OFF = 0;
+const INKPOT = 96;
+const QUILL = 196;
+const CANDLE_OFF = 14;
+const INKWELL_OFF = -6;
 /** How much of each is let sink below the foot of the screen: the candlestick's pan, and the belly of the pot. */
 const CANDLE_SINK = 0.12;
 const INKPOT_SINK = 0.34;
 /** How far the things rise above the labels at the desk's foot, and what stands over the first scroll. */
-const HEIGHT = 165;
+const HEIGHT = 100;
 const HEADER = 110;
 /** The height the labels take at the foot of the shelf, above the bottom inset: two short rows. */
 export const FOOT = 76;
@@ -51,7 +51,7 @@ const SMOKE = { width: 22, height: 66 };
 const MOUTH = { x: 0.5, y: 0.27 };
 const INK_LINE = 0.2;
 /** How much further it leans than it was painted: outward, toward the corner and off the side of the screen. */
-const QUILL_LEAN = 2;
+const QUILL_LEAN = 3;
 /** On the quill's painting, as painted (leaning right): where its nib is, which it turns about. */
 const NIB = { x: 0.05, y: 0.99 };
 
