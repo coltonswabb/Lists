@@ -1,5 +1,6 @@
 import { type FC, useEffect, useRef } from 'react';
-import { Image, Pressable, StyleSheet, View } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
+import { Image, Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
 import Animated, {
   Easing,
   useAnimatedStyle,
@@ -14,26 +15,37 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Defs, Ellipse, Path, RadialGradient, Stop } from 'react-native-svg';
 
 import { deskProps } from '../art';
+import { usePaneWidth } from '../PaneWidth';
 import { ROW_HEIGHT } from '../theme';
 
-const CANDLE = 58;
-const INKWELL = 92;
+/**
+ * The things stand close, on the near edge of the desk: large, and running off the sides of the screen, as
+ * things nearest the eye do. Their widths, and how far each is let run off its side.
+ */
+const CANDLE = 100;
+const INKWELL = 160;
+const CANDLE_OFF = 24;
+const INKWELL_OFF = 34;
+/** How much larger than they were first drawn, which the flame, its glow and its smoke follow. */
+const GROWN = CANDLE / 58;
 /** Room the things need above the labels at the desk's foot, and what stands over the first scroll. */
-const HEIGHT = 130;
+const HEIGHT = 186;
 const HEADER = 110;
 const FOOT = 58;
+/** How far above the labels the near edge of the desk runs. */
+const LIP = 4;
 
 /** Where the wick ends on the candle's painting, as fractions of its width and height. */
 const WICK = { x: 0.575, y: 0.11 };
-const FLAME = { width: 15, height: 30 };
-const GLOW = 120;
-const SMOKE = { width: 14, height: 42 };
+const FLAME = { width: 15 * GROWN, height: 30 * GROWN };
+const GLOW = 120 * GROWN;
+const SMOKE = { width: 14 * GROWN, height: 42 * GROWN };
 
 /** On the inkwell's painting: the line above which there is only feather, and where the quill meets the ink. */
 const FEATHER_ABOVE = 0.545;
 const NIB = { x: 0.295, y: 0.625 };
 /** Space round the feather so it is not cut off as it swings. */
-const SWING = 16;
+const SWING = 16 * (INKWELL / 92);
 
 /** Whether the shelf holds too many scrolls for the things to stand below them at their full size. */
 export const isCrowded = (screen: number, top: number, bottom: number, scrolls: number) =>
@@ -43,7 +55,7 @@ export const isCrowded = (screen: number, top: number, bottom: number, scrolls: 
  * The room the things take at the foot of a crowded shelf, which the shelf leaves clear so that no scroll lies
  * under them and they stand in the same place, at the same size, on every shelf. The candle is the way back to day and the quill the way to a new scroll, so they are never put away.
  */
-export const CROWDED_ROOM = HEIGHT + 4;
+export const CROWDED_ROOM = HEIGHT + 14;
 
 type DeskThingsProps = {
   /** The quill is taken up: start a new scroll. */
@@ -63,6 +75,10 @@ type DeskThingsProps = {
 export const DeskThings: FC<DeskThingsProps> = ({ onPen, onCandle, night }) => {
   const insets = useSafeAreaInsets();
   const still = useReducedMotion();
+  // Beside an open scroll on a wide screen the shelf's pane ends in the middle of the screen: the inkwell stands
+  // whole at that edge, and only runs off a real edge of the screen.
+  const { width: windowWidth } = useWindowDimensions();
+  const atScreenEdge = usePaneWidth() >= windowWidth - 1;
   const { inkwell, candle } = deskProps;
 
   // Two slow waves of different lengths never quite line up, so the flame doesn't visibly loop.
@@ -136,8 +152,21 @@ export const DeskThings: FC<DeskThingsProps> = ({ onPen, onCandle, night }) => {
   const inkHeight = inkwell ? (INKWELL * inkwell.height) / inkwell.width : 0;
   const split = inkHeight * FEATHER_ABOVE;
 
+  const lip = insets.bottom + FOOT - LIP;
+
   return (
-    <View pointerEvents="box-none" style={[styles.things, { bottom: insets.bottom + FOOT }]}>
+    <View pointerEvents="box-none" style={StyleSheet.absoluteFill}>
+      {/* The near edge of the desk: its lip catching the light, and the face below it falling into shadow, with the
+          labels written along it. The things stand on the top, just behind the lip. */}
+      <View pointerEvents="none" style={[styles.near, { height: lip }]}>
+        <LinearGradient colors={['rgba(0,0,0,0.2)', 'rgba(0,0,0,0.55)']} style={StyleSheet.absoluteFill} />
+        <LinearGradient colors={['rgba(255,236,200,0.16)', 'rgba(255,236,200,0)']} style={styles.lipLight} />
+        <LinearGradient colors={['rgba(0,0,0,0)', 'rgba(0,0,0,0.35)']} style={[styles.lipShade, { bottom: lip }]} />
+      </View>
+    <View
+      pointerEvents="box-none"
+      style={[styles.things, { bottom: lip - 6, left: -CANDLE_OFF, right: atScreenEdge ? -INKWELL_OFF : 8 }]}
+    >
       {candle ? (
         <Pressable
           onPress={() => {
@@ -227,6 +256,25 @@ export const DeskThings: FC<DeskThingsProps> = ({ onPen, onCandle, night }) => {
         </Pressable>
       ) : null}
     </View>
+      {/* The sides of the screen fall away into shadow over the things that run off them, as if they stood nearer than
+          the light and the eye's focus. */}
+      <LinearGradient
+        pointerEvents="none"
+        colors={['rgba(0,0,0,0.5)', 'rgba(0,0,0,0)']}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 0 }}
+        style={[styles.sideShade, styles.sideLeft, { bottom: lip, height: HEIGHT + 30 }]}
+      />
+      {atScreenEdge ? (
+        <LinearGradient
+          pointerEvents="none"
+          colors={['rgba(0,0,0,0)', 'rgba(0,0,0,0.5)']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 0 }}
+          style={[styles.sideShade, styles.sideRight, { bottom: lip, height: HEIGHT + 30 }]}
+        />
+      ) : null}
+    </View>
   );
 };
 
@@ -254,10 +302,15 @@ const GroundShadow: FC<{ width: number; left: number; top: number }> = ({ width,
 
 const styles = StyleSheet.create({
   shadow: { position: 'absolute' },
+  near: { position: 'absolute', left: 0, right: 0, bottom: 0 },
+  lipLight: { position: 'absolute', top: 0, left: 0, right: 0, height: 3 },
+  // Just behind the lip, the desk top darkens where it meets the edge.
+  lipShade: { position: 'absolute', left: 0, right: 0, height: 26 },
+  sideShade: { position: 'absolute', width: 46 },
+  sideLeft: { left: 0 },
+  sideRight: { right: 0 },
   things: {
     position: 'absolute',
-    left: 22,
-    right: 14,
     flexDirection: 'row',
     alignItems: 'flex-end',
     justifyContent: 'space-between',
