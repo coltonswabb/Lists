@@ -63,6 +63,8 @@ import { SWEEP_MS, SwipeRow } from './SwipeRow';
 import { WaxSeal } from './WaxSeal';
 
 const PULL_RESISTANCE = 0.75;
+/** The desk, seen through: the start of the fade where the shelf runs on below the screen. */
+const CLEAR_DESK = 'rgba(0,0,0,0)';
 /** How long after writing is finished by a touch that the same touch is kept from also opening or striking what it landed on. */
 const FINISH_SWALLOW_MS = 450;
 /** How far the sheet must be lifted before letting go clears the finished rows: a deliberate pull, not a stray scroll. */
@@ -1080,6 +1082,11 @@ export const GestureList: FC<GestureListProps> = ({
             <Pressable style={styles.tapZone} accessible={false} disabled={addIndex === null && (busy || deskIsQuiet)} onPressIn={touchBareBegan} onPress={touchBare} />
           </ScrollView>
           </Animated.View>
+          {/* Where the shelf runs on below what is shown, the scrolls fall away into the shadow at the desk's foot rather
+              than stopping at a hard line. Gone once the last scroll is in view. */}
+          {isShelf && !atBottom ? (
+            <LinearGradient pointerEvents="none" colors={[CLEAR_DESK, colors.desk]} style={styles.shelfFade} />
+          ) : null}
         </View>
       </GestureDetector>
     </Animated.View>
@@ -1093,6 +1100,7 @@ const makeStyles = (colors: Palette) =>
   fill: { flex: 1 },
   // Clipped, so rows lifted by a pull-up slide under the top roll instead of over the title.
   viewport: { flex: 1, overflow: 'hidden' },
+  shelfFade: { position: 'absolute', left: 0, right: 0, bottom: 0, height: Math.round(ROW_HEIGHT * 0.9) },
   header: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 20, height: 56 },
   back: { color: colors.onDesk, fontSize: 34, lineHeight: 36 },
   title: { color: colors.onDesk, fontFamily: fonts.display, fontSize: 30 },
