@@ -68,6 +68,8 @@ const FINISH_SWALLOW_MS = 450;
 /** How far the sheet must be lifted before letting go clears the finished rows: a deliberate pull, not a stray scroll. */
 // A short push is enough: about a row and a half of the finger's travel, or less if it is flicked.
 const ROLL_UP_AT = ROW_HEIGHT * 0.9;
+/** How far the bottom rod is pushed up, at most, before letting go rolls the scroll shut. */
+const ROD_ROLL_AT = ROW_HEIGHT * 1.6;
 /** A push released faster than this, in points a second, rolls the scroll up however short it was. */
 const FLICK_UP = 900;
 /**
@@ -378,6 +380,8 @@ export const GestureList: FC<GestureListProps> = ({
   // Opening a scroll unrolls its sheet from the top rod; afterwards its height is unconstrained.
   const sheetHeight = useSharedValue(isShelf ? UNCLIPPED : 0);
   const measuredHeight = useRef(0);
+  /** The same, where the gesture worklets can read it. */
+  const sheetMeasured = useSharedValue(0);
   const leaving = useRef(false);
   /**
    * How far the sheet unrolls: past its rows, and past whatever stands at its foot (the stamps, and
@@ -404,9 +408,11 @@ export const GestureList: FC<GestureListProps> = ({
     // Played slower and lower than the unrolling: the same paper, winding back down.
     play('paper', 0.78);
     // A long scroll takes longer to wind, up to a point.
-    const duration = Math.min(480, 220 + measuredHeight.current * 0.2);
+    // From wherever the sheet now is: rolled part way up by hand, or not at all.
+    const from = sheetHeight.value >= UNCLIPPED ? measuredHeight.current : sheetHeight.value;
+    const duration = Math.min(480, 220 + from * 0.2);
     rolledUp.set(withTiming(1, { duration }));
-    sheetHeight.set(measuredHeight.current);
+    sheetHeight.set(from);
     sheetHeight.set(
       withTiming(0, { duration, easing: Easing.in(Easing.cubic) }, () => {
         scheduleOnRN(onBack);
@@ -610,6 +616,57 @@ export const GestureList: FC<GestureListProps> = ({
       scheduleOnRN(endPushUp, rollUp);
     },
   });
+  // The bottom rod, taken in the hand: the sheet's length follows it up, and the top rod fattens with what is wound on.
+  const rodFrom = useSharedValue(0);
+  const rodArmed = useSharedValue(false);
+  const rodActive = useSharedValue(false);
+  const rodPush = usePanGesture({
+    enabled: onBack !== undefined && !dragging && editingId === null && titleDraft === null,
+    maxPointers: 1,
+    activeOffsetY: [-6, 6],
+    failOffsetX: [-30, 30],
+    hitSlop: { top: 22, bottom: 34, left: 0, right: 0 },
+    onActivate: () => {
+      'worklet';
+      scheduleOnRN(beginPull);
+      rodActive.value = true;
+      rodFrom.value = sheetMeasured.value;
+      sheetHeight.set(sheetMeasured.value);
+    },
+    onUpdate: (event) => {
+      'worklet';
+      const from = rodFrom.value;
+      if (from <= 0) return;
+      const left = Math.max(0, Math.min(from, from + event.translationY));
+      sheetHeight.set(left);
+      rolledUp.set(1 - left / from);
+      const next = from - left > Math.min(ROD_ROLL_AT, from * 0.45);
+      if (next !== rodArmed.value) {
+        rodArmed.value = next;
+        if (next) scheduleOnRN(tick);
+      }
+    },
+    onDeactivate: (event) => {
+      'worklet';
+      const rollUp = !event.canceled && (rodArmed.value || event.velocityY < -FLICK_UP);
+      rodArmed.value = false;
+      rodActive.value = false;
+      if (rollUp) {
+        scheduleOnRN(leave);
+        scheduleOnRN(endPushUp, false);
+        return;
+      }
+      // Let go too soon, the sheet unwinds again to its full length.
+      rolledUp.set(withTiming(0, { duration: 220 }));
+      sheetHeight.set(
+        withTiming(rodFrom.value, { duration: 240, easing: Easing.out(Easing.cubic) }, () => {
+          sheetHeight.set(UNCLIPPED);
+        }),
+      );
+      scheduleOnRN(endPushUp, false);
+    },
+  });
+
   const raiseStyle = useAnimatedStyle(() => ({ transform: [{ translateY: -raise.value }] }));
   const clearHintStyle = useAnimatedStyle(() => ({
     opacity: interpolate(raise.value, [0, ROLL_UP_AT * 0.4], [0, 1], 'clamp'),
@@ -960,6 +1017,8 @@ export const GestureList: FC<GestureListProps> = ({
               style={[isShelf ? styles.shelf : styles.sheet, sheetStyle]}
               onLayout={(event) => {
                 measuredHeight.current = event.nativeEvent.layout.height;
+                // Its own full length, kept for the rod at its foot; not while the rod is pushing it shorter.
+                if (!rodActive.value) sheetMeasured.value = event.nativeEvent.layout.height;
                 // The vine is drawn to the sheet's length; a change of a point or two is not worth drawing it again.
                 const tall = Math.round(event.nativeEvent.layout.height);
                 if (!isShelf && Math.abs(tall - sheetTall) > 2) setSheetTall(tall);
@@ -1077,9 +1136,13 @@ export const GestureList: FC<GestureListProps> = ({
               {isShelf ? null : <DeckleEdge side="right" />}
             </Animated.View>
             {isShelf ? null : (
-              <View style={styles.bottomRoller}>
-                <Roller paper={colors.paperTo} />
-              </View>
+              // The rod at the foot is the handle the scroll is rolled up by: taken and pushed up, the sheet winds up
+              // after it onto the top rod, and let go far enough it rolls shut.
+              <GestureDetector gesture={rodPush}>
+                <View style={styles.bottomRoller} accessibilityRole="button" accessibilityLabel="Roll up the scroll" accessibilityActions={[{ name: 'activate' }]} onAccessibilityAction={leave}>
+                  <Roller paper={colors.paperTo} />
+                </View>
+              </GestureDetector>
             )}
             <Pressable style={styles.tapZone} accessible={false} disabled={addIndex === null && (busy || deskIsQuiet)} onPressIn={touchBareBegan} onPress={touchBare} />
           </ScrollView>
