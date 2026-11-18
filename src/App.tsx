@@ -154,6 +154,8 @@ const PENDING_KIND_MS = 2 * 60 * 1000;
 
 /** How quickly the shelf goes into the dark behind a scroll as it opens. */
 const SHELF_FADE_MS = 220;
+/** How long the shelf goes on settling into the light after the scroll that covered it is gone. */
+const SHELF_SETTLE_MS = 260;
 
 /** Long enough for the seal to come down and be taken away before the scribe asks about the tutorial. */
 const TUTORIAL_OFFER_MS = 1900;
@@ -304,23 +306,30 @@ const Screens: FC<{ settings: Settings; address: Address; night: boolean; onCand
   // How much of the shelf shows behind an open scroll, and how much of the scroll is left as it closes.
   const shelfShown = useSharedValue(openListId ? 0 : 1);
   const scrollShown = useSharedValue(1);
+  /** A scroll is rolling up by hand or by the back arrow: the shelf is already on its way back and is left to finish. */
+  const closing = useRef(false);
   useEffect(() => {
     if (!openListId) {
-      shelfShown.set(1);
+      // Closed some other way, as by the system's back gesture: the shelf comes back gently all the same.
+      if (!closing.current) shelfShown.set(withTiming(1, { duration: SHELF_FADE_MS, easing: Easing.out(Easing.cubic) }));
+      closing.current = false;
       return;
     }
+    closing.current = false;
     // A scroll opens over the shelf, which goes into the dark behind it as it unrolls.
     scrollShown.set(1);
     shelfShown.set(withTiming(0, { duration: SHELF_FADE_MS, easing: Easing.out(Easing.quad) }));
   }, [openListId, shelfShown, scrollShown]);
   const leaving = (duration: number) => {
+    closing.current = true;
     // One after the other, overlapping only a little, so the scroll's title and the shelf's are never seen through each
     // other: the scroll winds up and fades as it nears the top rod, then the shelf settles into the light.
-    scrollShown.set(withDelay(duration * 0.3, withTiming(0, { duration: duration * 0.45, easing: Easing.in(Easing.quad) })));
-    shelfShown.set(withDelay(duration * 0.55, withTiming(1, { duration: duration * 0.45 + 120, easing: Easing.out(Easing.cubic) })));
+    scrollShown.set(withDelay(duration * 0.25, withTiming(0, { duration: duration * 0.45, easing: Easing.in(Easing.quad) })));
+    // Slow to come and slower to finish, running on past the moment the scroll is gone, so it is never seen arriving.
+    shelfShown.set(withDelay(duration * 0.4, withTiming(1, { duration: duration * 0.6 + SHELF_SETTLE_MS, easing: Easing.out(Easing.cubic) })));
   };
   // The shelf settles up a little as it comes back, rather than simply appearing.
-  const shelfStyle = useAnimatedStyle(() => ({ opacity: shelfShown.value, transform: [{ translateY: (1 - shelfShown.value) * 12 }] }));
+  const shelfStyle = useAnimatedStyle(() => ({ opacity: shelfShown.value, transform: [{ translateY: (1 - shelfShown.value) * 8 }] }));
   const scrollStyle = useAnimatedStyle(() => ({ opacity: scrollShown.value }));
 
   /** Where a place on the shelf as shown falls among all the scrolls kept, some of which may be hidden. */
