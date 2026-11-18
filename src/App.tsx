@@ -14,7 +14,7 @@ import { ChestScreen } from './components/ChestScreen';
 import { ChronicleScreen } from './components/ChronicleScreen';
 import { DayLight } from './components/DayLight';
 import { DayNightVeil } from './components/DayNightVeil';
-import { CROWDED_ROOM, DeskThings, isCrowded } from './components/DeskThings';
+import { CROWDED_ROOM, DeskThings, FOOT as DESK_FOOT, isCrowded } from './components/DeskThings';
 import { NightLight } from './components/NightLight';
 import { PatternSheet } from './components/PatternSheet';
 import { SealPress } from './components/SealPress';
@@ -857,19 +857,26 @@ const Screens: FC<{ settings: Settings; address: Address; night: boolean; onCand
           store.addListFrom(pattern.name, pattern.lines, pattern.daily);
         }}
       />
-      <View style={[styles.controls, { paddingBottom: insets.bottom + 12 }]}>
-        <Pressable onPress={() => setSearching(true)} hitSlop={12} accessibilityRole="button">
-          <Text style={styles.deskLabel}>Search</Text>
-        </Pressable>
-        <Pressable onPress={() => setChronicleOpen(true)} hitSlop={12} accessibilityRole="button">
-          <Text style={styles.deskLabel}>Chronicle</Text>
-        </Pressable>
-        <Pressable onPress={() => setChestOpen(true)} hitSlop={12} accessibilityRole="button" accessibilityLabel={`Chest, ${storedLists.length} scrolls`}>
-          <Text style={styles.deskLabel}>Chest</Text>
-        </Pressable>
-        <Pressable onPress={() => setSettingsOpen(true)} hitSlop={12} accessibilityRole="button">
-          <Text style={styles.deskLabel}>Settings</Text>
-        </Pressable>
+      {/* The Library's labels stand together between the candle and the inkwell, in two short rows. */}
+      <View style={[styles.libraryControls, { height: insets.bottom + DESK_FOOT, paddingBottom: insets.bottom + 10 }]}>
+        <View style={styles.labelRow}>
+          <Pressable onPress={() => setSearching(true)} hitSlop={10} accessibilityRole="button">
+            <Text style={styles.deskLabel}>Search</Text>
+          </Pressable>
+          <Text style={styles.labelDot}>·</Text>
+          <Pressable onPress={() => setChronicleOpen(true)} hitSlop={10} accessibilityRole="button">
+            <Text style={styles.deskLabel}>Chronicle</Text>
+          </Pressable>
+        </View>
+        <View style={styles.labelRow}>
+          <Pressable onPress={() => setChestOpen(true)} hitSlop={10} accessibilityRole="button" accessibilityLabel={`Chest, ${storedLists.length} scrolls`}>
+            <Text style={styles.deskLabel}>Chest</Text>
+          </Pressable>
+          <Text style={styles.labelDot}>·</Text>
+          <Pressable onPress={() => setSettingsOpen(true)} hitSlop={10} accessibilityRole="button">
+            <Text style={styles.deskLabel}>Settings</Text>
+          </Pressable>
+        </View>
       </View>
       {/* With a scroll open beside the shelf, the notice and the seal are the scroll's to show. */}
       {scrollPane ? null : <UndoToast undo={store.undo} onUndo={undoLast} onDismiss={store.dismissUndo} offset={44} />}
@@ -1009,6 +1016,9 @@ const makeStyles = (colors: Palette) =>
   controls: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', columnGap: 18, rowGap: 10, paddingHorizontal: 20, paddingTop: 12 },
     // Labels that sit on the desk rather than on paper: the accent is tuned for paper and can be too dark here.
     controlsCentred: { justifyContent: 'center' },
+    libraryControls: { alignItems: 'center', justifyContent: 'flex-end', rowGap: 6 },
+    labelRow: { flexDirection: 'row', alignItems: 'center', columnGap: 12 },
+    labelDot: { color: colors.onDeskFaded, fontSize: 16 },
     page: { flex: 1, width: '100%', maxWidth: PAGE_WIDTH, alignSelf: 'center' },
     panes: { flex: 1, flexDirection: 'row' },
     // Each pane keeps what slides about in it to itself.

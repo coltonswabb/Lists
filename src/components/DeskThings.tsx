@@ -22,18 +22,20 @@ import { ROW_HEIGHT } from '../theme';
  * The things stand close, on the near edge of the desk: large, and running off the sides of the screen, as
  * things nearest the eye do. Their widths, and how far each is let run off its side.
  */
-const CANDLE = 100;
-const INKWELL = 160;
-const CANDLE_OFF = 24;
-const INKWELL_OFF = 34;
+const CANDLE = 112;
+const INKWELL = 176;
+const CANDLE_OFF = 22;
+const INKWELL_OFF = 36;
+/** How much of each is let sink below the foot of the screen: the candlestick's feet, and the lower part of the pot. */
+const CANDLE_SINK = 0.2;
+const INKWELL_SINK = 0.08;
 /** How much larger than they were first drawn, which the flame, its glow and its smoke follow. */
 const GROWN = CANDLE / 58;
-/** Room the things need above the labels at the desk's foot, and what stands over the first scroll. */
-const HEIGHT = 186;
+/** How far the things rise above the labels at the desk's foot, and what stands over the first scroll. */
+const HEIGHT = 96;
 const HEADER = 110;
-const FOOT = 58;
-/** How far above the labels the near edge of the desk runs. */
-const LIP = 4;
+/** The height the labels take at the foot of the shelf, above the bottom inset: two short rows. */
+export const FOOT = 76;
 
 /** Where the wick ends on the candle's painting, as fractions of its width and height. */
 const WICK = { x: 0.575, y: 0.11 };
@@ -55,7 +57,7 @@ export const isCrowded = (screen: number, top: number, bottom: number, scrolls: 
  * The room the things take at the foot of a crowded shelf, which the shelf leaves clear so that no scroll lies
  * under them and they stand in the same place, at the same size, on every shelf. The candle is the way back to day and the quill the way to a new scroll, so they are never put away.
  */
-export const CROWDED_ROOM = HEIGHT + 14;
+export const CROWDED_ROOM = HEIGHT + 10;
 
 type DeskThingsProps = {
   /** The quill is taken up: start a new scroll. */
@@ -152,20 +154,11 @@ export const DeskThings: FC<DeskThingsProps> = ({ onPen, onCandle, night }) => {
   const inkHeight = inkwell ? (INKWELL * inkwell.height) / inkwell.width : 0;
   const split = inkHeight * FEATHER_ABOVE;
 
-  const lip = insets.bottom + FOOT - LIP;
-
   return (
     <View pointerEvents="box-none" style={StyleSheet.absoluteFill}>
-      {/* The near edge of the desk: its lip catching the light, and the face below it falling into shadow, with the
-          labels written along it. The things stand on the top, just behind the lip. */}
-      <View pointerEvents="none" style={[styles.near, { height: lip }]}>
-        <LinearGradient colors={['rgba(0,0,0,0.2)', 'rgba(0,0,0,0.55)']} style={StyleSheet.absoluteFill} />
-        <LinearGradient colors={['rgba(255,236,200,0.16)', 'rgba(255,236,200,0)']} style={styles.lipLight} />
-        <LinearGradient colors={['rgba(0,0,0,0)', 'rgba(0,0,0,0.35)']} style={[styles.lipShade, { bottom: lip }]} />
-      </View>
     <View
       pointerEvents="box-none"
-      style={[styles.things, { bottom: lip - 6, left: -CANDLE_OFF, right: atScreenEdge ? -INKWELL_OFF : 8 }]}
+      style={[styles.things, { bottom: 0, left: -CANDLE_OFF, right: atScreenEdge ? -INKWELL_OFF : 8 }]}
     >
       {candle ? (
         <Pressable
@@ -178,7 +171,7 @@ export const DeskThings: FC<DeskThingsProps> = ({ onPen, onCandle, night }) => {
           accessibilityLabel="Candle"
           accessibilityHint={night ? "Snuffs it, and the day returns" : "Lights it for night, to plan the morrow"}
           accessibilityState={{ checked: night }}
-          style={{ width: CANDLE, height: candleHeight }}
+          style={{ width: CANDLE, height: candleHeight, marginBottom: -candleHeight * CANDLE_SINK }}
         >
           <GroundShadow width={CANDLE * 1.7} left={-CANDLE * 0.35} top={candleHeight - 13} />
           <Animated.View
@@ -237,7 +230,7 @@ export const DeskThings: FC<DeskThingsProps> = ({ onPen, onCandle, night }) => {
           hitSlop={10}
           accessibilityRole="button"
           accessibilityLabel="Pen a new scroll"
-          style={{ width: INKWELL, height: inkHeight }}
+          style={{ width: INKWELL, height: inkHeight, marginBottom: -inkHeight * INKWELL_SINK }}
         >
           <GroundShadow width={INKWELL * 0.95} left={-INKWELL * 0.12} top={inkHeight - 14} />
           {/* The pot stays put; only the feather above its rim moves, hinged where the quill meets the ink. */}
@@ -256,24 +249,9 @@ export const DeskThings: FC<DeskThingsProps> = ({ onPen, onCandle, night }) => {
         </Pressable>
       ) : null}
     </View>
-      {/* The sides of the screen fall away into shadow over the things that run off them, as if they stood nearer than
-          the light and the eye's focus. */}
-      <LinearGradient
-        pointerEvents="none"
-        colors={['rgba(0,0,0,0.5)', 'rgba(0,0,0,0)']}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 0 }}
-        style={[styles.sideShade, styles.sideLeft, { bottom: lip, height: HEIGHT + 30 }]}
-      />
-      {atScreenEdge ? (
-        <LinearGradient
-          pointerEvents="none"
-          colors={['rgba(0,0,0,0)', 'rgba(0,0,0,0.5)']}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 0 }}
-          style={[styles.sideShade, styles.sideRight, { bottom: lip, height: HEIGHT + 30 }]}
-        />
-      ) : null}
+      {/* The foot of the screen falls away into shadow over the things that sink below it, as if they stood nearer
+          than the light and the eye's focus; the labels are written over it. */}
+      <LinearGradient pointerEvents="none" colors={['rgba(0,0,0,0)', 'rgba(0,0,0,0.62)']} style={[styles.footShade, { height: insets.bottom + FOOT + 70 }]} />
     </View>
   );
 };
@@ -302,13 +280,7 @@ const GroundShadow: FC<{ width: number; left: number; top: number }> = ({ width,
 
 const styles = StyleSheet.create({
   shadow: { position: 'absolute' },
-  near: { position: 'absolute', left: 0, right: 0, bottom: 0 },
-  lipLight: { position: 'absolute', top: 0, left: 0, right: 0, height: 3 },
-  // Just behind the lip, the desk top darkens where it meets the edge.
-  lipShade: { position: 'absolute', left: 0, right: 0, height: 26 },
-  sideShade: { position: 'absolute', width: 46 },
-  sideLeft: { left: 0 },
-  sideRight: { right: 0 },
+  footShade: { position: 'absolute', left: 0, right: 0, bottom: 0 },
   things: {
     position: 'absolute',
     flexDirection: 'row',
