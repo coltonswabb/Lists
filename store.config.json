@@ -1,6 +1,7 @@
 {
   "configVersion": 0,
   "apple": {
+    "version": "1.0.0",
     "copyright": "2026 Colton Swabb",
     "categories": [
       "PRODUCTIVITY",
@@ -46,7 +47,10 @@
       "contests": "NONE",
       "gambling": false,
       "unrestrictedWebAccess": false,
-      "seventeenPlus": false
+      "seventeenPlus": false,
+      "kidsAgeBand": null,
+      "ageRatingOverride": "NONE",
+      "koreaAgeRatingOverride": "NONE"
     },
     "release": {
       "automaticRelease": false,
