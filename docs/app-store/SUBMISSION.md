@@ -73,7 +73,7 @@ Decree is a to-do list app with no login and no in-app purchases. All data is st
 It is driven by gestures rather than buttons:
 - Pull down on the first screen to create a list ("scroll"); tap one to open it.
 - Inside a scroll, pull down to add an item, swipe right to complete, swipe left to delete.
-- Pull up past the end of a scroll to clear completed items.
+- Push up from the foot of a scroll to roll it shut; "Clear struck" below it removes completed items.
 - The "Read me first" scroll created on first launch lists every gesture.
 
 Notification permission is requested only when the user adds a reminder to an item, by ending it
