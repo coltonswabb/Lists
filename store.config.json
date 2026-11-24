@@ -1,0 +1,56 @@
+{
+  "configVersion": 0,
+  "apple": {
+    "copyright": "2026 Colton Swabb",
+    "categories": [
+      "PRODUCTIVITY",
+      "LIFESTYLE"
+    ],
+    "info": {
+      "en-US": {
+        "title": "Decree: Scroll To-Do Lists",
+        "subtitle": "Lists kept by a loyal scribe",
+        "description": "Decree turns your to-do lists into scrolls, kept in order by a scribe who calls you M'lord, M'lady or my liege.\n\nThere are almost no buttons. You pull down to write a new line, swipe right to strike one done, and keep pulling at the end of a scroll to sweep the finished lines away. Each item you finish plays the next note of a short tune, so finishing a scroll plays the whole thing.\n\nWRITE AS FAST AS YOU THINK\n• Pull down to add a line, and keep typing to add several\n• Paste a block of text to add one line for each row\n• End a line with a colon to start a section\n• End a line with \"@ 5pm\" or \"@ tomorrow 9am\" to be reminded\n\nGESTURES FOR EVERYTHING\n• Swipe right to strike an item done, left to cast it out\n• Hold and drag to reorder, with whole sections moving together\n• Pinch apart to write between two lines, pinch together to roll the scroll up\n• Restore anything you removed by mistake\n\nA SCRIBE AT YOUR DESK\n• Greets you by the hour and remarks on what you do\n• Notices a scroll that has gathered dust\n• Chatty, quiet or silent, as you prefer\n\nMADE TO BE KEPT\n• Daily scrolls that renew themselves each dawn\n• Seal a finished scroll into the Chronicle, a dated record of everything you have struck done\n• Five papers, from Scriptorium to Night Vigil, each with a matching app icon\n• Home Screen and Lock Screen widgets\n• Search across every scroll\n\nYOURS ALONE\nYour scrolls stay on your device. There is no account, no tracking and no advertising. Back up to a file whenever you wish.",
+        "keywords": [
+          "todo",
+          "to-do",
+          "tasks",
+          "checklist",
+          "grocery",
+          "planner",
+          "medieval",
+          "scroll",
+          "reminder",
+          "daily",
+          "gesture",
+          "notes"
+        ],
+        "releaseNotes": "The first edition of Decree.",
+        "promoText": "Every list is a scroll, and a scribe keeps them in order. Pull to write, swipe to strike, and hear each finished scroll play its tune.",
+        "privacyPolicyUrl": "https://github.com/coltonswabb/lists/blob/main/docs/privacy.md",
+        "supportUrl": "https://github.com/coltonswabb/lists/blob/main/docs/support.md"
+      }
+    },
+    "advisory": {
+      "alcoholTobaccoOrDrugUseOrReferences": "NONE",
+      "gamblingSimulated": "NONE",
+      "medicalOrTreatmentInformation": "NONE",
+      "profanityOrCrudeHumor": "NONE",
+      "sexualContentGraphicAndNudity": "NONE",
+      "sexualContentOrNudity": "NONE",
+      "horrorOrFearThemes": "NONE",
+      "matureOrSuggestiveThemes": "NONE",
+      "violenceCartoonOrFantasy": "NONE",
+      "violenceRealistic": "NONE",
+      "violenceRealisticProlongedGraphicOrSadistic": "NONE",
+      "contests": "NONE",
+      "gambling": false,
+      "unrestrictedWebAccess": false,
+      "seventeenPlus": false
+    },
+    "release": {
+      "automaticRelease": false,
+      "phasedRelease": true
+    }
+  }
+}
