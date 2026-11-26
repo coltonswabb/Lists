@@ -1,0 +1,15 @@
+{
+  "expo": {
+    "name": "Workouts",
+    "slug": "workouts",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "dark",
+    "backgroundColor": "#0e0f11",
+    "scheme": "workouts",
+    "ios": {
+      "supportsTablet": false,
+      "config": { "usesNonExemptEncryption": false }
+    }
+  }
+}
