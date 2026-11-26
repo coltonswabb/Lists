@@ -3,10 +3,13 @@ import type { Category, Days, Exercise, LiftEntry, SetEntry } from './types';
 
 export type Trend = 'up' | 'down' | 'same' | 'first';
 
+/** Where a set's reps fall in the exercise's range, and so what to do with the weight. */
+export type Zone = 'raise' | 'solid' | 'heavy' | 'drop';
+
 export type Verdict = {
   trend: Trend;
-  /** A set reached the rep target, so the weight should go up next time. */
-  raise: boolean;
+  /** What the session says about the weight for next time. */
+  call: Zone;
   detail: string;
 };
 
@@ -37,16 +40,59 @@ export const findPrevious = (days: Days, exerciseId: string, date: string): Prev
   return null;
 };
 
-export const hitTarget = (entry: LiftEntry, repTarget: number): boolean =>
-  logged(entry.sets).some((set) => !set.total && (set.reps ?? 0) >= repTarget);
+type Range = Pick<Exercise, 'repMin' | 'repTarget'>;
+
+export const zoneOf = (reps: number, { repMin, repTarget }: Range): Zone => {
+  if (reps >= repTarget) return 'raise';
+  if (reps > repMin) return 'solid';
+  return reps === repMin ? 'heavy' : 'drop';
+};
+
+/** One set at the target is enough to go up; otherwise the weakest set decides. */
+export const callFor = (entry: LiftEntry, range: Range): Zone | null => {
+  const zones = logged(entry.sets)
+    .filter((set) => !set.total)
+    .map((set) => zoneOf(set.reps ?? 0, range));
+  if (zones.length === 0) return null;
+  if (zones.includes('raise')) return 'raise';
+  if (zones.includes('drop')) return 'drop';
+  return zones.includes('heavy') ? 'heavy' : 'solid';
+};
+
+export const CALL_TEXT: Record<Zone, string> = {
+  raise: 'Go heavier next time',
+  solid: 'On track — same weight',
+  heavy: 'Heavy — hold this weight',
+  drop: 'Too heavy — drop the weight',
+};
+
+/** The heaviest weight ever logged for an exercise. */
+export const bestWeight = (days: Days, exerciseId: string): number =>
+  Math.max(
+    0,
+    ...Object.values(days).flatMap((day) =>
+      day.lifts.filter((lift) => lift.exerciseId === exerciseId).map((lift) => topWeight(logged(lift.sets))),
+    ),
+  );
+
+/** Every logged session of an exercise, newest first. */
+export const historyOf = (days: Days, exerciseId: string): Previous[] =>
+  Object.keys(days)
+    .sort()
+    .reverse()
+    .flatMap((date) =>
+      (days[date]?.lifts ?? [])
+        .filter((lift) => lift.exerciseId === exerciseId && isLogged(lift))
+        .map((entry) => ({ date, entry })),
+    );
 
 const formatWeight = (weight: number): string => (weight > 0 ? `${weight} lb` : 'bodyweight');
 
 export const judge = (entry: LiftEntry, previous: Previous | null, exercise: Exercise): Verdict | null => {
   const current = logged(entry.sets);
   if (current.length === 0) return null;
-  const raise = hitTarget(entry, exercise.repTarget);
-  if (!previous) return { trend: 'first', raise, detail: 'First time logged' };
+  const call = callFor(entry, exercise) ?? 'solid';
+  if (!previous) return { trend: 'first', call, detail: 'First time logged' };
 
   const before = logged(previous.entry.sets);
   const weightNow = topWeight(current);
@@ -54,16 +100,16 @@ export const judge = (entry: LiftEntry, previous: Previous | null, exercise: Exe
   if (weightNow !== weightBefore) {
     return {
       trend: weightNow > weightBefore ? 'up' : 'down',
-      raise,
+      call,
       detail: `${formatWeight(weightBefore)} → ${formatWeight(weightNow)}`,
     };
   }
   const repsNow = repsAt(current, weightNow);
   const repsBefore = repsAt(before, weightBefore);
-  if (repsNow === repsBefore) return { trend: 'same', raise, detail: `Same as last time (${repsNow} reps)` };
+  if (repsNow === repsBefore) return { trend: 'same', call, detail: `Same as last time (${repsNow} reps)` };
   return {
     trend: repsNow > repsBefore ? 'up' : 'down',
-    raise,
+    call,
     detail: `${repsBefore} → ${repsNow} reps at ${formatWeight(weightNow)}`,
   };
 };

@@ -1,9 +1,9 @@
 import { useState } from 'react';
 import type { FC } from 'react';
-import { StyleSheet, Text, TextInput, View } from 'react-native';
+import { StyleSheet, TextInput, View } from 'react-native';
 
 import { colors, MIN_HIT, radius, space } from '../theme';
-import { Button, Chip, NumberField, Sheet } from './Controls';
+import { Button, Chip, NumberField, SectionLabel, Sheet } from './Controls';
 
 type CardioSheetProps = {
   visible: boolean;
@@ -23,7 +23,7 @@ export const CardioSheet: FC<CardioSheetProps> = ({ visible, onAdd, onClose }) =
   return (
     <Sheet onClose={onClose} title="Add cardio" visible={visible}>
       <View style={styles.body}>
-        <Text style={styles.heading}>What</Text>
+        <SectionLabel>What</SectionLabel>
         <View style={styles.chips}>
           {KINDS.map((item) => (
             <Chip key={item} label={item} onPress={() => setKind(item)} selected={item === kind} tint={colors.cardio} />
@@ -38,7 +38,7 @@ export const CardioSheet: FC<CardioSheetProps> = ({ visible, onAdd, onClose }) =
           value={kind}
         />
 
-        <Text style={styles.heading}>Minutes</Text>
+        <SectionLabel>Minutes</SectionLabel>
         <View style={styles.chips}>
           {QUICK_MINUTES.map((item) => (
             <Chip
@@ -67,7 +67,6 @@ export const CardioSheet: FC<CardioSheetProps> = ({ visible, onAdd, onClose }) =
 
 const styles = StyleSheet.create({
   body: { paddingHorizontal: space.lg },
-  heading: { color: colors.textDim, fontSize: 13, fontWeight: '700', marginBottom: space.sm, marginTop: space.md },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: space.sm, marginBottom: space.md },
   input: {
     backgroundColor: colors.surface,

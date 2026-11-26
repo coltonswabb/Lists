@@ -4,7 +4,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { MONTH_NAMES, monthGrid, todayKey } from '../dates';
 import { dayCategories } from '../progress';
-import { categoryColor, colors, MIN_HIT, radius, space } from '../theme';
+import { categoryColor, colors, fonts, MIN_HIT, radius, space } from '../theme';
 import type { Days, Exercise } from '../types';
 
 export type Month = { year: number; month: number };
@@ -90,15 +90,15 @@ export const Calendar: FC<CalendarProps> = ({ month, selected, days, exercises, 
 const styles = StyleSheet.create({
   calendar: { paddingHorizontal: space.sm },
   header: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between' },
-  title: { color: colors.text, fontSize: 18, fontWeight: '700' },
+  title: { color: colors.text, fontFamily: fonts.heading, fontSize: 22, letterSpacing: 2, textTransform: 'uppercase' },
   arrow: { alignItems: 'center', height: MIN_HIT, justifyContent: 'center', width: MIN_HIT },
   arrowText: { color: colors.accent, fontSize: 30, lineHeight: 32 },
   week: { flexDirection: 'row' },
-  weekday: { color: colors.textFaint, flex: 1, fontSize: 12, fontWeight: '600', paddingBottom: space.xs, textAlign: 'center' },
+  weekday: { color: colors.textFaint, flex: 1, fontFamily: fonts.label, fontSize: 14, paddingBottom: space.xs, textAlign: 'center' },
   cell: { alignItems: 'center', borderRadius: radius.sm, flex: 1, height: MIN_HIT + 2, justifyContent: 'center' },
-  cellSelected: { backgroundColor: colors.surfaceRaised },
-  dayNumber: { color: colors.text, fontSize: 16, fontVariant: ['tabular-nums'] },
-  today: { color: colors.accent, fontWeight: '800' },
+  cellSelected: { backgroundColor: colors.surfaceRaised, borderColor: colors.accent, borderWidth: 1 },
+  dayNumber: { color: colors.text, fontFamily: fonts.heading, fontSize: 19, fontVariant: ['tabular-nums'] },
+  today: { color: colors.accent },
   dots: { flexDirection: 'row', gap: 3, height: 6, marginTop: 3 },
   dot: { borderRadius: 3, height: 6, width: 6 },
 });

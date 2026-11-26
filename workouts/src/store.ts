@@ -2,9 +2,10 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import { SEED_DATA } from './seed';
-import type { AppData, CardioEntry, Category, Day, Equipment, Exercise, LiftEntry, SetEntry } from './types';
+import { REP_MIN, REP_TARGET } from './types';
+import type { AppData, CardioEntry, Category, Day, Equipment, Exercise, LiftEntry, Muscle, SetEntry } from './types';
 
-const STORAGE_KEY = 'workouts:data:v1';
+const STORAGE_KEY = 'workouts:data:v2';
 
 const EMPTY_DAY: Day = { lifts: [], cardio: [] };
 
@@ -40,14 +41,14 @@ const withLift = (data: AppData, date: string, index: number, change: (lift: Lif
     lifts: day.lifts.map((lift, position) => (position === index ? change(lift) : lift)),
   }));
 
-export type NewExercise = { name: string; category: Category; equipment: Equipment };
+export type NewExercise = { name: string; category: Category; equipment: Equipment; muscles: Muscle[] };
 
 export type Store = {
   data: AppData;
   ready: boolean;
   addLift: (date: string, exerciseId: string, sets: SetEntry[]) => void;
   removeLift: (date: string, index: number) => void;
-  moveLift: (date: string, index: number, offset: -1 | 1) => void;
+  moveLift: (date: string, from: number, to: number) => void;
   addSet: (date: string, index: number) => void;
   updateSet: (date: string, index: number, setIndex: number, patch: Partial<SetEntry>) => void;
   removeSet: (date: string, index: number, setIndex: number) => void;
@@ -83,16 +84,13 @@ export const useStore = (): Store => {
     );
   }, []);
 
-  const moveLift = useCallback((date: string, index: number, offset: -1 | 1) => {
+  const moveLift = useCallback((date: string, from: number, to: number) => {
     setData((current) =>
       withDay(current, date, (day) => {
-        const target = index + offset;
-        const moving = day.lifts[index];
-        const displaced = day.lifts[target];
-        if (!moving || !displaced) return day;
-        const lifts = [...day.lifts];
-        lifts[index] = displaced;
-        lifts[target] = moving;
+        const moving = day.lifts[from];
+        if (!moving || from === to) return day;
+        const lifts = day.lifts.filter((_, position) => position !== from);
+        lifts.splice(to, 0, moving);
         return { ...day, lifts };
       }),
     );
@@ -137,7 +135,8 @@ export const useStore = (): Store => {
   }, []);
 
   const addExercise = useCallback((exercise: NewExercise): Exercise => {
-    const created: Exercise = { ...exercise, id: newId(), repTarget: 9 };
+    const { name, category, equipment, muscles } = exercise;
+    const created: Exercise = { id: newId(), name, category, equipment, muscles, repMin: REP_MIN, repTarget: REP_TARGET };
     setData((current) => ({ ...current, exercises: [...current.exercises, created] }));
     return created;
   }, []);

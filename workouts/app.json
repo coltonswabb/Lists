@@ -9,7 +9,12 @@
     "scheme": "workouts",
     "ios": {
       "supportsTablet": false,
-      "config": { "usesNonExemptEncryption": false }
-    }
+      "config": {
+        "usesNonExemptEncryption": false
+      }
+    },
+    "plugins": [
+      "expo-font"
+    ]
   }
 }
