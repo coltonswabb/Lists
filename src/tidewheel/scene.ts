@@ -26,6 +26,7 @@ import {
   TRACK_LENGTH,
   trackAt,
   trackYawAt,
+  WIN_HALF_W,
   WIPER,
 } from './cabinet';
 import { MAX_COINS, onTrack, type Physics, surging } from './physics';
@@ -39,6 +40,7 @@ const COIN_METAL: Record<CoinKind, { colour: number; roughness: number }> = {
   small: { colour: 0xdfe3ee, roughness: 0.3 },
   medium: { colour: 0xf2c14e, roughness: 0.26 },
   large: { colour: 0xff8f6b, roughness: 0.22 },
+  giant: { colour: 0xffd27a, roughness: 0.16 },
 };
 
 const lean = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), -BOARD.lean);
@@ -49,6 +51,10 @@ export type Scene = {
   resize: (width: number, height: number) => void;
   /** Throws a burst of sparks up from a point in the cabinet. */
   sparkle: (at: { x: number; y: number; z: number }, colour: number, count: number) => void;
+  /** Jolts the camera, 0 to 1. */
+  shake: (amount: number) => void;
+  /** Sends a ring of light racing outward along the ground from a point. */
+  shockwave: (at: { x: number; y: number; z: number }, colour: number) => void;
   /** Where the chute is, at a point across the cabinet. */
   chute: (x: number) => { x: number; y: number; z: number };
   /** Where on the page a point across the chute sits, for placing words over the picture. */
@@ -71,7 +77,13 @@ const box = (w: number, h: number, d: number, material: THREE.Material, x: numbe
   return mesh;
 };
 
-const SPARKS = 220;
+const SPARKS = 320;
+const BULBS = 14;
+/** Seconds a shockwave takes to spread and fade, and how wide it gets. */
+const WAVE_TIME = 0.55;
+const WAVE_REACH = 4.4;
+const CAMERA_AT = new THREE.Vector3(0, 16, 25.4);
+const CAMERA_LOOKS_AT = new THREE.Vector3(0, 3.6, 4.9);
 /** The ring of moon phases painted on the backboard: how far up the board, and how wide. */
 const MOON_RING = { up: 4.6, radius: 1.5 } as const;
 /** The board is drawn taller than the part coins can reach, so it runs off the top of the screen instead of ending in mid-air. */
@@ -126,12 +138,18 @@ export const createScene = (canvas: HTMLCanvasElement): Scene => {
   const dullBrass = new THREE.MeshStandardMaterial({ color: 0x8a6a34, metalness: 0.9, roughness: 0.5 });
   const shelfTop = new THREE.MeshStandardMaterial({ color: 0x1d2660, metalness: 0.5, roughness: 0.3 });
   const glowCoral = new THREE.MeshStandardMaterial({ color: 0x220806, emissive: CORAL, emissiveIntensity: 1.6 });
+  const gutter = new THREE.MeshStandardMaterial({ color: 0x000000, roughness: 1 });
   const glowMoon = new THREE.MeshStandardMaterial({ color: 0x10142e, emissive: 0x8fa4ff, emissiveIntensity: 1.1 });
 
   // The bed, with a lit lip along the edge everything is trying to get over.
   scene.add(box(HALF_W * 2, 3, BED_FRONT + 2, lacquer, 0, -1.5, BED_FRONT / 2 - 1));
-  const lip = box(HALF_W * 2, 0.12, 0.14, glowCoral, 0, -0.07, BED_FRONT + 0.06);
-  scene.add(lip);
+  scene.add(box(WIN_HALF_W * 2, 0.12, 0.14, glowCoral, 0, -0.07, BED_FRONT + 0.06));
+  // The two ends of the edge are gutters: dark, and fenced off from the paying middle by a post.
+  for (const side of [-1, 1]) {
+    scene.add(box(HALF_W - WIN_HALF_W, 0.12, 0.14, dark, (side * (HALF_W + WIN_HALF_W)) / 2, -0.07, BED_FRONT + 0.06));
+    scene.add(box(0.1, 1.6, 1.5, brass, side * WIN_HALF_W, -0.9, BED_FRONT + 0.8));
+    scene.add(box(HALF_W - WIN_HALF_W, 0.05, 1.5, gutter, (side * (HALF_W + WIN_HALF_W)) / 2, -1.6, BED_FRONT + 0.8));
+  }
   scene.add(box(HALF_W * 2 + 4, 0.4, 8, dark, 0, -4.4, BED_FRONT + 2));
 
   for (const side of [-1, 1]) {
@@ -206,6 +224,28 @@ export const createScene = (canvas: HTMLCanvasElement): Scene => {
   ringArm.add(ringRod);
   scene.add(ringArm);
 
+  // A run of bulbs down each side of the cabinet, which chase when things are going well.
+  const bulbs = new THREE.InstancedMesh(new THREE.SphereGeometry(0.11, 10, 8), new THREE.MeshBasicMaterial(), BULBS * 2);
+  for (let n = 0; n < BULBS * 2; n++) {
+    const side = n < BULBS ? -1 : 1;
+    const along = (n % BULBS) / (BULBS - 1);
+    bulbs.setMatrixAt(n, new THREE.Matrix4().makeTranslation(side * (HALF_W - 0.02), 2.3 + along * 1.6, WIPER.z + 0.6 + along * (BED_FRONT - WIPER.z - 0.8)));
+    bulbs.setColorAt(n, new THREE.Color(0x222a66));
+  }
+  scene.add(bulbs);
+  const bulbColour = new THREE.Color();
+
+  const waves = Array.from({ length: 4 }, () => {
+    const mesh = new THREE.Mesh(new THREE.RingGeometry(0.82, 1, 48), new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, depthTest: false, side: THREE.DoubleSide }));
+    mesh.rotation.x = -Math.PI / 2;
+    mesh.renderOrder = 6;
+    mesh.visible = false;
+    scene.add(mesh);
+    return { mesh, age: 1 };
+  });
+  let nextWave = 0;
+  let jolt = 0;
+
   const geometries = {} as Record<CoinKind, THREE.CylinderGeometry>;
   const materials = {} as Record<CoinKind, THREE.Material[]>;
   const coins = {} as Record<CoinKind, THREE.InstancedMesh>;
@@ -261,9 +301,9 @@ export const createScene = (canvas: HTMLCanvasElement): Scene => {
   // Instance colours multiply the metal's own, so values above 1 brighten a coin and values below darken it.
   const plain = new THREE.Color(1, 1, 1);
   const charged = new THREE.Color(1.5, 1.7, 2.1);
-  const tints: Record<Power, THREE.Color> = { heavy: new THREE.Color(0.2, 0.22, 0.3), burst: new THREE.Color(2.4, 0.5, 0.3), chip: new THREE.Color(0.25, 1.9, 1.7) };
+  const tints: Record<Power, THREE.Color> = { burst: new THREE.Color(2.6, 0.45, 0.25), split: new THREE.Color(1.5, 0.6, 2.6), chip: new THREE.Color(0.25, 1.9, 1.7) };
   const tintOf = (power: Power | undefined, ringed: boolean) => (power ? tints[power] : ringed ? charged : plain);
-  const counts: Record<CoinKind, number> = { small: 0, medium: 0, large: 0 };
+  const counts: Record<CoinKind, number> = { small: 0, medium: 0, large: 0, giant: 0 };
   let lastDraw = performance.now();
 
   /** Puts a coin that is on the track, or waiting at the top of it, in with the loose ones. */
@@ -280,7 +320,7 @@ export const createScene = (canvas: HTMLCanvasElement): Scene => {
     const dt = Math.min(0.05, (now - lastDraw) / 1000);
     lastDraw = now;
 
-    counts.small = counts.medium = counts.large = 0;
+    counts.small = counts.medium = counts.large = counts.giant = 0;
     const seen = new Set<object>();
     for (const piece of physics.pieces) {
       const at = piece.body.translation();
@@ -322,7 +362,7 @@ export const createScene = (canvas: HTMLCanvasElement): Scene => {
     ringArm.rotation.y = physics.ringYaw;
     ringGlow.emissiveIntensity = 2.2 + Math.sin(now / 160) * 0.5 + pulse * 4;
     // The track will have swung on by the time a coin let go now reaches the jump, so the marker shows where it will point then.
-    const yawThen = trackYawAt(physics.time + RIDE_TIME);
+    const yawThen = trackYawAt(physics.aimClock + RIDE_TIME);
     aim.visible = physics.held !== undefined;
     aim.position.set(Math.sin(yawThen) * aimForward, AIM_HEIGHT, TRACK.pivotZ + Math.cos(yawThen) * aimForward);
 
@@ -339,7 +379,40 @@ export const createScene = (canvas: HTMLCanvasElement): Scene => {
     }
     sparkGeometry.attributes.position!.needsUpdate = true;
 
+    for (let n = 0; n < BULBS * 2; n++) {
+      // Lit bulbs run from the back to the front; the brighter the cabinet is flaring, the faster and brighter they go.
+      const phase = ((n % BULBS) / BULBS - now / (pulse > 0.05 ? 260 : 1400)) % 1;
+      const lit = Math.pow((phase + 1) % 1, 6);
+      bulbs.setColorAt(n, bulbColour.setRGB(0.12 + lit * (1.2 + pulse * 2), 0.14 + lit * (0.55 + pulse), 0.4 + lit * 0.5));
+    }
+    bulbs.instanceColor!.needsUpdate = true;
+
+    for (const wave of waves) {
+      if (wave.age >= 1) continue;
+      wave.age = Math.min(1, wave.age + dt / WAVE_TIME);
+      wave.mesh.scale.setScalar(0.3 + wave.age * WAVE_REACH);
+      (wave.mesh.material as THREE.MeshBasicMaterial).opacity = (1 - wave.age) * 0.9;
+      wave.mesh.visible = wave.age < 1;
+    }
+
+    jolt = Math.max(0, jolt - dt * 2.6);
+    const sway = jolt * jolt * 0.55;
+    camera.position.set(CAMERA_AT.x + Math.sin(now / 23) * sway, CAMERA_AT.y + Math.cos(now / 17) * sway, CAMERA_AT.z - jolt * 0.8);
+    camera.lookAt(CAMERA_LOOKS_AT);
+
     renderer.render(scene, camera);
+  };
+
+  const shake: Scene['shake'] = (amount) => {
+    jolt = Math.min(1, Math.max(jolt, amount));
+  };
+
+  const shockwave: Scene['shockwave'] = (at, colour) => {
+    const wave = waves[nextWave]!;
+    nextWave = (nextWave + 1) % waves.length;
+    wave.age = 0;
+    wave.mesh.position.set(at.x, Math.max(0.3, at.y - 0.3), at.z);
+    (wave.mesh.material as THREE.MeshBasicMaterial).color.set(colour);
   };
 
   const chute: Scene['chute'] = (x) => ({ x, y: -0.2, z: BED_FRONT + 0.5 });
@@ -366,8 +439,8 @@ export const createScene = (canvas: HTMLCanvasElement): Scene => {
     camera.aspect = width / height;
     // The cabinet is taller than it is wide: fit its width on a phone, and on anything wider fit its height instead.
     camera.fov = THREE.MathUtils.radToDeg(2 * Math.atan(Math.tan(HALF_VIEW_ACROSS) / Math.min(camera.aspect, PHONE_ASPECT)));
-    camera.position.set(0, 16, 25.4);
-    camera.lookAt(0, 3.6, 4.9);
+    camera.position.copy(CAMERA_AT);
+    camera.lookAt(CAMERA_LOOKS_AT);
     camera.updateProjectionMatrix();
   };
 
@@ -381,5 +454,5 @@ export const createScene = (canvas: HTMLCanvasElement): Scene => {
     renderer.dispose();
   };
 
-  return { draw, resize, sparkle, chute, chuteOnScreen, dispose };
+  return { draw, resize, sparkle, shake, shockwave, chute, chuteOnScreen, dispose };
 };

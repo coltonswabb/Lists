@@ -169,7 +169,7 @@ export const RING = (() => {
     swing: 0.44,
     period: 3.3,
     /** How far off centre, in radians about the post, a coin can be and still go through. */
-    tolerance: 0.13,
+    tolerance: 0.085,
   } as const;
 })();
 
@@ -183,7 +183,7 @@ export const landingForward = (height: number): number => {
   return end.forward + TRACK.launchSpeed * end.dirForward * time;
 };
 
-export type CoinKind = 'small' | 'medium' | 'large';
+export type CoinKind = 'small' | 'medium' | 'large' | 'giant';
 
 export type CoinSpec = {
   radius: number;
@@ -192,15 +192,22 @@ export type CoinSpec = {
   value: number;
   /** How often the track serves one, relative to the others. */
   weight: number;
+  /** How heavy it is for its size. */
+  density: number;
 };
 
 export const COINS: Record<CoinKind, CoinSpec> = {
-  small: { radius: 0.5, thickness: 0.15, value: 1, weight: 66 },
-  medium: { radius: 0.68, thickness: 0.18, value: 3, weight: 25 },
-  large: { radius: 0.9, thickness: 0.23, value: 10, weight: 9 },
+  small: { radius: 0.5, thickness: 0.15, value: 1, weight: 66, density: 1 },
+  medium: { radius: 0.68, thickness: 0.18, value: 3, weight: 25, density: 1 },
+  large: { radius: 0.9, thickness: 0.23, value: 10, weight: 9, density: 1 },
+  // Never served in the ordinary run: it is a prize. Wide, thick and dense enough to bulldoze the heap it lands on.
+  giant: { radius: 1.45, thickness: 0.34, value: 30, weight: 0, density: 3 },
 };
 
-export const COIN_KINDS: readonly CoinKind[] = ['small', 'medium', 'large'];
+export const COIN_KINDS: readonly CoinKind[] = ['small', 'medium', 'large', 'giant'];
+
+/** Only the middle of the front edge pays. A coin that goes over nearer a side wall than this is lost down a gutter. */
+export const WIN_HALF_W = 3.9;
 
 /** A coin that went through the ring is worth this many times its usual value when it falls. */
 export const RING_BONUS = 3;
@@ -210,26 +217,49 @@ export const CARD = { width: 1.5, length: 2.1, thickness: 0.05 } as const;
 /** The set to collect. A card is won by getting it over the front edge. */
 export const CARD_NAMES = ['Moon', 'Tide', 'Heron', 'Kelp', 'Lantern', 'Anchor', 'Shell', 'Comet', 'Leviathan'] as const;
 
+export type Rarity = 'common' | 'rare' | 'epic' | 'legendary';
+
+/** How rare each card is, in the order of CARD_NAMES. */
+export const CARD_RARITY: readonly Rarity[] = ['common', 'common', 'common', 'common', 'rare', 'rare', 'rare', 'epic', 'legendary'];
+
+export const RARITIES: Record<Rarity, { /** How often it is dealt, relative to the others. */ weight: number; /** Coins paid for one you already have. */ duplicate: number; colour: string }> = {
+  common: { weight: 10, duplicate: 5, colour: '#cfd4e2' },
+  rare: { weight: 5, duplicate: 15, colour: '#5fb0ff' },
+  epic: { weight: 2, duplicate: 40, colour: '#c77dff' },
+  legendary: { weight: 1, duplicate: 100, colour: '#ffb347' },
+};
+
+/** Coins paid for completing the set. */
+export const SET_BONUS = 250;
+
+/** How much slower the track and the ring swing while the player holds to steady their aim. */
+export const STEADY_RATE = 0.3;
+
 /** How far the shelf's front edge is from the back at a moment, given how far out it reaches on this push. */
 export const shelfFrontAt = (time: number, reach: number): number => SHELF.min + ((reach - SHELF.min) * (1 - Math.cos((time / SHELF.period) * Math.PI * 2))) / 2;
 
 /**
  * What can make a coin more than a coin.
- * - heavy: several times the weight, so it ploughs into the heap where an ordinary coin would ride on top.
  * - burst: goes off shortly after it lands and throws its neighbours outward.
+ * - split: breaks into a fan of coins in mid-air.
  * - chip: a token dealt into the heap now and then. Get it over the edge and the machine rains coins.
  */
-export type Power = 'heavy' | 'burst' | 'chip';
+export type Power = 'burst' | 'split' | 'chip';
 
 export const POWERS = {
-  heavyDensity: 7,
   /** Seconds from leaving the jump to going off. */
-  burstFuse: 1.1,
-  burstReach: 3.2,
-  burstForce: 13,
+  burstFuse: 1.15,
+  burstReach: 3.8,
+  burstForce: 17,
+  /** Seconds from leaving the jump to breaking apart, and how many coins it becomes. */
+  splitAfter: 0.2,
+  splitInto: 6,
+  /** How far round a giant coin's landing shoves the heap, and how hard. */
+  slamReach: 3.6,
+  slamForce: 9,
   /** Coins the machine rains when a chip is won, and seconds between them. */
-  rain: 14,
-  rainGap: 0.13,
+  rain: 16,
+  rainGap: 0.12,
 } as const;
 
 /** What the track serves: a size of coin, and perhaps a power. */
