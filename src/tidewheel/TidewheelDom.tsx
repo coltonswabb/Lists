@@ -3,12 +3,12 @@
 import { type CSSProperties, useEffect, useRef, useState } from 'react';
 
 import { cardColour } from './art';
-import { CARD_NAMES, COINS } from './cabinet';
+import { CARD_NAMES, type CoinKind, COINS, RING_BONUS } from './cabinet';
 import { advance, createPhysics, type Physics, release, STEP } from './physics';
 import { createScene, type Scene } from './scene';
-import { chime, clink, fanfare, release as releaseSound, wakeSound } from './sound';
+import { chime, clink, fanfare, release as releaseSound, swoosh, wakeSound } from './sound';
 
-export type Haptic = 'drop' | 'fall' | 'card';
+export type Haptic = 'drop' | 'fall' | 'card' | 'ring';
 
 type Props = {
   /** Asks the phone to buzz. Runs on the native side; absent on the web. */
@@ -27,18 +27,25 @@ const REFILL_AFTER = 3;
 const REFILL = 15;
 const MAX_STEPS_PER_FRAME = 3;
 
+const NEXT_SIZE: Record<CoinKind, number> = { small: 12, medium: 16, large: 21 };
+const NEXT_FILL: Record<CoinKind, string> = {
+  small: 'radial-gradient(circle at 35% 30%, #ffffff, #cfd4e2 55%, #7d8499)',
+  medium: 'radial-gradient(circle at 35% 30%, #fff3c4, #f2c14e 55%, #a9792a)',
+  large: 'radial-gradient(circle at 35% 30%, #ffd9c9, #ff8f6b 55%, #a8482c)',
+};
+
 const COIN_COLOURS = { small: 0xdfe3ee, medium: 0xf2c14e, large: 0xff8f6b } as const;
 
 type Popup = { id: number; x: number; y: number; text: string; big: boolean };
 
-type Hud = { coins: number; multiplier: number; collected: boolean[]; toast: string | undefined; popups: Popup[]; ready: boolean };
+type Hud = { coins: number; multiplier: number; collected: boolean[]; toast: string | undefined; popups: Popup[]; next: CoinKind[]; ready: boolean };
 
 const multiplierFor = (run: number) => Math.min(MAX_MULTIPLIER, 1 + Math.floor(run / COINS_PER_MULTIPLIER));
 
 export default function TidewheelDom({ onHaptic }: Props) {
   const canvas = useRef<HTMLCanvasElement>(null);
   const tap = useRef<() => void>(() => {});
-  const [hud, setHud] = useState<Hud>({ coins: START_COINS, multiplier: 1, collected: CARD_NAMES.map(() => false), toast: undefined, popups: [], ready: false });
+  const [hud, setHud] = useState<Hud>({ coins: START_COINS, multiplier: 1, collected: CARD_NAMES.map(() => false), toast: undefined, popups: [], next: [], ready: false });
 
   useEffect(() => {
     let physics: Physics | undefined;
@@ -71,9 +78,18 @@ export default function TidewheelDom({ onHaptic }: Props) {
       let toast: string | undefined;
       let changed = false;
       for (let n = 0; n < steps; n++) {
-        const falls = advance(physics);
-        if (physics.clinks > 0) clink();
-        for (const fall of falls) {
+        const happened = advance(physics);
+        if (happened.clinked) clink();
+        if (happened.launched) changed = true;
+        if (happened.ringed) {
+          changed = true;
+          toast = `Through the ring  ×${RING_BONUS}`;
+          toastUntil = physics.time + 1.4;
+          pulse = Math.min(1, pulse + 0.6);
+          swoosh();
+          buzz('ring');
+        }
+        for (const fall of happened.falls) {
           changed = true;
           const at = scene.chuteOnScreen(fall.x);
           if (fall.piece.type === 'card') {
@@ -88,9 +104,9 @@ export default function TidewheelDom({ onHaptic }: Props) {
           }
           run = physics.time - lastFall > RUN_GAP ? 1 : run + 1;
           lastFall = physics.time;
-          const gain = COINS[fall.piece.kind].value * multiplierFor(run);
+          const gain = COINS[fall.piece.kind].value * multiplierFor(run) * (fall.piece.charged ? RING_BONUS : 1);
           coins += gain;
-          const big = fall.piece.kind === 'large';
+          const big = fall.piece.kind === 'large' || fall.piece.charged;
           popups.push({ id: popupId++, x: at.x, y: at.y, text: `+${gain}`, big });
           scene.sparkle(fall.x, COIN_COLOURS[fall.piece.kind], big ? 26 : 9);
           pulse = Math.min(1, pulse + (big ? 0.5 : 0.16));
@@ -126,6 +142,7 @@ export default function TidewheelDom({ onHaptic }: Props) {
         collected: [...collected],
         toast: toast ?? (clearToast ? undefined : old.toast),
         popups: [...old.popups.slice(-14), ...popups],
+        next: [...physics!.queue],
         ready: true,
       }));
     };
@@ -137,7 +154,7 @@ export default function TidewheelDom({ onHaptic }: Props) {
       coins--;
       releaseSound();
       buzz('drop');
-      setHud((old) => ({ ...old, coins }));
+      setHud((old) => ({ ...old, coins, next: [...physics!.queue] }));
     };
 
     void createPhysics().then((made) => {
@@ -145,7 +162,7 @@ export default function TidewheelDom({ onHaptic }: Props) {
       physics = made;
       scene = createScene(canvas.current);
       fit();
-      setHud((old) => ({ ...old, ready: true }));
+      setHud((old) => ({ ...old, next: [...made.queue], ready: true }));
       raf = requestAnimationFrame(frame);
     });
     window.addEventListener('resize', fit);
@@ -167,6 +184,12 @@ export default function TidewheelDom({ onHaptic }: Props) {
           <span style={styles.coinDot} />
           <span style={styles.count}>{hud.coins}</span>
           {hud.multiplier > 1 && <span style={styles.multiplier}>×{hud.multiplier}</span>}
+        </div>
+        <div style={styles.next}>
+          <span style={styles.nextLabel}>NEXT</span>
+          {hud.next.map((kind, n) => (
+            <span key={n} style={{ ...styles.nextCoin, width: NEXT_SIZE[kind], height: NEXT_SIZE[kind], background: NEXT_FILL[kind] }} />
+          ))}
         </div>
       </div>
       {hud.popups.map((popup) => (
@@ -208,6 +231,9 @@ const styles: Record<string, CSSProperties> = {
   coinDot: { width: 16, height: 16, borderRadius: 8, background: 'radial-gradient(circle at 35% 30%, #fff3c4, #f2c14e 55%, #a9792a)' },
   count: { color: '#fff6dc', fontSize: 24, fontWeight: 500, fontVariantNumeric: 'tabular-nums', minWidth: 34, textAlign: 'center' },
   multiplier: { color: '#ff6b5a', fontSize: 20, fontWeight: 700 },
+  next: { display: 'flex', alignItems: 'center', gap: 6, height: 22 },
+  nextLabel: { color: 'rgba(239, 231, 214, 0.55)', fontSize: 10, letterSpacing: 2, marginRight: 2 },
+  nextCoin: { display: 'inline-block', borderRadius: 999 },
   popup: { position: 'absolute', fontWeight: 700, textShadow: '0 2px 10px rgba(0,0,0,0.7)', pointerEvents: 'none', animation: 'tw-rise 0.9s ease-out forwards' },
   toast: {
     position: 'absolute',

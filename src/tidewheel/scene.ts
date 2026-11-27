@@ -6,8 +6,27 @@ import * as THREE from 'three';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
 
 import { boardArt, cardFace, coinFace } from './art';
-import { BED_FRONT, BOARD, CARD, COIN_KINDS, type CoinKind, COINS, GLASS_Z, HALF_W, onBoard, RAMP, SHELF, WHEEL, WIPER } from './cabinet';
-import { heldPlace, MAX_COINS, type Physics } from './physics';
+import {
+  BED_FRONT,
+  BOARD,
+  CARD,
+  COIN_KINDS,
+  type CoinKind,
+  COINS,
+  GLASS_Z,
+  HALF_W,
+  landingForward,
+  onBoard,
+  RIDE_TIME,
+  RING,
+  SHELF,
+  TRACK,
+  TRACK_LENGTH,
+  trackAt,
+  trackYawAt,
+  WIPER,
+} from './cabinet';
+import { MAX_COINS, onTrack, type Physics } from './physics';
 
 const INK = 0x05071a;
 const LACQUER = 0x141a44;
@@ -49,6 +68,8 @@ const box = (w: number, h: number, d: number, material: THREE.Material, x: numbe
 };
 
 const SPARKS = 220;
+/** The ring of moon phases painted on the backboard: how far up the board, and how wide. */
+const MOON_RING = { up: 4.6, radius: 1.5 } as const;
 /** The board is drawn taller than the part coins can reach, so it runs off the top of the screen instead of ending in mid-air. */
 const BOARD_SHOWN = BOARD.length + 9;
 /** Half the angle the camera sees across the cabinet, and the screen shape that angle is meant for. */
@@ -122,52 +143,68 @@ export const createScene = (canvas: HTMLCanvasElement): Scene => {
   shelf.children.forEach((child) => (child.castShadow = true));
   scene.add(shelf);
 
-  scene.add(box(HALF_W * 2, WIPER.top - SHELF.top - 0.03, 4, dark, 0, (WIPER.top + SHELF.top + 0.03) / 2, WIPER.z - 2));
+  scene.add(box(HALF_W * 2, WIPER.top - SHELF.top - 0.03, 4, lacquer, 0, (WIPER.top + SHELF.top + 0.03) / 2, WIPER.z - 2));
+  scene.add(box(HALF_W * 2, 0.1, 0.08, glowMoon, 0, WIPER.top - 0.05, WIPER.z + 0.03));
 
   const board = new THREE.Mesh(
     new THREE.BoxGeometry(HALF_W * 2, BOARD_SHOWN, BOARD.thickness),
-    new THREE.MeshStandardMaterial({ map: boardArt(HALF_W * 2, BOARD_SHOWN, WHEEL.up, WHEEL.radius), metalness: 0.2, roughness: 0.5 }),
+    new THREE.MeshStandardMaterial({ map: boardArt(HALF_W * 2, BOARD_SHOWN, MOON_RING.up, MOON_RING.radius), metalness: 0.2, roughness: 0.5 }),
   );
   board.position.copy(new THREE.Vector3().copy(onBoard(0, BOARD_SHOWN / 2, -BOARD.thickness / 2)));
   board.quaternion.copy(lean);
   board.receiveShadow = true;
   scene.add(board);
 
-  const rampTop = onBoard(0, RAMP.from);
-  const ramp = new THREE.Mesh(new THREE.BoxGeometry(HALF_W * 2, RAMP.thickness, Math.hypot(RAMP.endY - rampTop.y, RAMP.endZ - rampTop.z)), dullBrass);
-  const rampPitch = Math.atan2(rampTop.y - RAMP.endY, RAMP.endZ - rampTop.z);
-  ramp.position.set(0, (rampTop.y + RAMP.endY) / 2 - (Math.cos(rampPitch) * RAMP.thickness) / 2, (rampTop.z + RAMP.endZ) / 2 - (Math.sin(rampPitch) * RAMP.thickness) / 2);
-  ramp.rotation.x = rampPitch;
-  ramp.castShadow = true;
-  ramp.receiveShadow = true;
-  scene.add(ramp);
-
   // The sill under the glass, where the outside of the cabinet begins.
   scene.add(box(HALF_W * 2 + 0.8, 5, 0.6, dark, 0, -3.4, GLASS_Z + 0.3));
   scene.add(box(HALF_W * 2 + 0.8, 0.1, 0.62, brass, 0, -0.9, GLASS_Z + 0.3));
 
-  // The wheel lies in the board's plane: its own x and y are across and up the board.
-  const wheel = new THREE.Group();
-  wheel.position.copy(new THREE.Vector3().copy(onBoard(0, WHEEL.up, 0.2)));
-  wheel.quaternion.copy(lean);
-  const spinner = new THREE.Group();
-  const ring = new THREE.Mesh(new THREE.TorusGeometry(WHEEL.radius, 0.07, 12, 72), brass);
-  spinner.add(ring);
-  for (let i = 0; i < 6; i++) {
-    const spoke = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, WHEEL.radius * 2, 8), brass);
-    spoke.rotation.z = (i / 6) * Math.PI;
-    spinner.add(spoke);
+  // The track is built pointing straight at the player, standing on its post; turning the group about the post swings it.
+  const track = new THREE.Group();
+  track.position.set(0, 0, TRACK.pivotZ);
+  const railPoints = (side: number) =>
+    Array.from({ length: 49 }, (_, n) => {
+      const at = trackAt((n / 48) * TRACK_LENGTH);
+      return new THREE.Vector3(side * TRACK.gauge, at.height, at.forward);
+    });
+  for (const side of [-1, 1]) {
+    const rail = new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(railPoints(side)), 96, 0.045, 8), brass);
+    rail.castShadow = true;
+    track.add(rail);
   }
-  const hub = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.3, 0.2, 24), glowCoral);
-  hub.rotation.x = Math.PI / 2;
-  spinner.add(hub);
-  wheel.add(spinner);
-  scene.add(wheel);
+  for (let n = 0; n <= 16; n++) {
+    const at = trackAt((n / 16) * TRACK_LENGTH);
+    const tie = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, TRACK.gauge * 2 + 0.12, 6), brass);
+    tie.rotation.z = Math.PI / 2;
+    tie.position.set(0, at.height - 0.03, at.forward);
+    track.add(tie);
+  }
+  // A strut from the dip back to the wall, so the track is visibly held up by something.
+  const dip = trackAt(TRACK_LENGTH * 0.82);
+  const strut = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 1, 8), dullBrass);
+  const strutFrom = new THREE.Vector3(0, dip.height - 0.05, dip.forward);
+  const strutTo = new THREE.Vector3(0, dip.height + 0.9, 1.0);
+  strut.position.copy(strutFrom).add(strutTo).multiplyScalar(0.5);
+  strut.scale.y = strutFrom.distanceTo(strutTo);
+  strut.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), strutTo.clone().sub(strutFrom).normalize());
+  track.add(strut);
+  scene.add(track);
+
+  // The ring rides an arc about the same post, facing it.
+  const ringArm = new THREE.Group();
+  ringArm.position.set(0, 0, TRACK.pivotZ);
+  const ringGlow = new THREE.MeshStandardMaterial({ color: 0x2a0d08, emissive: CORAL, emissiveIntensity: 2.2 });
+  const ring = new THREE.Mesh(new THREE.TorusGeometry(RING.radius, 0.07, 12, 64), ringGlow);
+  ring.position.set(0, RING.height, RING.forward);
+  ringArm.add(ring);
+  const ringRod = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 9, 6), dullBrass);
+  ringRod.position.set(0, RING.height + RING.radius + 4.5, RING.forward);
+  ringArm.add(ringRod);
+  scene.add(ringArm);
 
   const geometries = {} as Record<CoinKind, THREE.CylinderGeometry>;
   const materials = {} as Record<CoinKind, THREE.Material[]>;
   const coins = {} as Record<CoinKind, THREE.InstancedMesh>;
-  const held = {} as Record<CoinKind, THREE.Mesh>;
   for (const kind of COIN_KINDS) {
     geometries[kind] = new THREE.CylinderGeometry(COINS[kind].radius, COINS[kind].radius, COINS[kind].thickness, 40);
     materials[kind] = coinMaterials(kind);
@@ -177,9 +214,6 @@ export const createScene = (canvas: HTMLCanvasElement): Scene => {
     mesh.frustumCulled = false;
     coins[kind] = mesh;
     scene.add(mesh);
-    held[kind] = new THREE.Mesh(geometries[kind], materials[kind]);
-    held[kind].castShadow = true;
-    scene.add(held[kind]);
   }
 
   const cardGeometry = new THREE.BoxGeometry(CARD.width, CARD.thickness, CARD.length);
@@ -196,9 +230,13 @@ export const createScene = (canvas: HTMLCanvasElement): Scene => {
     return face;
   };
 
-  // A spot of light on the ramp's edge showing where the coin would arrive if let go now.
-  const aim = new THREE.Mesh(new THREE.SphereGeometry(0.16, 16, 12), new THREE.MeshBasicMaterial({ color: CORAL }));
+  // A disc of light on the pile showing where a coin let go now would come down.
+  const aim = new THREE.Mesh(new THREE.RingGeometry(0.42, 0.56, 40), new THREE.MeshBasicMaterial({ color: CORAL, transparent: true, opacity: 0.85, depthTest: false }));
+  aim.rotation.x = -Math.PI / 2;
+  aim.renderOrder = 5;
   scene.add(aim);
+  const AIM_HEIGHT = SHELF.top + 0.5;
+  const aimForward = landingForward(AIM_HEIGHT);
 
   const sparkPositions = new Float32Array(SPARKS * 3).fill(-999);
   const sparkColours = new Float32Array(SPARKS * 3);
@@ -216,23 +254,18 @@ export const createScene = (canvas: HTMLCanvasElement): Scene => {
   const position = new THREE.Vector3();
   const rotation = new THREE.Quaternion();
   const one = new THREE.Vector3(1, 1, 1);
-  const flatOnBoard = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), Math.PI / 2 - BOARD.lean);
+  const charge = new THREE.Color(0xa8f6ff);
+  const plain = new THREE.Color(0xffffff);
   const counts: Record<CoinKind, number> = { small: 0, medium: 0, large: 0 };
   let lastDraw = performance.now();
 
-  /** Slides along the board under gravity until the foot of it, to find where a coin let go now would arrive. */
-  const arrival = (physics: Physics): number => {
-    const speed = WHEEL.radius * WHEEL.spin;
-    const up = WHEEL.up + Math.sin(physics.wheelAngle) * WHEEL.radius - RAMP.from;
-    const upSpeed = Math.cos(physics.wheelAngle) * speed;
-    const pull = 34 * Math.cos(BOARD.lean);
-    const time = (upSpeed + Math.sqrt(upSpeed * upSpeed + 2 * pull * Math.max(0, up))) / pull;
-    let x = Math.cos(physics.wheelAngle) * WHEEL.radius - Math.sin(physics.wheelAngle) * speed * time;
-    const limit = HALF_W - 0.6;
-    // A coin that reaches a wall comes back off it.
-    if (x > limit) x = limit - (x - limit) * 0.3;
-    if (x < -limit) x = -limit - (x + limit) * 0.3;
-    return Math.max(-limit, Math.min(limit, x));
+  /** Puts a coin that is on the track, or waiting at the top of it, in with the loose ones. */
+  const place = (kind: CoinKind, distance: number, yaw: number, roll: number) => {
+    const seat = onTrack(kind, distance, yaw, roll);
+    position.set(seat.position.x, seat.position.y, seat.position.z);
+    rotation.set(seat.rotation.x, seat.rotation.y, seat.rotation.z, seat.rotation.w);
+    coins[kind].setColorAt(counts[kind], plain);
+    coins[kind].setMatrixAt(counts[kind]++, matrix.compose(position, rotation, one));
   };
 
   const draw: Scene['draw'] = (physics, pulse) => {
@@ -248,6 +281,7 @@ export const createScene = (canvas: HTMLCanvasElement): Scene => {
       position.set(at.x, at.y, at.z);
       rotation.set(turn.x, turn.y, turn.z, turn.w);
       if (piece.type === 'coin') {
+        coins[piece.kind].setColorAt(counts[piece.kind], piece.charged ? charge : plain);
         coins[piece.kind].setMatrixAt(counts[piece.kind]++, matrix.compose(position, rotation, one));
         continue;
       }
@@ -268,19 +302,22 @@ export const createScene = (canvas: HTMLCanvasElement): Scene => {
       scene.remove(mesh);
       cardMeshes.delete(piece);
     }
+    for (const rider of physics.riders) place(rider.kind, rider.distance, physics.trackYaw, rider.roll);
+    if (physics.held) place(physics.held, 0, physics.trackYaw, 0);
     for (const kind of COIN_KINDS) {
       coins[kind].count = counts[kind];
       coins[kind].instanceMatrix.needsUpdate = true;
-      held[kind].visible = physics.held === kind;
-      if (physics.held !== kind) continue;
-      held[kind].position.copy(new THREE.Vector3().copy(heldPlace(physics, kind)));
-      held[kind].quaternion.copy(flatOnBoard);
+      if (coins[kind].instanceColor) coins[kind].instanceColor.needsUpdate = true;
     }
 
     shelf.position.z = physics.shelfFront;
-    spinner.rotation.z = physics.wheelAngle;
+    track.rotation.y = physics.trackYaw;
+    ringArm.rotation.y = physics.ringYaw;
+    ringGlow.emissiveIntensity = 2.2 + Math.sin(now / 160) * 0.5 + pulse * 4;
+    // The track will have swung on by the time a coin let go now reaches the jump, so the marker shows where it will point then.
+    const yawThen = trackYawAt(physics.time + RIDE_TIME);
     aim.visible = physics.held !== undefined;
-    aim.position.set(arrival(physics), RAMP.endY + 0.12, RAMP.endZ - 0.05);
+    aim.position.set(Math.sin(yawThen) * aimForward, AIM_HEIGHT, TRACK.pivotZ + Math.cos(yawThen) * aimForward);
 
     flare.intensity = pulse * 60;
     glowCoral.emissiveIntensity = 1.6 + pulse * 5;
@@ -320,8 +357,8 @@ export const createScene = (canvas: HTMLCanvasElement): Scene => {
     camera.aspect = width / height;
     // The cabinet is taller than it is wide: fit its width on a phone, and on anything wider fit its height instead.
     camera.fov = THREE.MathUtils.radToDeg(2 * Math.atan(Math.tan(HALF_VIEW_ACROSS) / Math.min(camera.aspect, PHONE_ASPECT)));
-    camera.position.set(0, 14.5, 22);
-    camera.lookAt(0, 3.4, 3.6);
+    camera.position.set(0, 15.5, 24.6);
+    camera.lookAt(0, 3.7, 4.6);
     camera.updateProjectionMatrix();
   };
 

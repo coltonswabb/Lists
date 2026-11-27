@@ -44,3 +44,8 @@ export const fanfare = () => {
 };
 
 export const release = () => tone(320, 0.08, 0.06, 'square');
+
+/** A coin threading the ring. */
+export const swoosh = () => {
+  [5, 7, 9].forEach((degree, n) => tone(SCALE[degree]!, 0.22, 0.1, 'sine', n * 0.05));
+};

@@ -13,7 +13,7 @@ const FILL = { flex: 1 } as const;
  */
 export const TidewheelScreen: FC = () => {
   const onHaptic = useCallback(async (kind: Haptic) => {
-    if (kind === 'card') success();
+    if (kind === 'card' || kind === 'ring') success();
     else if (kind === 'fall') thud();
     else tick();
   }, []);
