@@ -17,8 +17,11 @@ import {
   GRAVITY,
   HALF_W,
   onBoard,
+  type Power,
+  POWERS,
   RING,
   ringYawAt,
+  type Serving,
   SHELF,
   shelfFrontAt,
   TRACK,
@@ -31,29 +34,44 @@ import {
 
 export const STEP = 1 / 60;
 /** The most coins the cabinet holds. Past this the track waits for some to fall. */
-export const MAX_COINS = 240;
+export const MAX_COINS = 330;
 const CARDS_ON_BED = 3;
 /** A fresh card is dealt onto the shelf after this many coins have been dropped, if the bed is short of cards. */
 const COINS_PER_CARD = 24;
+/** A chip is dealt after this many coins have been dropped, if there is not one in the cabinet already. */
+const COINS_PER_CHIP = 34;
+/** Pushes the shelf reaches further on, once the tide has been called in. */
+const SURGE_PUSHES = 2;
 
 type Vec = { x: number; y: number; z: number };
 type Quat = { x: number; y: number; z: number; w: number };
 
-export type Piece =
-  | { type: 'coin'; kind: CoinKind; body: RAPIER.RigidBody; /** Went through the ring on its way in. */ charged: boolean }
-  | { type: 'card'; card: number; body: RAPIER.RigidBody };
+export type Coin = {
+  type: 'coin';
+  kind: CoinKind;
+  power: Power | undefined;
+  body: RAPIER.RigidBody;
+  /** Went through the ring on its way in. */
+  charged: boolean;
+  /** When a burst coin goes off, or undefined if it will not. */
+  fuseAt: number | undefined;
+};
+export type Card = { type: 'card'; card: number; body: RAPIER.RigidBody };
+export type Piece = Coin | Card;
 
 /** Something that went down the chute this step, and where across the cabinet it went. */
 export type Fall = { piece: Piece; x: number };
 
 /** A coin on its way down the track. It follows the rail exactly until the jump, where it becomes a free body. */
-export type Rider = { kind: CoinKind; distance: number; roll: number };
+export type Rider = Serving & { distance: number; roll: number };
 
 /** What happened in one step. */
 export type Happened = {
   falls: Fall[];
   /** Where a coin went through the ring, if one did. */
   ringed: Vec | undefined;
+  /** Where a burst coin went off, if one did. */
+  burst: Vec | undefined;
   /** Whether a coin just left the jump. */
   launched: boolean;
   /** Whether a coin in flight struck something. */
@@ -67,19 +85,27 @@ export type Physics = {
   pieces: Piece[];
   time: number;
   shelfFront: number;
+  /** The pushes, counted from the start, on which the shelf reaches further: from this one up to but not including the next. */
+  surgeFrom: number;
+  surgeUntil: number;
   /** Which way the track points. Coins on it swing with it. */
   trackYaw: number;
   ringYaw: number;
   /** The coin waiting at the top of the track, or undefined while there is none. */
-  held: CoinKind | undefined;
+  held: Serving | undefined;
   /** The coins that will be set at the top after the held one, soonest first. */
-  queue: CoinKind[];
+  queue: Serving[];
   riders: Rider[];
   /** Coins that have left the jump and not yet reached the ring's arc. */
-  flying: Piece[];
+  flying: Coin[];
   reloadAt: number;
   dropped: number;
   nextCard: number;
+  /** Coins the machine still owes from a chip, and when the next one comes down. */
+  rain: number;
+  rainAt: number;
+  /** Whether the next coin served should carry a power, as the prize for threading the ring. */
+  prize: boolean;
   random: () => number;
 };
 
@@ -87,13 +113,13 @@ const QUEUE_LENGTH = 2;
 
 const quatAboutX = (angle: number): Quat => ({ x: Math.sin(angle / 2), y: 0, z: 0, w: Math.cos(angle / 2) });
 const quatAboutY = (angle: number): Quat => ({ x: 0, y: Math.sin(angle / 2), z: 0, w: Math.cos(angle / 2) });
+const quatAboutZ = (angle: number): Quat => ({ x: 0, y: 0, z: Math.sin(angle / 2), w: Math.cos(angle / 2) });
 const multiply = (a: Quat, b: Quat): Quat => ({
   x: a.w * b.x + a.x * b.w + a.y * b.z - a.z * b.y,
   y: a.w * b.y - a.x * b.z + a.y * b.w + a.z * b.x,
   z: a.w * b.z + a.x * b.y - a.y * b.x + a.z * b.w,
   w: a.w * b.w - a.x * b.x - a.y * b.y - a.z * b.z,
 });
-const quatAboutZ = (angle: number): Quat => ({ x: 0, y: 0, z: Math.sin(angle / 2), w: Math.cos(angle / 2) });
 
 /** A small seeded generator, so a cabinet fills the same way every time for the same seed. */
 const mulberry = (seed: number) => {
@@ -117,58 +143,73 @@ const pickCoin = (random: () => number): CoinKind => {
   return 'small';
 };
 
+const serve = (physics: Physics): Serving => {
+  const kind = pickCoin(physics.random);
+  if (!physics.prize) return { kind, power: undefined };
+  physics.prize = false;
+  return { kind: kind === 'small' ? 'medium' : kind, power: physics.random() < 0.5 ? 'heavy' : 'burst' };
+};
+
 const fixedBox = (world: RAPIER.World, centre: Vec, half: Vec, friction: number, rotation = quatAboutX(0)) =>
-  world.createCollider(RAPIER.ColliderDesc.cuboid(half.x, half.y, half.z).setTranslation(centre.x, centre.y, centre.z).setRotation(rotation).setFriction(friction).setRestitution(0.1));
+  world.createCollider(RAPIER.ColliderDesc.cuboid(half.x, half.y, half.z).setTranslation(centre.x, centre.y, centre.z).setRotation(rotation).setFriction(friction).setRestitution(0.05));
 
 const buildCabinet = (world: RAPIER.World): RAPIER.RigidBody => {
   const tall = 9;
-  fixedBox(world, { x: 0, y: -1.5, z: BED_FRONT / 2 - 2 }, { x: HALF_W, y: 1.5, z: BED_FRONT / 2 + 2 }, 0.32);
-  fixedBox(world, { x: -HALF_W - 0.5, y: tall / 2 - 3, z: GLASS_Z / 2 }, { x: 0.5, y: tall, z: GLASS_Z / 2 + 2 }, 0.2);
-  fixedBox(world, { x: HALF_W + 0.5, y: tall / 2 - 3, z: GLASS_Z / 2 }, { x: 0.5, y: tall, z: GLASS_Z / 2 + 2 }, 0.2);
+  fixedBox(world, { x: 0, y: -1.5, z: BED_FRONT / 2 - 2 }, { x: HALF_W, y: 1.5, z: BED_FRONT / 2 + 2 }, 0.3);
+  fixedBox(world, { x: -HALF_W - 0.5, y: tall / 2 - 3, z: GLASS_Z / 2 }, { x: 0.5, y: tall, z: GLASS_Z / 2 + 2 }, 0.15);
+  fixedBox(world, { x: HALF_W + 0.5, y: tall / 2 - 3, z: GLASS_Z / 2 }, { x: 0.5, y: tall, z: GLASS_Z / 2 + 2 }, 0.15);
   fixedBox(world, { x: 0, y: tall / 2 - 3, z: GLASS_Z + 0.25 }, { x: HALF_W, y: tall, z: 0.25 }, 0.1);
   // The wiper: a hair above the shelf's top, so the shelf passes under it and anything riding the shelf does not.
-  fixedBox(world, { x: 0, y: (SHELF.top + 0.03 + WIPER.top) / 2, z: WIPER.z - 2 }, { x: HALF_W, y: (WIPER.top - SHELF.top - 0.03) / 2, z: 2 }, 0.2);
+  fixedBox(world, { x: 0, y: (SHELF.top + 0.03 + WIPER.top) / 2, z: WIPER.z - 2 }, { x: HALF_W, y: (WIPER.top - SHELF.top - 0.03) / 2, z: 2 }, 0.15);
   const mid = BOARD.length / 2;
   fixedBox(world, onBoard(0, mid, -BOARD.thickness / 2), { x: HALF_W, y: mid, z: BOARD.thickness / 2 }, 0.2, quatAboutX(-BOARD.lean));
 
   const shelf = world.createRigidBody(RAPIER.RigidBodyDesc.kinematicPositionBased().setTranslation(0, SHELF.top / 2, SHELF.min - SHELF.length / 2));
-  world.createCollider(RAPIER.ColliderDesc.cuboid(HALF_W, SHELF.top / 2, SHELF.length / 2).setFriction(0.5).setRestitution(0.05), shelf);
+  world.createCollider(RAPIER.ColliderDesc.cuboid(HALF_W, SHELF.top / 2, SHELF.length / 2).setFriction(0.28).setRestitution(0.02), shelf);
   return shelf;
 };
 
 type Placement = Vec & { rotation?: Quat; velocity?: Vec; spin?: Vec };
 
-const addCoin = (physics: Physics, kind: CoinKind, at: Placement): Piece => {
-  const spec = COINS[kind];
+/**
+ * Coins are made to settle: they grip each other, barely bounce, and lose their spin and drift quickly. A heap should sit still
+ * until something with real weight arrives, not shuffle about every time the shelf moves. The shelf itself is slick, though: a
+ * grippy shelf carries its heap back and forth and lets it buckle upward instead of sliding it off the front.
+ */
+const addCoin = (physics: Physics, serving: Serving, at: Placement): Coin => {
+  const spec = COINS[serving.kind];
   const body = physics.world.createRigidBody(
     RAPIER.RigidBodyDesc.dynamic()
       .setTranslation(at.x, at.y, at.z)
       .setRotation(at.rotation ?? quatAboutX(0))
       .setLinvel(at.velocity?.x ?? 0, at.velocity?.y ?? 0, at.velocity?.z ?? 0)
       .setAngvel(at.spin ?? { x: 0, y: 0, z: 0 })
-      .setAngularDamping(0.6)
-      .setLinearDamping(0.05),
+      .setAngularDamping(1.1)
+      .setLinearDamping(0.35),
   );
-  physics.world.createCollider(RAPIER.ColliderDesc.cylinder(spec.thickness / 2, spec.radius).setFriction(0.36).setRestitution(0.12).setDensity(1), body);
-  const piece: Piece = { type: 'coin', kind, body, charged: false };
+  const density = serving.power === 'heavy' ? POWERS.heavyDensity : 1;
+  physics.world.createCollider(RAPIER.ColliderDesc.cylinder(spec.thickness / 2, spec.radius).setFriction(0.42).setRestitution(0.03).setDensity(density), body);
+  const piece: Coin = { type: 'coin', kind: serving.kind, power: serving.power, body, charged: false, fuseAt: undefined };
   physics.pieces.push(piece);
   return piece;
 };
 
-const addCard = (physics: Physics, card: number, at: Placement): Piece => {
+const addCard = (physics: Physics, card: number, at: Placement): Card => {
   const body = physics.world.createRigidBody(
     RAPIER.RigidBodyDesc.dynamic()
       .setTranslation(at.x, at.y, at.z)
       .setRotation(at.rotation ?? quatAboutX(0))
-      .setAngularDamping(1.2)
-      .setLinearDamping(0.15),
+      .setAngularDamping(2)
+      .setLinearDamping(0.3),
   );
   // Light and slick next to a coin: a card rides on top of the heap and skates where a coin would dig in.
-  physics.world.createCollider(RAPIER.ColliderDesc.cuboid(CARD.width / 2, CARD.thickness / 2, CARD.length / 2).setFriction(0.22).setRestitution(0.02).setDensity(0.35), body);
-  const piece: Piece = { type: 'card', card, body };
+  physics.world.createCollider(RAPIER.ColliderDesc.cuboid(CARD.width / 2, CARD.thickness / 2, CARD.length / 2).setFriction(0.25).setRestitution(0.02).setDensity(0.35), body);
+  const piece: Card = { type: 'card', card, body };
   physics.pieces.push(piece);
   return piece;
 };
+
+const PLAIN = (kind: CoinKind): Serving => ({ kind, power: undefined });
 
 /** Scatters coins over the shelf and the bed in loose layers and lets them come to rest, then lays the first cards on top. */
 const prefill = (physics: Physics) => {
@@ -178,20 +219,20 @@ const prefill = (physics: Physics) => {
     for (let z = z0 + shift; z <= z1; z += pitch) {
       for (let x = -HALF_W + COINS.medium.radius + 0.05 + shift; x <= HALF_W - COINS.medium.radius; x += pitch) {
         // Large coins would overlap their neighbours on this grid, so they are laid on top afterwards.
-        const kind = random() < 0.3 ? 'medium' : 'small';
-        addCoin(physics, kind, { x: x + (random() - 0.5) * 0.06, y, z: z + (random() - 0.5) * 0.06 });
+        addCoin(physics, PLAIN(random() < 0.3 ? 'medium' : 'small'), { x: x + (random() - 0.5) * 0.06, y, z: z + (random() - 0.5) * 0.06 });
       }
     }
-    for (let i = 0; i < 20; i++) advance(physics);
+    for (let i = 0; i < 16; i++) advance(physics);
   };
-  for (let n = 0; n < 2; n++) layer(WIPER.z + 0.9, SHELF.min - 0.5, SHELF.top + 0.5, (n % 2) * 0.5);
-  for (let n = 0; n < 11; n++) layer(SHELF.max + 0.75, BED_FRONT - 0.8, 0.8, (n % 3) * 0.45);
-  for (let n = 0; n < 5; n++) addCoin(physics, 'large', { x: -3.6 + n * 1.8, y: 2.2, z: BED_FRONT - 2.4 + (n % 2) * 1.2 });
-  for (let i = 0; i < 90; i++) advance(physics);
+  for (let n = 0; n < 2; n++) layer(WIPER.z + 0.9, SHELF.min - 0.6, SHELF.top + 0.5, (n % 2) * 0.5);
+  for (let n = 0; n < 6; n++) layer(SHELF.max + 0.75, BED_FRONT - 0.9, 0.8, (n % 3) * 0.45);
+  for (let n = 0; n < 5; n++) addCoin(physics, PLAIN('large'), { x: -3.6 + n * 1.8, y: 2.2, z: BED_FRONT - 3 + (n % 2) * 1.4 });
+  for (let i = 0; i < 60; i++) advance(physics);
   for (let n = 0; n < CARDS_ON_BED; n++) {
-    addCard(physics, n, { x: -3 + n * 3, y: 2.4, z: BED_FRONT - 2.7 + (n % 2) * 0.8, rotation: quatAboutY((random() - 0.5) * 1.2) });
+    addCard(physics, n, { x: -3 + n * 3, y: 2.4, z: BED_FRONT - 3.2 + (n % 2) * 0.9, rotation: quatAboutY((random() - 0.5) * 1.2) });
   }
-  for (let i = 0; i < 120; i++) advance(physics);
+  addCoin(physics, { kind: 'medium', power: 'chip' }, { x: 0.4, y: 2.6, z: SHELF.max + 1.6 });
+  for (let i = 0; i < 90; i++) advance(physics);
 };
 
 export const createPhysics = async (seed = 11): Promise<Physics> => {
@@ -207,6 +248,8 @@ export const createPhysics = async (seed = 11): Promise<Physics> => {
     pieces: [],
     time: 0,
     shelfFront: SHELF.min,
+    surgeFrom: -1,
+    surgeUntil: -1,
     trackYaw: 0,
     ringYaw: 0,
     held: undefined,
@@ -216,11 +259,14 @@ export const createPhysics = async (seed = 11): Promise<Physics> => {
     reloadAt: Infinity,
     dropped: 0,
     nextCard: CARDS_ON_BED,
+    rain: 0,
+    rainAt: 0,
+    prize: false,
     random,
   };
   prefill(physics);
-  physics.held = pickCoin(random);
-  for (let n = 0; n < QUEUE_LENGTH; n++) physics.queue.push(pickCoin(random));
+  physics.held = serve(physics);
+  for (let n = 0; n < QUEUE_LENGTH; n++) physics.queue.push(serve(physics));
   physics.reloadAt = 0;
   return physics;
 };
@@ -246,54 +292,90 @@ export const onTrack = (kind: CoinKind, distance: number, yaw: number, roll: num
   return { position: fromPost(yaw, forward, height), rotation };
 };
 
-/**
- * Lets go of the coin at the top of the track. Returns the kind released, or undefined if there was none or the cabinet is full.
- */
-export const release = (physics: Physics): CoinKind | undefined => {
-  const kind = physics.held;
-  if (kind === undefined || coinCount(physics) + physics.riders.length >= MAX_COINS) return undefined;
-  physics.riders.push({ kind, distance: 0, roll: 0 });
+/** Lets go of the coin at the top of the track. Returns what was released, or undefined if there was none or the cabinet is full. */
+export const release = (physics: Physics): Serving | undefined => {
+  const serving = physics.held;
+  if (serving === undefined || coinCount(physics) + physics.riders.length >= MAX_COINS) return undefined;
+  physics.riders.push({ ...serving, distance: 0, roll: 0 });
   physics.held = undefined;
   physics.reloadAt = physics.time + TRACK.reload;
   physics.dropped++;
 
+  const dealAt = (): Placement => ({ x: (physics.random() - 0.5) * 6, y: SHELF.top + 2.6, z: WIPER.z + 2.2, rotation: quatAboutY((physics.random() - 0.5) * 1.6) });
   const cards = physics.pieces.filter((p) => p.type === 'card').length;
-  if (physics.dropped % COINS_PER_CARD === 0 && cards < CARDS_ON_BED + 1) {
-    const card = physics.nextCard++ % CARD_NAMES.length;
-    addCard(physics, card, { x: (physics.random() - 0.5) * 6, y: SHELF.top + 2.6, z: WIPER.z + 1.5, rotation: quatAboutY((physics.random() - 0.5) * 1.6) });
-  }
-  return kind;
+  if (physics.dropped % COINS_PER_CARD === 0 && cards < CARDS_ON_BED + 1) addCard(physics, physics.nextCard++ % CARD_NAMES.length, dealAt());
+  const hasChip = physics.pieces.some((p) => p.type === 'coin' && p.power === 'chip');
+  if (physics.dropped % COINS_PER_CHIP === 0 && !hasChip) addCoin(physics, { kind: 'medium', power: 'chip' }, dealAt());
+  return serving;
+};
+
+/** Calls the tide in: from its next push, the shelf reaches further for a couple of pushes. */
+export const surge = (physics: Physics) => {
+  physics.surgeFrom = Math.floor(physics.time / SHELF.period) + 1;
+  physics.surgeUntil = physics.surgeFrom + SURGE_PUSHES;
+};
+
+/** Whether the shelf is on a far-reaching push right now. */
+export const surging = (physics: Physics): boolean => {
+  const push = Math.floor(physics.time / SHELF.period);
+  return push >= physics.surgeFrom && push < physics.surgeUntil;
+};
+
+/** Has the machine rain a number of free coins onto the shelf. */
+export const rain = (physics: Physics, coins: number) => {
+  physics.rain += coins;
+  physics.rainAt = Math.max(physics.rainAt, physics.time);
 };
 
 /** Turns a coin that has reached the jump into a free body, carrying on at the speed and spin it had on the rail. */
-const launch = (physics: Physics, rider: Rider): Piece => {
+const launch = (physics: Physics, rider: Rider): Coin => {
   const end = trackAt(TRACK_LENGTH);
   const yaw = physics.trackYaw;
   const { position, rotation } = onTrack(rider.kind, TRACK_LENGTH, yaw, rider.roll);
   const speed = TRACK.launchSpeed;
   const along = speed * end.dirForward;
   const rolling = speed / COINS[rider.kind].radius;
-  // A little sideways wobble, so the coin topples onto its face when it lands instead of rolling away on its rim.
-  const wobble = (physics.random() < 0.5 ? -1 : 1) * (6 + physics.random() * 6);
-  const piece = addCoin(physics, rider.kind, {
+  // A sideways tumble, so the coin topples onto its face when it lands instead of rolling away on its rim.
+  const tumble = (physics.random() < 0.5 ? -1 : 1) * (9 + physics.random() * 6);
+  const piece = addCoin(physics, rider, {
     ...position,
     rotation,
     velocity: { x: Math.sin(yaw) * along, y: speed * end.dirUp, z: Math.cos(yaw) * along },
-    spin: { x: Math.cos(yaw) * rolling + Math.sin(yaw) * wobble, y: 0, z: -Math.sin(yaw) * rolling + Math.cos(yaw) * wobble },
+    spin: { x: Math.cos(yaw) * rolling + Math.sin(yaw) * tumble, y: 0, z: -Math.sin(yaw) * rolling + Math.cos(yaw) * tumble },
   });
   piece.body.collider(0).setActiveEvents(RAPIER.ActiveEvents.COLLISION_EVENTS);
+  if (rider.power === 'burst') piece.fuseAt = physics.time + POWERS.burstFuse;
   return piece;
+};
+
+/** A burst coin going off: everything near it is thrown outward and a little upward, the nearer the harder. */
+const explode = (physics: Physics, coin: Coin): Vec => {
+  const from = coin.body.translation();
+  for (const piece of physics.pieces) {
+    if (piece === coin) continue;
+    const at = piece.body.translation();
+    const dx = at.x - from.x;
+    const dz = at.z - from.z;
+    const distance = Math.hypot(dx, at.y - from.y, dz);
+    if (distance > POWERS.burstReach) continue;
+    const push = piece.body.mass() * POWERS.burstForce * (1 - distance / POWERS.burstReach);
+    const flat = Math.hypot(dx, dz) || 1;
+    piece.body.applyImpulse({ x: (dx / flat) * push, y: push * 0.35, z: (dz / flat) * push }, true);
+  }
+  coin.fuseAt = undefined;
+  coin.power = undefined;
+  return { x: from.x, y: from.y, z: from.z };
 };
 
 /** Moves everything on by one step of STEP seconds, and reports what happened. */
 export const advance = (physics: Physics): Happened => {
-  const happened: Happened = { falls: [], ringed: undefined, launched: false, clinked: false };
+  const happened: Happened = { falls: [], ringed: undefined, burst: undefined, launched: false, clinked: false };
   physics.time += STEP;
-  physics.shelfFront = shelfFrontAt(physics.time);
+  physics.shelfFront = shelfFrontAt(physics.time, SHELF.max + (surging(physics) ? SHELF.surge : 0));
   physics.shelf.setNextKinematicTranslation({ x: 0, y: SHELF.top / 2, z: physics.shelfFront - SHELF.length / 2 });
   physics.ringYaw = ringYawAt(physics.time);
-
   physics.trackYaw = trackYawAt(physics.time);
+
   for (let i = physics.riders.length - 1; i >= 0; i--) {
     const rider = physics.riders[i]!;
     const speed = trackSpeedAt(rider.distance);
@@ -303,6 +385,13 @@ export const advance = (physics: Physics): Happened => {
     physics.flying.push(launch(physics, rider));
     physics.riders.splice(i, 1);
     happened.launched = true;
+  }
+
+  if (physics.rain > 0 && physics.time >= physics.rainAt && coinCount(physics) < MAX_COINS) {
+    physics.rain--;
+    physics.rainAt = physics.time + POWERS.rainGap;
+    const at = { x: (physics.random() - 0.5) * (HALF_W * 2 - 2), y: 7 + physics.random() * 2, z: WIPER.z + 1.2 + physics.random() * (SHELF.min - WIPER.z - 2) };
+    addCoin(physics, PLAIN(physics.random() < 0.3 ? 'medium' : 'small'), { ...at, rotation: quatAboutX(physics.random() * 0.6) });
   }
 
   physics.world.step(physics.events);
@@ -315,8 +404,9 @@ export const advance = (physics: Physics): Happened => {
     const at = piece.body.translation();
     if (Math.hypot(at.x, at.z - TRACK.pivotZ) < RING.forward) continue;
     const heading = Math.atan2(at.x, at.z - TRACK.pivotZ);
-    if (piece.type === 'coin' && Math.abs(heading - physics.ringYaw) < RING.tolerance && Math.abs(at.y - RING.height) < RING.radius * 0.7) {
+    if (Math.abs(heading - physics.ringYaw) < RING.tolerance && Math.abs(at.y - RING.height) < RING.radius * 0.7) {
       piece.charged = true;
+      physics.prize = true;
       happened.ringed = { x: at.x, y: at.y, z: at.z };
     }
     physics.flying.splice(i, 1);
@@ -324,10 +414,11 @@ export const advance = (physics: Physics): Happened => {
 
   for (let i = physics.pieces.length - 1; i >= 0; i--) {
     const piece = physics.pieces[i]!;
+    if (piece.type === 'coin' && piece.fuseAt !== undefined && physics.time >= piece.fuseAt) happened.burst = explode(physics, piece);
     const at = piece.body.translation();
     if (at.y > CHUTE_Y) continue;
     happened.falls.push({ piece, x: at.x });
-    const inFlight = physics.flying.indexOf(piece);
+    const inFlight = piece.type === 'coin' ? physics.flying.indexOf(piece) : -1;
     if (inFlight >= 0) physics.flying.splice(inFlight, 1);
     physics.world.removeRigidBody(piece.body);
     physics.pieces.splice(i, 1);
@@ -335,7 +426,7 @@ export const advance = (physics: Physics): Happened => {
 
   if (physics.held === undefined && physics.time >= physics.reloadAt) {
     physics.held = physics.queue.shift();
-    physics.queue.push(pickCoin(physics.random));
+    physics.queue.push(serve(physics));
   }
   return happened;
 };

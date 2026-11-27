@@ -17,8 +17,10 @@ import {
   HALF_W,
   landingForward,
   onBoard,
+  type Power,
   RIDE_TIME,
   RING,
+  type Serving,
   SHELF,
   TRACK,
   TRACK_LENGTH,
@@ -26,7 +28,7 @@ import {
   trackYawAt,
   WIPER,
 } from './cabinet';
-import { MAX_COINS, onTrack, type Physics } from './physics';
+import { MAX_COINS, onTrack, type Physics, surging } from './physics';
 
 const INK = 0x05071a;
 const LACQUER = 0x141a44;
@@ -45,8 +47,10 @@ export type Scene = {
   /** Redraws the cabinet from the physics. `pulse` is 0 to 1: how brightly the cabinet lights are flaring. */
   draw: (physics: Physics, pulse: number) => void;
   resize: (width: number, height: number) => void;
-  /** Throws a burst of sparks up from the chute, at a point across the cabinet. */
-  sparkle: (x: number, colour: number, count: number) => void;
+  /** Throws a burst of sparks up from a point in the cabinet. */
+  sparkle: (at: { x: number; y: number; z: number }, colour: number, count: number) => void;
+  /** Where the chute is, at a point across the cabinet. */
+  chute: (x: number) => { x: number; y: number; z: number };
   /** Where on the page a point across the chute sits, for placing words over the picture. */
   chuteOnScreen: (x: number) => { x: number; y: number };
   dispose: () => void;
@@ -168,7 +172,7 @@ export const createScene = (canvas: HTMLCanvasElement): Scene => {
       return new THREE.Vector3(side * TRACK.gauge, at.height, at.forward);
     });
   for (const side of [-1, 1]) {
-    const rail = new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(railPoints(side)), 96, 0.045, 8), brass);
+    const rail = new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(railPoints(side)), 96, 0.07, 10), brass);
     rail.castShadow = true;
     track.add(rail);
   }
@@ -254,17 +258,20 @@ export const createScene = (canvas: HTMLCanvasElement): Scene => {
   const position = new THREE.Vector3();
   const rotation = new THREE.Quaternion();
   const one = new THREE.Vector3(1, 1, 1);
-  const charge = new THREE.Color(0xa8f6ff);
-  const plain = new THREE.Color(0xffffff);
+  // Instance colours multiply the metal's own, so values above 1 brighten a coin and values below darken it.
+  const plain = new THREE.Color(1, 1, 1);
+  const charged = new THREE.Color(1.5, 1.7, 2.1);
+  const tints: Record<Power, THREE.Color> = { heavy: new THREE.Color(0.2, 0.22, 0.3), burst: new THREE.Color(2.4, 0.5, 0.3), chip: new THREE.Color(0.25, 1.9, 1.7) };
+  const tintOf = (power: Power | undefined, ringed: boolean) => (power ? tints[power] : ringed ? charged : plain);
   const counts: Record<CoinKind, number> = { small: 0, medium: 0, large: 0 };
   let lastDraw = performance.now();
 
   /** Puts a coin that is on the track, or waiting at the top of it, in with the loose ones. */
-  const place = (kind: CoinKind, distance: number, yaw: number, roll: number) => {
+  const place = ({ kind, power }: Serving, distance: number, yaw: number, roll: number) => {
     const seat = onTrack(kind, distance, yaw, roll);
     position.set(seat.position.x, seat.position.y, seat.position.z);
     rotation.set(seat.rotation.x, seat.rotation.y, seat.rotation.z, seat.rotation.w);
-    coins[kind].setColorAt(counts[kind], plain);
+    coins[kind].setColorAt(counts[kind], tintOf(power, false));
     coins[kind].setMatrixAt(counts[kind]++, matrix.compose(position, rotation, one));
   };
 
@@ -281,7 +288,7 @@ export const createScene = (canvas: HTMLCanvasElement): Scene => {
       position.set(at.x, at.y, at.z);
       rotation.set(turn.x, turn.y, turn.z, turn.w);
       if (piece.type === 'coin') {
-        coins[piece.kind].setColorAt(counts[piece.kind], piece.charged ? charge : plain);
+        coins[piece.kind].setColorAt(counts[piece.kind], tintOf(piece.power, piece.charged));
         coins[piece.kind].setMatrixAt(counts[piece.kind]++, matrix.compose(position, rotation, one));
         continue;
       }
@@ -302,7 +309,7 @@ export const createScene = (canvas: HTMLCanvasElement): Scene => {
       scene.remove(mesh);
       cardMeshes.delete(piece);
     }
-    for (const rider of physics.riders) place(rider.kind, rider.distance, physics.trackYaw, rider.roll);
+    for (const rider of physics.riders) place(rider, rider.distance, physics.trackYaw, rider.roll);
     if (physics.held) place(physics.held, 0, physics.trackYaw, 0);
     for (const kind of COIN_KINDS) {
       coins[kind].count = counts[kind];
@@ -320,7 +327,7 @@ export const createScene = (canvas: HTMLCanvasElement): Scene => {
     aim.position.set(Math.sin(yawThen) * aimForward, AIM_HEIGHT, TRACK.pivotZ + Math.cos(yawThen) * aimForward);
 
     flare.intensity = pulse * 60;
-    glowCoral.emissiveIntensity = 1.6 + pulse * 5;
+    glowCoral.emissiveIntensity = 1.6 + pulse * 5 + (surging(physics) ? 3 + Math.sin(now / 90) * 1.5 : 0);
     glowMoon.emissiveIntensity = 1.1 + pulse * 2.5;
 
     for (let i = 0; i < SPARKS; i++) {
@@ -335,12 +342,14 @@ export const createScene = (canvas: HTMLCanvasElement): Scene => {
     renderer.render(scene, camera);
   };
 
-  const sparkle: Scene['sparkle'] = (x, colour, count) => {
+  const chute: Scene['chute'] = (x) => ({ x, y: -0.2, z: BED_FRONT + 0.5 });
+
+  const sparkle: Scene['sparkle'] = (at, colour, count) => {
     const tint = new THREE.Color(colour);
     for (let n = 0; n < count; n++) {
       const i = nextSpark;
       nextSpark = (nextSpark + 1) % SPARKS;
-      sparkPositions.set([x + (Math.random() - 0.5) * 0.8, -0.2, BED_FRONT + 0.5], i * 3);
+      sparkPositions.set([at.x + (Math.random() - 0.5) * 0.8, at.y, at.z], i * 3);
       sparkVelocity.set([(Math.random() - 0.5) * 6, 7 + Math.random() * 7, (Math.random() - 0.3) * 3], i * 3);
       sparkColours.set([tint.r, tint.g, tint.b], i * 3);
       sparkLife[i] = 0.6 + Math.random() * 0.5;
@@ -357,8 +366,8 @@ export const createScene = (canvas: HTMLCanvasElement): Scene => {
     camera.aspect = width / height;
     // The cabinet is taller than it is wide: fit its width on a phone, and on anything wider fit its height instead.
     camera.fov = THREE.MathUtils.radToDeg(2 * Math.atan(Math.tan(HALF_VIEW_ACROSS) / Math.min(camera.aspect, PHONE_ASPECT)));
-    camera.position.set(0, 15.5, 24.6);
-    camera.lookAt(0, 3.7, 4.6);
+    camera.position.set(0, 16, 25.4);
+    camera.lookAt(0, 3.6, 4.9);
     camera.updateProjectionMatrix();
   };
 
@@ -372,5 +381,5 @@ export const createScene = (canvas: HTMLCanvasElement): Scene => {
     renderer.dispose();
   };
 
-  return { draw, resize, sparkle, chuteOnScreen, dispose };
+  return { draw, resize, sparkle, chute, chuteOnScreen, dispose };
 };

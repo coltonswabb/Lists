@@ -49,3 +49,10 @@ export const release = () => tone(320, 0.08, 0.06, 'square');
 export const swoosh = () => {
   [5, 7, 9].forEach((degree, n) => tone(SCALE[degree]!, 0.22, 0.1, 'sine', n * 0.05));
 };
+
+/** A burst coin going off. */
+export const boom = () => {
+  tone(90, 0.35, 0.22, 'sine');
+  tone(140, 0.2, 0.12, 'triangle');
+  tone(1800, 0.08, 0.05, 'square');
+};
